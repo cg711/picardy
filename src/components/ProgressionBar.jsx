@@ -20,6 +20,14 @@ export default function ProgressionBar({
   onMove,
   onSurprise,
   onSmooth,
+  lyrics = [],
+  onLyric,
+  shapes = [],
+  tuningId = 'standard',
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }) {
   // These have to sit above the empty-state return: hooks must run in the same
   // order on every render, and clearing the progression would otherwise change
@@ -83,6 +91,9 @@ export default function ProgressionBar({
               {barOf[i].startsBar && <span className="bar-num">bar {barOf[i].bar}</span>}
               <div className="chip-top">
                 <span className="chip-roman">{romanNumeral(chord, musicKey, inv)}</span>
+                {String(shapes[i] ?? '').startsWith(`${tuningId}:`) && (
+                  <span className="pinned-shape" title="A guitar shape is pinned to this chord">▦</span>
+                )}
                 <button
                   className="chip-x"
                   title="Remove"
@@ -114,6 +125,16 @@ export default function ProgressionBar({
                 </select>
               </label>
 
+              <input
+                className="chip-lyric"
+                value={lyrics[i] ?? ''}
+                onChange={(e) => onLyric(i, e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="lyric…"
+                aria-label={`Lyric on chord ${i + 1}`}
+                spellCheck={false}
+              />
+
               <div className="chip-controls" onClick={(e) => e.stopPropagation()}>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>
                 <button
@@ -130,6 +151,10 @@ export default function ProgressionBar({
         })}
       </div>
       <div className="prog-actions">
+        <div className="undo-pair">
+          <button className="btn ghost" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)">↶</button>
+          <button className="btn ghost" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)">↷</button>
+        </div>
         <button className="btn ghost" onClick={onClear}>Clear</button>
         <button
           className="btn ghost"

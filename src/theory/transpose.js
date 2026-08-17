@@ -1,48 +1,84 @@
 // Transposition, and the capo arithmetic guitarists actually want.
 
 import { mod, pcOf, spellFrom, normAcc, LETTER_PC } from './notes.js'
-import { makeChord } from './chords.js'
-import { makeKey, KEY_CHOICES, scaleNotes } from './keys.js'
+import { makeChord, chordNotes } from './chords.js'
+import { makeKey, KEY_CHOICES, scaleNotes, keySteps } from './keys.js'
 import { parseNote, noteName } from './notes.js'
 
 /**
- * Move a note by a generic-interval step and a semitone step together, so the
- * spelling stays sane: C up 2 letters and 4 semitones is E, not Fb.
+ * Transposition that preserves function, not just pitch.
+ *
+ * A chord's spelling encodes what it *is*: B♭ in C major is a lowered 7th, so
+ * in D major it must be C — the lowered 7th there — and not B♯. Deriving a
+ * fresh spelling from the pitch class alone cannot know that, which is how
+ * B♭ ends up as A♯ and how repeated transposition drifts into double
+ * accidentals. Carrying the generic degree and the interval across from the
+ * source key keeps both the function and the accidental character intact.
  */
-function shiftNote(note, letterStep, semitoneStep) {
-  const letter = mod(note.letter + letterStep, 7)
-  const want = mod(LETTER_PC[note.letter] + note.acc + semitoneStep, 12)
-  return { letter, acc: normAcc(want - LETTER_PC[letter]) }
+function moveNote(note, sourceKey, targetKey) {
+  const generic = mod(note.letter - sourceKey.tonic.letter, 7) + 1
+  const above = mod(pcOf(note) - pcOf(sourceKey.tonic), 12)
+  return spellFrom(targetKey.tonic, generic, above)
+}
+
+export function transposeNote(note, sourceKey, targetKey) {
+  return moveNote(note, sourceKey, targetKey)
+}
+
+/** Every spelling of a pitch class within a double accidental. */
+function enharmonics(pitchClass) {
+  const out = []
+  for (let letter = 0; letter < 7; letter++) {
+    const acc = normAcc(pitchClass - LETTER_PC[letter])
+    if (Math.abs(acc) <= 2) out.push({ letter, acc })
+  }
+  return out
 }
 
 /**
- * How many letter names to move for a given semitone shift, choosing the
- * spelling that keeps accidentals smallest — the difference between writing
- * a transposed chord as D♭ or as C♯.
+ * How awkward a chord looks on the page. Double accidentals dominate, because
+ * one B𝄫 makes the whole chord unreadable however tidy the rest of it is.
  */
-function letterStepFor(semitones, preferFlats) {
-  const s = mod(semitones, 12)
-  const sharpSteps = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6]
-  const flatSteps = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]
-  return (preferFlats ? flatSteps : sharpSteps)[s]
+function spellingCost(chord) {
+  if (!chord) return Infinity
+  const tones = chordNotes(chord)
+  const doubles = tones.filter((t) => Math.abs(t.note.acc) > 1).length
+  const total = tones.reduce((sum, t) => sum + Math.abs(t.note.acc), 0)
+  return doubles * 100 + total
 }
 
-export function transposeNote(note, semitones, preferFlats = false) {
-  return shiftNote(note, letterStepFor(semitones, preferFlats), semitones)
-}
-
-export function transposeChord(chord, semitones, preferFlats = false) {
-  if (!chord) return null
-  const root = transposeNote(chord.root, semitones, preferFlats)
-  const bass = chord.bass ? transposeNote(chord.bass, semitones, preferFlats) : null
+export function transposeChord(chord, sourceKey, targetKey) {
+  if (!chord || !sourceKey || !targetKey) return chord
   if (chord.poly) {
-    const upper = transposeChord(chord.poly.upper, semitones, preferFlats)
-    const lower = transposeChord(chord.poly.lower, semitones, preferFlats)
+    const upper = transposeChord(chord.poly.upper, sourceKey, targetKey)
+    const lower = transposeChord(chord.poly.lower, sourceKey, targetKey)
     return makeChord(lower.root, lower.qualityId, lower.alterations, lower.bass, {
       poly: { upper, lower },
     })
   }
-  return makeChord(root, chord.qualityId, chord.alterations, bass)
+
+  const root = moveNote(chord.root, sourceKey, targetKey)
+  const bass = chord.bass ? moveNote(chord.bass, sourceKey, targetKey) : null
+  const functional = makeChord(root, chord.qualityId, chord.alterations, bass)
+
+  // The functional spelling is the right answer when it is legible. It is not
+  // always: ♭6 of D♭ is B𝄫, and a German sixth built on it needs a double sharp
+  // inside. When that happens, take the enharmonic root that spells the whole
+  // chord most cleanly — readability beats derivation on a chart people read.
+  if (spellingCost(functional) < 100) return functional
+
+  let best = { chord: functional, cost: spellingCost(functional) }
+  for (const candidate of enharmonics(pcOf(root))) {
+    const alt = makeChord(
+      candidate,
+      chord.qualityId,
+      chord.alterations,
+      bass ? enharmonics(pcOf(bass)).find((b) => Math.abs(b.acc) <= 1) ?? bass : null,
+    )
+    const cost = spellingCost(alt)
+    if (cost < best.cost) best = { chord: alt, cost }
+  }
+  return best.chord
 }
 
 export function transposeKey(key, semitones) {

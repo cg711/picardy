@@ -82,9 +82,13 @@ approach diminished chords.
 movement, using dynamic programming over every inversion of every chord. Typically cuts movement
 by 75–80%. Slash chords keep the bass you gave them.
 
-**Transpose and capo.** Move the music, not just the label — with spelling chosen so no key ever
-needs a double accidental, and every roman numeral preserved. For guitar, it suggests capo
-positions that let you play open shapes: "capo 1 → play in C" for a song in D♭.
+**Transpose and capo.** Move the music, not just the label. Spelling carries the *generic
+interval* across from the source key rather than being re-derived from the pitch, so B♭ in C
+becomes C in D — the lowered 7th in both — instead of B♯, and repeated transposition doesn't drift
+into double accidentals. Where the functional spelling would be unreadable (♭6 of D♭ is B𝄫), the
+cleanest enharmonic wins instead; that trades the roman numeral for legibility, which is the
+choice a real chart makes. For guitar it suggests capo positions that let you play open shapes:
+"capo 1 → play in C" for a song in D♭.
 
 **Import and analysis.** Paste a chart like `| Cmaj7 | Am7 | Dm7 G7 |` and it parses into a
 section, splitting shared bars. Then it reads the progression back: names the cadence, finds
@@ -96,6 +100,22 @@ dependency.
 
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
+
+**Lyrics.** Each chord slot carries the words sung on it, so the chart reads as words under
+chords the way a lead sheet does. They travel with the section, into the share link, and into the
+PDF — printed under the chord they belong to, with tied continuations left blank since no new
+syllable lands there.
+
+**Pinned voicings.** The guitar shape you choose is remembered against that chord, survives
+leaving and returning to it, rides along in the share link, and is the shape drawn in the PDF.
+A shape is only valid in the tuning it was chosen in, so it is ignored rather than drawn wrong
+after a tuning change. The same chord pinned to two different shapes gets two diagrams in the
+legend rather than one silently winning.
+
+**Undo/redo.** ⌘Z and ⇧⌘Z, or the buttons by the progression. It watches the editor state rather
+than being wired into each action, so transposing, reharmonising, smoothing voicings and
+generating are all undoable without having been taught about it. Typing a lyric collapses into a
+single step instead of one per keystroke.
 
 **Four ways in.** Type a chord symbol with autocomplete (`Cmaj7`, `F#m7b5`, `Bb13`, `D/F#`,
 `C7#9`, `Abger6`), click roman numerals from a grid organised by function, click suggestions to

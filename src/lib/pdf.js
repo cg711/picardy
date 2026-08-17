@@ -7,7 +7,7 @@
 import { chordSymbol, chordId, chordNotes, voiceChord } from '../theory/chords.js'
 import { romanNumeral } from '../theory/keys.js'
 import { mod, pcOf, prettyName, noteName } from '../theory/notes.js'
-import { findVoicings, TUNINGS } from '../theory/guitar.js'
+import { findVoicings, TUNINGS, decodeShape, shapeFromFrets } from '../theory/guitar.js'
 import { groupIntoBars, timeSignatureOf } from '../theory/rhythm.js'
 import { readSegment } from './song.js'
 
@@ -38,7 +38,7 @@ const ascii = (s) =>
  * dompurify into the main bundle — neither of which this chart needs, since
  * everything here is drawn with vector primitives.
  */
-export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, lefty = false }) {
+export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, tuningId = 'standard', lefty = false }) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   let y = MARGIN
@@ -59,7 +59,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
   // --- chord legend ----------------------------------------------------------
   const distinct = collectChords(song, segments)
   if (instrument !== 'none' && distinct.length) {
-    y = drawLegend(doc, distinct, y, { instrument, tuning, lefty })
+    y = drawLegend(doc, distinct, y, { instrument, tuning, tuningId, lefty })
     y += 4
     doc.setDrawColor(...RULE).setLineWidth(0.2)
     doc.line(MARGIN, y, PAGE.w - MARGIN, y)
@@ -77,11 +77,18 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
     const repeats = Math.max(1, entry.repeats ?? 1)
     const heading = `${segment.name}${repeats > 1 ? `  (x${repeats})` : ''}`
     const bars = groupIntoBars(
-      live.progression.map((chord, i) => ({ chord, durationId: live.durations[i], inversion: live.inversions[i] })),
+      live.progression.map((chord, i) => ({
+        chord,
+        durationId: live.durations[i],
+        inversion: live.inversions[i],
+        lyric: live.lyrics[i],
+      })),
       live.timeSignature,
     )
 
-    const needed = 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * 18
+    const hasLyrics = live.lyrics.some((l) => l && l.trim())
+
+    const needed = 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * (hasLyrics ? 24 : 18)
     if (y + needed > PAGE.h - MARGIN) {
       doc.addPage()
       y = MARGIN
@@ -101,7 +108,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
     )
     y += 4
 
-    y = drawBars(doc, bars, live.key, y, live.timeSignature)
+    y = drawBars(doc, bars, live.key, y, live.timeSignature, hasLyrics)
     y += 7
   }
 
@@ -132,8 +139,12 @@ function collectChords(song, segments) {
     if (!segment) continue
     const live = readSegment(segment)
     live.progression.forEach((chord, i) => {
-      const id = chordId(chord)
-      if (!seen.has(id)) seen.set(id, { chord, inversion: live.inversions[i] })
+      // Keyed by chord *and* pinned shape: the same chord played two ways
+      // deserves two diagrams, not one that silently drops the other.
+      const id = `${chordId(chord)}|${live.shapes[i] ?? ''}`
+      if (!seen.has(id)) {
+        seen.set(id, { chord, inversion: live.inversions[i], shape: live.shapes[i] })
+      }
     })
   }
   return [...seen.values()]
@@ -143,12 +154,21 @@ function barsPerRow() {
   return 4
 }
 
+/** Trim a string to the width available, so lyrics never run into the next bar. */
+function fitText(doc, text, maxWidth) {
+  if (doc.getTextWidth(text) <= maxWidth) return text
+  let cut = text
+  while (cut.length > 1 && doc.getTextWidth(cut + '…') > maxWidth) cut = cut.slice(0, -1)
+  return cut + '…'
+}
+
 // --- the chart --------------------------------------------------------------
 
-function drawBars(doc, bars, key, startY, timeSignatureId) {
+function drawBars(doc, bars, key, startY, timeSignatureId, hasLyrics = false) {
   const perRow = barsPerRow(timeSignatureId)
   const barW = CONTENT_W / perRow
-  const barH = 16
+  // A lyric line needs its own band under the numerals.
+  const barH = hasLyrics ? 22 : 16
   let y = startY
 
   for (let i = 0; i < bars.length; i += perRow) {
@@ -179,6 +199,14 @@ function drawBars(doc, bars, key, startY, timeSignatureId) {
 
         doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...MUTED)
         doc.text(ascii(romanNumeral(slot.chord, key, slot.inversion)), cx, y + 12)
+
+        // Words sit under the chord they are sung on, the way a chart reads.
+        // A tied continuation carries no new syllable.
+        if (hasLyrics && slot.lyric && !slot.tiedFromPrevious) {
+          doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...INK)
+          const room = (barW - 4) * Math.max(0.25, slot.beats / perBar)
+          doc.text(fitText(doc, ascii(slot.lyric), room), cx, y + 19)
+        }
         cursor += slot.beats
       })
     })
@@ -190,7 +218,7 @@ function drawBars(doc, bars, key, startY, timeSignatureId) {
 
 // --- diagrams ---------------------------------------------------------------
 
-function drawLegend(doc, entries, startY, { instrument, tuning, lefty }) {
+function drawLegend(doc, entries, startY, { instrument, tuning, tuningId, lefty }) {
   const both = instrument === 'both'
   const cellW = both ? CONTENT_W / 4 : CONTENT_W / 6
   const cellH = both ? 40 : 34
@@ -215,7 +243,7 @@ function drawLegend(doc, entries, startY, { instrument, tuning, lefty }) {
 
     let dy = y + 7
     if (instrument === 'guitar' || both) {
-      dy = drawGuitarBox(doc, entry.chord, x, dy, cellW - 4, { tuning, lefty })
+      dy = drawGuitarBox(doc, entry.chord, x, dy, cellW - 4, { tuning, tuningId, lefty, pinned: entry.shape })
     }
     if (instrument === 'piano' || both) {
       drawPianoDiagram(doc, entry.chord, x, dy + 1, cellW - 4)
@@ -225,11 +253,17 @@ function drawLegend(doc, entries, startY, { instrument, tuning, lefty }) {
   return y + cellH
 }
 
-function drawGuitarBox(doc, chord, x, y, w, { tuning, lefty }) {
-  const bassPc = pcOf(chordNotes(chord)[0].note)
-  let shapes = findVoicings(chord, { tuning, bassPc, limit: 1 })
-  if (!shapes.length) shapes = findVoicings(chord, { tuning, bassPc: null, limit: 1 })
-  const shape = shapes[0]
+function drawGuitarBox(doc, chord, x, y, w, { tuning, tuningId, lefty, pinned }) {
+  // A shape the player pinned to this chord wins over anything the search would
+  // pick — that choice is the whole point of pinning it.
+  const pinnedFrets = decodeShape(pinned, tuningId)
+  let shape = pinnedFrets ? shapeFromFrets(pinnedFrets, tuning) : null
+  if (!shape) {
+    const bassPc = pcOf(chordNotes(chord)[0].note)
+    let found = findVoicings(chord, { tuning, bassPc, limit: 1 })
+    if (!found.length) found = findVoicings(chord, { tuning, bassPc: null, limit: 1 })
+    shape = found[0]
+  }
   const strings = tuning.length
   const boxW = Math.min(w, 20)
   const colW = boxW / (strings - 1)

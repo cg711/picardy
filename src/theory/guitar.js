@@ -301,3 +301,48 @@ export function fretboardMap(chord, tuning = TUNINGS.standard.strings, maxFret =
 }
 
 export { QUALITIES }
+
+// --- storing a chosen shape --------------------------------------------------
+//
+// A shape is only meaningful against the tuning it was found in, so the tuning
+// id travels with it. Anything stored under a different tuning is ignored rather
+// than drawn wrong.
+
+export function encodeShape(shape, tuningId) {
+  if (!shape) return null
+  return `${tuningId}:${shape.frets.map((f) => (f === null ? 'x' : f)).join('-')}`
+}
+
+export function decodeShape(encoded, tuningId) {
+  if (!encoded) return null
+  const [storedTuning, frets] = String(encoded).split(':')
+  if (!frets || storedTuning !== tuningId) return null
+  const parsed = frets.split('-').map((f) => (f === 'x' ? null : parseInt(f, 10)))
+  if (parsed.some((f) => f !== null && !Number.isInteger(f))) return null
+  return parsed
+}
+
+/** Rebuild a full shape record from stored frets, for drawing and playback. */
+export function shapeFromFrets(frets, tuning) {
+  if (!frets || frets.length !== tuning.length) return null
+  const sounding = []
+  for (let i = 0; i < frets.length; i++) if (frets[i] !== null) sounding.push(i)
+  if (!sounding.length) return null
+  const fretted = sounding.filter((i) => frets[i] > 0).map((i) => frets[i])
+  const minF = fretted.length ? Math.min(...fretted) : 0
+  const maxF = fretted.length ? Math.max(...fretted) : 0
+  const notesAtMin = fretted.filter((f) => f === minF).length
+  const hasOpen = sounding.some((i) => frets[i] === 0)
+  const barre = fretted.length > 4 && minF > 0 && notesAtMin >= 2 && !hasOpen
+  return {
+    frets,
+    sounding,
+    midis: sounding.map((i) => tuning[i] + frets[i]),
+    bassPc: mod(Math.min(...sounding.map((i) => tuning[i] + frets[i])), 12),
+    span: fretted.length ? maxF - minF : 0,
+    position: fretted.length ? minF : 0,
+    fingers: barre ? 1 + fretted.filter((f) => f > minF).length : fretted.length,
+    barre,
+    score: 0,
+  }
+}

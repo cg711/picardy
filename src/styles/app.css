@@ -693,3 +693,18 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .transpose button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .transpose button:disabled { opacity: 0.35; cursor: not-allowed; }
 .capo { font-size: 11px; padding: 2px 8px; border: 1px dashed var(--border); border-radius: 999px; }
+
+/* ---------- lyrics & pinned shapes ---------- */
+
+.chip-lyric {
+  width: 100%; margin-top: 6px; font: inherit; font-size: 11px; padding: 3px 6px;
+  border-radius: 5px; border: 1px solid var(--border-soft);
+  background: #0e131b; color: var(--text); outline: none;
+}
+.chip-lyric::placeholder { color: #55637a; }
+.chip-lyric:focus { border-color: var(--accent); }
+.chip-top { gap: 4px; }
+.pinned-shape { font-size: 10px; color: var(--accent-2); margin-right: auto; }
+
+.undo-pair { display: flex; gap: 4px; }
+.undo-pair .btn { padding: 6px 10px; font-size: 14px; line-height: 1; }

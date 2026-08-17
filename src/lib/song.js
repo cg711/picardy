@@ -27,7 +27,7 @@ export function segmentHue(name) {
 const uid = () => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 /** Snapshot the editor into a storable segment. Chords are stored as symbols. */
-export function makeSegment({ name, key, progression, inversions, durations, timeSignature }) {
+export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lyrics }) {
   return {
     id: uid(),
     name: name || 'Untitled',
@@ -36,6 +36,8 @@ export function makeSegment({ name, key, progression, inversions, durations, tim
     chords: progression.map(chordId),
     inversions: progression.map((_, i) => inversions[i] ?? 0),
     durations: progression.map((_, i) => durations[i] ?? DEFAULT_DURATION),
+    shapes: progression.map((_, i) => shapes?.[i] ?? null),
+    lyrics: progression.map((_, i) => lyrics?.[i] ?? ''),
     at: Date.now(),
   }
 }
@@ -50,6 +52,8 @@ export function readSegment(segment) {
     progression,
     inversions: progression.map((_, i) => segment.inversions?.[i] ?? 0),
     durations: progression.map((_, i) => segment.durations?.[i] ?? DEFAULT_DURATION),
+    shapes: progression.map((_, i) => segment.shapes?.[i] ?? null),
+    lyrics: progression.map((_, i) => segment.lyrics?.[i] ?? ''),
     timeSignature: segment.timeSignature || DEFAULT_TIME_SIGNATURE,
   }
 }
@@ -77,6 +81,8 @@ export function flattenSong(song, segments) {
           key: live.key,
           inversion: live.inversions[i],
           durationId: live.durations[i],
+          shape: live.shapes[i],
+          lyric: live.lyrics[i],
           timeSignature: live.timeSignature,
           entryIndex,
           segmentId: segment.id,

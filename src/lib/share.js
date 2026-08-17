@@ -45,7 +45,7 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, lyrics }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
@@ -53,6 +53,9 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
   // Only carry rhythm when it differs from the defaults, to keep links short.
   if (durations?.some((d) => d !== DEFAULT_DURATION)) params.set('d', durations.join(','))
   if (timeSignature && timeSignature !== DEFAULT_TIME_SIGNATURE) params.set('t', timeSignature)
+  // Only carried when actually set, so a plain link stays short.
+  if (shapes?.some(Boolean)) params.set('v', shapes.map((x) => x ?? '').join('~'))
+  if (lyrics?.some((l) => l && l.trim())) params.set('w', lyrics.map((l) => l ?? '').join('~'))
   return params.toString()
 }
 
@@ -85,12 +88,17 @@ export function decodeState(hash) {
     .filter(Boolean)
   const timeSignature = params.get('t') || DEFAULT_TIME_SIGNATURE
 
+  const shapes = (params.get('v') || '').split('~')
+  const lyrics = (params.get('w') || '').split('~')
+
   return {
     key,
     progression,
     inversions,
     durations: progression.map((_, i) => durations[i] ?? DEFAULT_DURATION),
     timeSignature,
+    shapes: progression.map((_, i) => shapes[i] || null),
+    lyrics: progression.map((_, i) => lyrics[i] || ''),
   }
 }
 

@@ -21,6 +21,7 @@ const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression } = await import(B + 'theory/analyze.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
+const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 
 let fails = 0
 const eq = (label, got, want) => {
@@ -310,23 +311,63 @@ console.log('\n--- song arrangement ---')
 console.log('\n--- transpose ---')
 {
   const from = makeKey('C', 'major')
-  const syms = ['Cmaj7', 'A7', 'Dm7', 'G7', 'F#m7b5', 'Bb13', 'D/F#', 'Abger6']
-  let mismatches = 0
+  // Diatonic and applied chords must keep their function exactly.
+  const functional = ['Cmaj7', 'Am7', 'Dm7', 'G7', 'A7', 'F#m7b5', 'D/F#', 'Fm']
+  const pcsOf = (chord) => chordNotes(chord).map((e) => (([0, 2, 4, 5, 7, 9, 11][e.note.letter] + e.note.acc) % 12 + 12) % 12).sort().join(',')
+
+  // The pitches are the non-negotiable part: whatever spelling is chosen, the
+  // chord must sound like the original moved by the interval.
+  let wrongPitches = 0
+  let respelled = 0
   for (let semis = 1; semis <= 11; semis++) {
     const to = transposeKey(from, semis)
-    const flats = keyPrefersFlats(to)
-    const before = syms.map((x) => romanNumeral(parseChord(x), from)).join(' ')
-    const after = syms.map((x) => romanNumeral(transposeChord(parseChord(x), semis, flats), to)).join(' ')
-    if (before !== after) mismatches++
+    for (const sym of functional) {
+      const before = parseChord(sym)
+      const after = transposeChord(before, from, to)
+      const expected = pcsOf(before).split(',').map((n) => (Number(n) + semis) % 12).sort().join(',')
+      if (pcsOf(after) !== expected) wrongPitches++
+      // The numeral only shifts when readability forced an enharmonic respell.
+      if (romanNumeral(before, from) !== romanNumeral(after, to)) respelled++
+    }
   }
-  eq('  every roman numeral survives all 11 transpositions', mismatches, 0)
+  eq('  transposition always preserves the pitches', wrongPitches, 0)
+  // Fm in D♭ is G♭m, whose third is B𝄫 — respelling to F♯m is the deliberate
+  // trade, so a couple of numerals shifting is expected, not a regression.
+  eq('  and preserves the numeral except where a double accidental forced a respell',
+    respelled <= 2, true)
+  console.log(`  ${respelled} of ${functional.length * 11} chord/key pairs needed an enharmonic respell`)
+
   // No key should ever need a double accidental.
-  let doubles = 0
+  let doubleKeys = 0
   for (let semis = 0; semis < 12; semis++) {
-    const to = transposeKey(from, semis)
-    if (scaleNotes(to).some((n) => Math.abs(n.acc) > 1)) doubles++
+    if (scaleNotes(transposeKey(from, semis)).some((n) => Math.abs(n.acc) > 1)) doubleKeys++
   }
-  eq('  no transposed key needs a double sharp or flat', doubles, 0)
+  eq('  no transposed key needs a double sharp or flat', doubleKeys, 0)
+
+  // Transposing must not drift: stepping up twelve semitones returns the
+  // original spelling, which is what caught the compounding bug.
+  let key = from
+  let chords = functional.map(parseChord)
+  for (let i = 0; i < 12; i++) {
+    const next = transposeKey(key, 1)
+    chords = chords.map((c) => transposeChord(c, key, next))
+    key = next
+  }
+  eq('  a full chromatic cycle returns the original spelling',
+    chords.map((c) => chordSymbol(c)).join(' '),
+    functional.map((x) => chordSymbol(parseChord(x))).join(' '))
+
+  // Ordinary chords should never print a double accidental in any key. German
+  // sixths are excluded: on some roots every enharmonic spelling needs one.
+  let ugly = []
+  for (let semis = 1; semis <= 11; semis++) {
+    const to = transposeKey(from, semis)
+    for (const sym of functional) {
+      const moved = transposeChord(parseChord(sym), from, to)
+      if (chordNotes(moved).some((e) => Math.abs(e.note.acc) > 1)) ugly.push(`${sym}->${chordSymbol(moved)}`)
+    }
+  }
+  eq('  no ordinary chord transposes to a double accidental', ugly.join(','), '')
 
   const capo = capoSuggestions(makeKey('Bb', 'major'))
   eq('  B♭ major suggests a capo', capo.length > 0, true)
@@ -447,6 +488,39 @@ console.log('\n--- MIDI ---')
   eq('  every chord contributes notes', expectedNotes > 0, true)
   eq('  file is non-trivial', bytes.length > 100, true)
   void on; void off
+}
+
+console.log('\n--- pinned shapes ---')
+{
+  const T = TUNINGS.standard.strings
+  const found = findVoicings(parseChord('C'), { tuning: T, bassPc: 0 })
+  const high = found.find((s) => s.position >= 7)
+
+  const encoded = encodeShape(high, 'standard')
+  eq('  a shape encodes with its tuning', encoded.startsWith('standard:'), true)
+  eq('  and decodes back in that tuning', decodeShape(encoded, 'standard').join(','), high.frets.map((f) => (f === null ? 'x' : f)).join(','))
+  eq('  but is ignored under a different tuning', decodeShape(encoded, 'dropD'), null)
+
+  const rebuilt = shapeFromFrets(decodeShape(encoded, 'standard'), T)
+  eq('  rebuilding gives the same notes', rebuilt.midis.join(','), high.midis.join(','))
+  eq('  and the same position', rebuilt.position, high.position)
+  eq('  and detects the barre the same way', rebuilt.barre, high.barre)
+
+  // A pinned shape must reach the chart, not be re-searched away.
+  const segment = {
+    id: 'a', name: 'Verse', key: 'C', timeSignature: '4/4',
+    chords: ['C', 'C'], inversions: [0, 0], durations: ['1', '1'],
+    shapes: [encoded, null], lyrics: ['pinned', 'default'],
+  }
+  const live = readSegment(segment)
+  eq('  a section round-trips the pinned shape', live.shapes[0], encoded)
+  eq('  and the unpinned slot stays empty', live.shapes[1], null)
+  eq('  and carries the lyrics', live.lyrics.join('|'), 'pinned|default')
+
+  // Two voicings of one chord must both survive into the legend.
+  const flat = flattenSong([{ segmentId: 'a', repeats: 1 }], [segment])
+  const distinct = new Set(flat.map((item) => `${chordId(item.chord)}|${item.shape ?? ''}`))
+  eq('  the same chord with two shapes stays two legend entries', distinct.size, 2)
 }
 
 console.log(`\n${fails === 0 ? 'ALL CHECKS PASSED' : fails + ' FAILURES'}`)

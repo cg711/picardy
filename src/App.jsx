@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { makeKey, keyName, detectKey, romanNumeral } from './theory/keys.js'
-import { chordSymbol, chordName, chordNotes, voiceChord, inversionLabel, chordId } from './theory/chords.js'
-import { pcOf, prettyName } from './theory/notes.js'
+import { chordSymbol, chordName, chordNotes, voiceChord, inversionLabel, chordId, parseChord } from './theory/chords.js'
+import { pcOf, prettyName, noteName } from './theory/notes.js'
 import { suggestNext, analyzeChord } from './theory/suggest.js'
 import { generateProgression, FLAVOURS } from './theory/generate.js'
 import { DURATIONS, DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, TIME_SIGNATURES, beatsOf, timeSignatureOf } from './theory/rhythm.js'
-import { transposeChord, transposeKey, keyPrefersFlats } from './theory/transpose.js'
+import { transposeChord, transposeKey } from './theory/transpose.js'
 import { optimiseInversions, progressionMovement } from './theory/voicelead.js'
 import { scalesForChord, guideTones, commonTones } from './theory/scales.js'
 import { reharmonise } from './theory/reharm.js'
-import { findVoicings, TUNINGS, voicingLabel } from './theory/guitar.js'
+import { findVoicings, TUNINGS, voicingLabel, encodeShape, decodeShape, shapeFromFrets } from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
 import { playChord, playProgression, stopPlayback, setVolume, resumeAudio, PATTERNS } from './audio/synth.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
@@ -19,6 +19,7 @@ import {
   loadPrefs, savePref,
 } from './lib/share.js'
 import { toneColor } from './lib/colors.js'
+import { useUndo } from './lib/useUndo.js'
 import {
   makeSegment, readSegment, flattenSong, loadSegments, saveSegments, loadSong, saveSong, uniqueName,
 } from './lib/song.js'
@@ -48,6 +49,10 @@ export default function App() {
   const [progression, setProgression] = useState(initial?.progression ?? [])
   const [inversions, setInversions] = useState(initial?.inversions ?? [])
   const [durations, setDurations] = useState(initial?.durations ?? [])
+  // Parallel to `progression`: the voicing the user picked for each chord, and
+  // the words sung on it. Both are per-slot, so they move with the chord.
+  const [shapes, setShapes] = useState(initial?.shapes ?? [])
+  const [lyrics, setLyrics] = useState(initial?.lyrics ?? [])
   const [timeSignature, setTimeSignature] = useState(initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE)
   const [newChordDuration, setNewChordDuration] = useState(DEFAULT_DURATION)
   const [activeIndex, setActiveIndex] = useState((initial?.progression?.length ?? 1) - 1)
@@ -88,8 +93,46 @@ export default function App() {
   const [scaleId, setScaleId] = useState(null)
   const [detailTab, setDetailTab] = useState('voicing')
   const prevLen = useRef(progression.length)
+  const activeIndexRef = useRef(activeIndex)
+  useEffect(() => {
+    activeIndexRef.current = activeIndex
+  }, [activeIndex])
 
   const tuning = TUNINGS[tuningId].strings
+
+  // --- undo / redo -----------------------------------------------------------
+  //
+  // Everything the editor can change is snapshotted together, so any action
+  // becomes undoable without having to be wired up individually. Chords are
+  // stored as symbols because chord objects are not worth deep-comparing.
+
+  const snapshot = useMemo(() => ({
+    chords: progression.map(chordId),
+    inversions,
+    durations,
+    shapes,
+    lyrics,
+    key: `${noteName(musicKey.tonic)}${musicKey.mode === 'minor' ? 'm' : ''}`,
+    timeSignature,
+  }), [progression, inversions, durations, shapes, lyrics, musicKey, timeSignature])
+
+  const applySnapshot = useCallback((snap) => {
+    const minor = /m$/.test(snap.key)
+    const restored = makeKey(minor ? snap.key.slice(0, -1) : snap.key, minor ? 'minor' : 'major')
+    if (restored) setMusicKey(restored)
+    const chords = snap.chords.map(parseChord).filter(Boolean)
+    setProgression(chords)
+    setInversions(snap.inversions)
+    setDurations(snap.durations)
+    setShapes(snap.shapes)
+    setLyrics(snap.lyrics)
+    setTimeSignature(snap.timeSignature)
+    setActiveIndex(Math.min(activeIndexRef.current, chords.length - 1))
+    setPreview(null)
+    setGenerated(null)
+  }, [])
+
+  const { undo, redo, canUndo, canRedo } = useUndo(snapshot, applySnapshot)
 
   // --- derived ---------------------------------------------------------------
 
@@ -114,7 +157,7 @@ export default function App() {
     return pcOf(notes[activeInversion % notes.length].note)
   }, [activeChord, activeInversion])
 
-  const shapes = useMemo(() => {
+  const voicings = useMemo(() => {
     if (!activeChord) return []
     const limit = showAllShapes ? Infinity : 12
     const withBass = findVoicings(activeChord, { tuning, bassPc, limit })
@@ -129,15 +172,23 @@ export default function App() {
   // changes which voicing is on the neck.
   const shownShapes = useMemo(() => {
     const base = showAllShapes
-      ? [...shapes].sort((a, b) => a.position - b.position || b.score - a.score)
-      : shapes
+      ? [...voicings].sort((a, b) => a.position - b.position || b.score - a.score)
+      : voicings
     if (voicingPick && !base.some((s) => shapeKey(s) === shapeKey(voicingPick))) {
       return [voicingPick, ...base]
     }
     return base
-  }, [shapes, showAllShapes, voicingPick])
+  }, [voicings, showAllShapes, voicingPick])
 
-  const shape = voicingPick ?? shownShapes[0] ?? null
+  // A shape stored against this chord slot wins over the search order, but only
+  // in the tuning it was chosen in.
+  const storedShape = useMemo(() => {
+    if (preview || activeIndex < 0) return null
+    const frets = decodeShape(shapes[activeIndex], tuningId)
+    return frets ? shapeFromFrets(frets, tuning) : null
+  }, [shapes, activeIndex, tuningId, tuning, preview])
+
+  const shape = voicingPick ?? storedShape ?? shownShapes[0] ?? null
   const displayKey = playbackKey ?? musicKey
   const analysis = activeChord ? analyzeChord(activeChord, displayKey) : null
 
@@ -160,8 +211,8 @@ export default function App() {
   // --- effects ---------------------------------------------------------------
 
   useEffect(() => {
-    writeHash({ key: musicKey, progression, inversions, durations, timeSignature })
-  }, [musicKey, progression, inversions, durations, timeSignature])
+    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyrics })
+  }, [musicKey, progression, inversions, durations, timeSignature, shapes, lyrics])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -202,6 +253,8 @@ export default function App() {
       const insertAt = activeIndex + 1 >= progression.length ? progression.length : activeIndex + 1
       setInversions((iv) => [...iv.slice(0, insertAt), 0, ...iv.slice(insertAt)])
       setDurations((d) => [...d.slice(0, insertAt), newChordDuration, ...d.slice(insertAt)])
+      setShapes((sh) => [...sh.slice(0, insertAt), null, ...sh.slice(insertAt)])
+      setLyrics((ly) => [...ly.slice(0, insertAt), '', ...ly.slice(insertAt)])
       setPreview(null)
       setSelection(new Set())
       setGenerated(null)
@@ -223,6 +276,8 @@ export default function App() {
     setProgression((p) => p.filter((_, j) => j !== i))
     setInversions((iv) => iv.filter((_, j) => j !== i))
     setDurations((d) => d.filter((_, j) => j !== i))
+    setShapes((sh) => sh.filter((_, j) => j !== i))
+    setLyrics((ly) => ly.filter((_, j) => j !== i))
     setActiveIndex((a) => Math.max(0, Math.min(a, progression.length - 2)))
     setPreview(null)
     setGenerated(null)
@@ -245,6 +300,16 @@ export default function App() {
     setDurations((d) => {
       const padded = [...d]
       while (padded.length < progression.length) padded.push(DEFAULT_DURATION)
+      return swap(padded)
+    })
+    setShapes((sh) => {
+      const padded = [...sh]
+      while (padded.length < progression.length) padded.push(null)
+      return swap(padded)
+    })
+    setLyrics((ly) => {
+      const padded = [...ly]
+      while (padded.length < progression.length) padded.push('')
       return swap(padded)
     })
     setActiveIndex(j)
@@ -280,6 +345,25 @@ export default function App() {
     })
     resumeAudio()
     playChord([midi], { duration: 0.9, timbre })
+  }
+
+  const setLyricAt = (i, text) => {
+    setLyrics((ly) => {
+      const next = [...ly]
+      while (next.length < progression.length) next.push('')
+      next[i] = text
+      return next
+    })
+  }
+
+  const clearShapeAt = (i) => {
+    setShapes((sh) => {
+      const next = [...sh]
+      while (next.length < progression.length) next.push(null)
+      next[i] = null
+      return next
+    })
+    setVoicingPick(null)
   }
 
   const setDurationAt = (i, id) => {
@@ -324,6 +408,8 @@ export default function App() {
     setProgression(result.progression)
     setInversions(invs)
     setDurations(durs)
+    setShapes(result.progression.map(() => null))
+    setLyrics(result.progression.map(() => ''))
     setActiveIndex(result.progression.length - 1)
     setPreview(null)
     setSelection(new Set())
@@ -336,9 +422,9 @@ export default function App() {
   const transpose = (semitones) => {
     if (!progression.length && !segments.length) return
     const target = transposeKey(musicKey, semitones)
-    const flats = keyPrefersFlats(target)
+    const source = musicKey
     setMusicKey(target)
-    setProgression((p) => p.map((c) => transposeChord(c, semitones, flats)))
+    setProgression((p) => p.map((c) => transposeChord(c, source, target)))
     setPreview(null)
     setGenerated(null)
   }
@@ -388,6 +474,8 @@ export default function App() {
     setProgression(parsed.chords)
     setInversions(parsed.chords.map(() => 0))
     setDurations(parsed.durations)
+    setShapes(parsed.chords.map(() => null))
+    setLyrics(parsed.chords.map(() => ''))
     setActiveIndex(parsed.chords.length - 1)
     setPreview(null)
     setGenerated(null)
@@ -404,6 +492,8 @@ export default function App() {
       inversions,
       durations,
       timeSignature,
+      shapes,
+      lyrics,
     })
     setSegments((list) => [...list, segment])
   }
@@ -418,6 +508,8 @@ export default function App() {
     setProgression(live.progression)
     setInversions(live.inversions)
     setDurations(live.durations)
+    setShapes(live.shapes)
+    setLyrics(live.lyrics)
     setTimeSignature(live.timeSignature)
     setActiveIndex(live.progression.length - 1)
     setPreview(null)
@@ -580,12 +672,22 @@ export default function App() {
               onMove={moveChord}
               onSurprise={surprise}
               onSmooth={smoothVoicing}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              lyrics={lyrics}
+              onLyric={setLyricAt}
+              shapes={shapes}
+              tuningId={tuningId}
               durations={durations}
               timeSignature={timeSignature}
               onClear={() => {
                 setProgression([])
                 setInversions([])
                 setDurations([])
+                setShapes([])
+                setLyrics([])
                 setActiveIndex(-1)
                 setPreview(null)
                 setGenerated(null)
@@ -881,15 +983,15 @@ export default function App() {
                 <div className="voicings-head">
                   <span className="lbl">Voicings</span>
                   <span className="muted small">
-                    {shapes.length
+                    {voicings.length
                       ? showAllShapes
-                        ? `all ${shapes.length} playable shapes, in fret order${shape ? ` — ${voicingLabel(shape)}` : ''}`
-                        : `${shapes.length}${shapes.total > shapes.length ? ` of ${shapes.total}` : ''} playable shape${shapes.total === 1 ? '' : 's'}, spread across the neck${shape ? ` — ${voicingLabel(shape)}` : ''}`
+                        ? `all ${voicings.length} playable shapes, in fret order${shape ? ` — ${voicingLabel(shape)}` : ''}`
+                        : `${voicings.length}${voicings.total > voicings.length ? ` of ${voicings.total}` : ''} playable shape${voicings.total === 1 ? '' : 's'}, spread across the neck${shape ? ` — ${voicingLabel(shape)}` : ''}`
                       : 'no playable shape found in this tuning'}
                   </span>
-                  {shapes.total > 12 && (
+                  {voicings.total > 12 && (
                     <button className="btn ghost tiny" onClick={() => setShowAllShapes((v) => !v)}>
-                      {showAllShapes ? 'Show fewer' : `Show all ${shapes.total}`}
+                      {showAllShapes ? 'Show fewer' : `Show all ${voicings.total}`}
                     </button>
                   )}
                 </div>
@@ -905,6 +1007,16 @@ export default function App() {
                       lefty={lefty}
                       onClick={() => {
                         setVoicingPick(s)
+                        // Remember it against this chord so it survives leaving
+                        // the chord, reloading, and reaches the PDF.
+                        if (!preview && activeIndex >= 0) {
+                          setShapes((sh) => {
+                            const next = [...sh]
+                            while (next.length < progression.length) next.push(null)
+                            next[activeIndex] = encodeShape(s, tuningId)
+                            return next
+                          })
+                        }
                         playChord(s.midis, { timbre: 'guitar', strum: 0.03, duration: 2 })
                       }}
                     />
@@ -931,6 +1043,8 @@ export default function App() {
                         setProgression(s.progression)
                         setInversions(s.progression.map(() => 0))
                         setDurations(s.progression.map(() => DEFAULT_DURATION))
+                        setShapes(s.progression.map(() => null))
+                        setLyrics(s.progression.map(() => ''))
                         setActiveIndex(s.progression.length - 1)
                         setPreview(null)
                       }}
@@ -953,7 +1067,7 @@ export default function App() {
           onCancel={() => setExporting(false)}
           onExport={({ title, instrument }) => {
             setSongTitle(title)
-            exportChart({ song, segments, title, bpm, instrument, tuning, lefty })
+            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId, lefty })
             setExporting(false)
           }}
         />
