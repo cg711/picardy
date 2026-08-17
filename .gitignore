@@ -1,0 +1,14 @@
+# Dependencies — 105 MB, restored by `npm ci`
+node_modules/
+
+# Build output — produced in CI, never committed
+dist/
+.vite/
+
+# Local editor / OS noise
+.DS_Store
+*.log
+npm-debug.log*
+
+# Local Claude Code settings that are machine-specific
+.claude/settings.local.json

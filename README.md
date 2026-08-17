@@ -1,0 +1,199 @@
+# Picardy
+
+A fretboard and keyboard progression explorer. Enter chords, get ranked suggestions for what
+could come next — from plain diatonic moves through extensions, borrowed chords, applied
+dominants, tritone subs, augmented sixths, passing diminished chords and upper-structure
+polychords — each with a roman numeral, a plain-English reason, and a live view on both
+instruments.
+
+Named for the Picardy third: the major chord that ends a minor piece, where you expected the sad
+one. It is the whole idea of the app in one device — the unexpected chord that turns out to work,
+and a reason why.
+
+```bash
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173. `npm run check` runs the theory regression suite —
+spelling, roman numerals, key detection, guitar voicing search, chord identification — and
+prints the ranked suggestions for a handful of progressions so the musical judgements can be
+eyeballed rather than only asserted.
+
+## What it does
+
+**Suggestions with context.** The engine generates ~90–100 candidate next chords per step, then
+scores each one against the progression you have actually built: the previous chord's harmonic
+function, root motion, unresolved tendency tones (a dominant seventh's tritone, a °7's leading
+tone, a ø7 acting as a ii), voice-leading smoothness, and how far into the phrase you are.
+Candidates are grouped into tiers from *Very common* down to *Rare*.
+
+Because a single chord can be several things at once — A♭ in C major is ♭VI borrowed from the
+parallel minor *and* a chromatic mediant of the tonic — the strongest reading becomes the
+headline and the others are kept as "also…" notes in the expanded explanation. The category
+filter matches any of a chord's readings, so nothing disappears from the list.
+
+**Surprise me.** Generates a whole progression in the current key and plays it. The body is a
+weighted random walk through the ranked suggestions — so every step is still a move the engine
+rates as idiomatic — and the last two or three chords come from a cadence template, which is what
+makes the result *end* rather than just stop. Fifteen cadences are on offer (perfect, plagal,
+minor plagal, half, deceptive, ii–V–I, tritone-sub ii–subV–I, backdoor, Neapolitan, German sixth,
+cadential 6/4, Picardy third, Phrygian half, Aeolian), weighted so the resolving ones dominate
+and the exotic ones stay special.
+
+A style setting picks which slice of the vocabulary is in play and how far down the ranked list
+the walk is willing to reach: *Pop / folk* stays near the top of the diatonic list, *Jazz* opens
+up secondary dominants and tritone subs, *Modal / rock* leans on mixture, *Chromatic / romantic*
+brings in Neapolitans, augmented sixths and chromatic mediants, *Cinematic* favours mediants and
+pedal points. The result is captioned with the style and the cadence it landed on.
+
+**Rhythm.** Every chord carries a length, from a 16th note to a whole note (dotted values
+included), and each section has its own time signature. The progression strip marks where bars
+start and warns when the last bar is short; playback follows the actual durations.
+
+**Sections and songs.** Save the current progression as a named section — Verse, Chorus, Bridge,
+or anything you type. A section stores its own chords, lengths, inversions, key and metre, so a
+song can modulate: a chorus a minor third up from the verse keeps its own roman numerals. Arrange
+sections into a song with repeat counts, reorder them, and play the whole thing end to end. The
+instruments follow along and the numerals switch key as each section arrives.
+
+**PDF chart.** One click produces a lead sheet: chords laid out in bars with roman numerals
+underneath, tied continuations bracketed where a chord crosses a bar line, and a legend of
+fingering diagrams for every distinct chord. Choose guitar, piano, both, or symbols only at export
+time; guitar boxes honour the left-handed setting. Everything is drawn with vector primitives, so
+it prints sharp and the file stays small — and jsPDF is loaded on demand, so the export costs
+nothing until you use it.
+
+**What to play over the chords.** A scale layer derives the fitting scales from the chord's
+function rather than a lookup table: any scale containing every chord tone is a candidate, ranked
+by how much of it stays inside the key, with the conventional choice breaking ties. That gets
+Dorian over `ii`, Lydian over `IV`, Phrygian over `iii`, Phrygian dominant over a minor-key `V7`,
+and Lydian dominant over a tritone sub — without any of them being special-cased. Alternates are
+listed with reasons, because chord-scale choices are genuinely contested. Guide tones (the 3rd and
+7th that spell the chord) and the notes held in common with the next chord are marked on both
+instruments.
+
+**Reharmonisation.** Point the engine at a chord already written and it offers substitutions in
+place — tritone subs, rootless dominants, third swaps, borrowed variants, richer extensions, bass
+inversions — and chords to slip in before it: applied dominants, related ii chords, chromatic
+approach diminished chords.
+
+**Smooth voicing.** One button picks inversions across the whole progression to minimise voice
+movement, using dynamic programming over every inversion of every chord. Typically cuts movement
+by 75–80%. Slash chords keep the bass you gave them.
+
+**Transpose and capo.** Move the music, not just the label — with spelling chosen so no key ever
+needs a double accidental, and every roman numeral preserved. For guitar, it suggests capo
+positions that let you play open shapes: "capo 1 → play in C" for a song in D♭.
+
+**Import and analysis.** Paste a chart like `| Cmaj7 | Am7 | Dm7 G7 |` and it parses into a
+section, splitting shared bars. Then it reads the progression back: names the cadence, finds
+complete ii–V–Is, flags applied chords and borrowed colour, and describes the root motion.
+
+**MIDI export.** A Format 1 `.mid` file — tempo, metre, per-chord durations, voiced chords, and a
+marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
+dependency.
+
+**Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
+strum, arpeggio, and bass + comp.
+
+**Four ways in.** Type a chord symbol with autocomplete (`Cmaj7`, `F#m7b5`, `Bb13`, `D/F#`,
+`C7#9`, `Abger6`), click roman numerals from a grid organised by function, click suggestions to
+extend the chain, or click notes on the piano/fretboard and let the app identify what you played.
+
+**Both instruments, with inversions.** Every chord shows its guitar shapes (searched, not looked
+up — so alternate tunings and odd chords work), the full neck map of chord tones, and a piano
+voicing. Selecting an inversion re-searches the guitar for shapes with the right note in the
+bass and updates the figured bass on the roman numeral (`V7` → `V7 6/5`).
+
+**Audio and sharing.** Web Audio playback of single chords or the whole progression with tempo,
+metre, and timbre control. The progression lives in the URL hash, so the *Share link* button
+produces a bookmarkable link; recent progressions are kept in `localStorage`.
+
+## Deploying
+
+`npm run build` emits a fully static `dist/` — no server, no environment variables, no secrets in
+the bundle. State lives in the URL hash and `localStorage`, so there is no SPA rewrite rule to
+configure and no backend to host. `vite.config.js` sets `base: './'`, so the same build works at a
+domain root or under a subpath.
+
+`npm run preview` serves the built bundle locally on port 4173 to check it before shipping.
+
+Drag `dist/` onto [Netlify Drop](https://app.netlify.com/drop) for an instant URL, or from the
+project directory:
+
+```bash
+npx wrangler pages deploy dist          # Cloudflare Pages
+npx vercel deploy dist --prod           # Vercel
+npx netlify deploy --dir=dist --prod    # Netlify CLI
+```
+
+If you connect a git repo instead, the build command is `npm run build` and the publish directory
+is `dist`.
+
+## Layout
+
+```
+src/
+  theory/
+    notes.js      pitch spelling — letters and accidentals kept separate from pitch classes,
+                  so Cb, E#, and Fx come out right
+    chords.js     quality table, symbol parser, chord spelling, piano voicings, inversions
+    keys.js       scales, roman numerals (incl. applied-dominant and figured-bass notation),
+                  harmonic function, key detection
+    suggest.js    the suggestion engine: generators + context-aware scoring
+    generate.js   "Surprise me" — styles, cadence templates, whole-progression walk
+    rhythm.js     note durations, time signatures, grouping chords into bars with ties
+    scales.js     chord-scales derived from function, guide tones, common tones
+    reharm.js     in-place substitutions and approach chords
+    transpose.js  transposition with sane spelling, plus capo suggestions
+    voicelead.js  inversion search that minimises voice movement
+    analyze.js    cadence detection and prose analysis of a progression
+    guitar.js     fretboard voicing search and playability filtering
+    identify.js   reverse lookup — notes to chord symbol
+  components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
+  audio/synth.js  Web Audio polysynth
+  lib/            URL/share encoding, colour tokens, segment + song model,
+                  PDF export, MIDI writer, chart text import
+```
+
+### How chords are represented
+
+A chord is a root note plus a list of `[genericDegree, semitones]` pairs. Carrying the generic
+degree alongside the semitone is what lets `C7#9` spell as C E G B♭ **D♯** rather than E♭, and
+what makes a German sixth on A♭ come out as A♭ C E♭ **F♯** — spelled as a sixth, which is why it
+resolves outward to the dominant instead of down a fifth like a real dominant seventh.
+
+### How guitar shapes are found
+
+For each four-fret window, every combination of open/fretted/muted strings is tested against the
+chord's pitch classes, then filtered for playability: span, required bass note, all essential
+chord tones present, at most one interior muted string, and two fingering models — one finger per
+note (max four), or barre the lowest fret and finger the rest, which costs one finger but cannot
+have an open string ringing underneath it. A shape passes if either model works, which is why
+open A (`x02220`, three fingers at one fret, no barre) and Bb (`x13331`, a two-string barre) are
+both playable. Grips needing a finger to reach *back* behind fingers already further up the neck
+are rejected.
+
+Typically 30–150 grips survive. Showing them by score alone is useless — the top of the list is
+the same open shape with different strings dropped, all at the bottom of the neck. So near-
+duplicates are removed (a shape whose sounding notes are a subset of a better one), and selection
+is greedy with a penalty for reusing a neck position. C major ends up spanning positions 1, 2, 3,
+5, 8, 10 and 12 instead of 1–3.
+
+The panel shows twelve of those by default and says how many exist — **Show all N** expands to
+every one of them, laid out in a wrapping grid sorted by fret position rather than by score. A
+shape chosen from the full list stays pinned to the front of the short list when you collapse
+again, so collapsing never silently swaps the voicing on the neck.
+
+`npm run check` asserts that 22 canonical grips — the open chords, the E- and A-shape barres, the
+common sevenths — all survive and appear in the shown list.
+
+### Handedness
+
+A Right/Left toggle in the Guitar panel mirrors the neck and the chord boxes **together**: the
+nut moves to the right, the frets ascend leftward, low E moves to the right-hand column of each
+box, and the string order stays put. Coordinates are mirrored rather than an SVG transform being
+applied, so fret numbers and interval labels stay the right way round; the neck also scrolls to
+whichever end the nut is on. The preference is stored in `localStorage` and the check suite
+asserts the two diagrams agree in both modes.
