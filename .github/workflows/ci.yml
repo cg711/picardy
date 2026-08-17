@@ -1,0 +1,37 @@
+name: CI
+
+# Deployment is handled by Cloudflare's own git integration, which builds and
+# publishes on push. This workflow is the check that runs alongside it: it gives
+# pull requests a pass/fail before merge, without a second deploy racing the
+# first.
+#
+# Production is gated separately by Cloudflare's build command, which runs
+# `npm run check` before `npm run build` — so a failing suite never ships.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # 122 assertions over chord spelling, roman numerals, key detection,
+      # voicing search, chord-scales, reharmonisation and MIDI output.
+      - name: Theory checks
+        run: npm run check
+
+      - name: Build
+        run: npm run build

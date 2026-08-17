@@ -1,0 +1,13 @@
+{
+  // Picardy is a static site: no server-side code, so this is an assets-only
+  // Worker. Declaring it explicitly stops wrangler trying to auto-configure the
+  // Cloudflare Vite plugin — which is meant for Workers that run server code,
+  // and which demands Vite 6+.
+  "name": "picardy",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./dist",
+    // Every route resolves to the one page; all app state lives in the URL hash.
+    "not_found_handling": "single-page-application"
+  }
+}
