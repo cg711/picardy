@@ -101,10 +101,20 @@ dependency.
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
-**Lyrics.** Each chord slot carries the words sung on it, so the chart reads as words under
-chords the way a lead sheet does. They travel with the section, into the share link, and into the
-PDF — printed under the chord they belong to, with tied continuations left blank since no new
-syllable lands there.
+**Lyrics on a timeline.** Type or paste lyrics as plain text, one line per row, with a chord
+lane above each line. Chords sit on a beat grid drawn at a constant scale, so a bar is the same
+width on every line, and dragging one *ripples*: the chord before it lengthens and everything
+after slides along, which is what makes it feel like sliding a divider rather than editing two
+numbers. Chords snap to bar lines and beats when dragged near one and stay wherever you put them
+otherwise — holding ⌥ turns snapping off entirely, so a chord can land mid-word.
+
+That freedom is why lengths are stored as plain beat counts rather than note values: no fixed set
+of note values can express a chord that changes three-eighths of the way through a word. The
+note-value picker is still there as a shortcut, and old links and saved sections that used the
+preset ids are read back correctly.
+
+The PDF follows suit — sections with lyrics print as a real chord-over-lyric chart, with each
+chord placed at the point in the line where it falls, rather than as a bar grid.
 
 **Pinned voicings.** The guitar shape you choose is remembered against that chord, survives
 leaving and returning to it, rides along in the share link, and is the shape drawn in the PDF.

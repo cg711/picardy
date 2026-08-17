@@ -3,7 +3,7 @@
 import { parseChord, chordId } from '../theory/chords.js'
 import { makeKey } from '../theory/keys.js'
 import { noteName, parseNote } from '../theory/notes.js'
-import { DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE } from '../theory/rhythm.js'
+import { DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, toBeats } from '../theory/rhythm.js'
 
 const STORAGE_KEY = 'picardy.history.v1'
 const PREFS_KEY = 'picardy.prefs.v1'
@@ -45,17 +45,20 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, lyrics }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, lyricLines, lines }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
   if (inversions?.some((i) => i)) params.set('i', inversions.join(','))
   // Only carry rhythm when it differs from the defaults, to keep links short.
-  if (durations?.some((d) => d !== DEFAULT_DURATION)) params.set('d', durations.join(','))
+  if (durations?.some((d) => toBeats(d) !== DEFAULT_DURATION)) {
+    params.set('d', durations.map((d) => +toBeats(d).toFixed(3)).join(','))
+  }
   if (timeSignature && timeSignature !== DEFAULT_TIME_SIGNATURE) params.set('t', timeSignature)
   // Only carried when actually set, so a plain link stays short.
   if (shapes?.some(Boolean)) params.set('v', shapes.map((x) => x ?? '').join('~'))
-  if (lyrics?.some((l) => l && l.trim())) params.set('w', lyrics.map((l) => l ?? '').join('~'))
+  if (lyricLines?.some((l) => l && l.trim())) params.set('w', lyricLines.map((l) => l ?? '').join('~'))
+  if (lines?.some((n) => n)) params.set('n', lines.join(','))
   return params.toString()
 }
 
@@ -83,22 +86,25 @@ export function decodeState(hash) {
     .split(',')
     .map((n) => parseInt(n, 10) || 0)
 
+  // Numbers now, but old links carry preset ids — toBeats accepts either.
   const durations = (params.get('d') || '')
     .split(',')
     .filter(Boolean)
+    .map((d) => toBeats(Number.isNaN(Number(d)) ? d : Number(d)))
   const timeSignature = params.get('t') || DEFAULT_TIME_SIGNATURE
 
   const shapes = (params.get('v') || '').split('~')
-  const lyrics = (params.get('w') || '').split('~')
+  const lyricLines = params.get('w') ? params.get('w').split('~') : ['']
 
   return {
     key,
     progression,
     inversions,
     durations: progression.map((_, i) => durations[i] ?? DEFAULT_DURATION),
+    lines: (params.get('n') || '').split(',').map((n) => parseInt(n, 10) || 0),
     timeSignature,
     shapes: progression.map((_, i) => shapes[i] || null),
-    lyrics: progression.map((_, i) => lyrics[i] || ''),
+    lyricLines,
   }
 }
 

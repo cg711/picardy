@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { chordSymbol, chordNotes, inversionLabel } from '../theory/chords.js'
 import { romanNumeral } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
-import { DURATIONS, durationOf, describeLength, barsAreComplete, timeSignatureOf } from '../theory/rhythm.js'
+import { DURATIONS, durationOf, toBeats, describeLength, barsAreComplete, timeSignatureOf, presetFor } from '../theory/rhythm.js'
 
 export default function ProgressionBar({
   progression,
@@ -20,14 +20,13 @@ export default function ProgressionBar({
   onMove,
   onSurprise,
   onSmooth,
-  lyrics = [],
-  onLyric,
   shapes = [],
   tuningId = 'standard',
   onUndo,
   onRedo,
   canUndo,
   canRedo,
+  hideWhenEmpty = false,
 }) {
   // These have to sit above the empty-state return: hooks must run in the same
   // order on every render, and clearing the progression would otherwise change
@@ -47,6 +46,10 @@ export default function ProgressionBar({
       strip.scrollTo({ left: right - strip.clientWidth + 12, behavior: 'smooth' })
     }
   }, [focused])
+
+  // In the lyric view the chips are hidden, so the empty-state prompt would be
+  // a second, contradictory one.
+  if (!progression.length && hideWhenEmpty) return null
 
   if (!progression.length) {
     return (
@@ -70,7 +73,7 @@ export default function ProgressionBar({
   const barOf = progression.map((_, i) => {
     const bar = Math.floor(beatCursor / ts.beatsPerBar) + 1
     const beat = beatCursor % ts.beatsPerBar
-    beatCursor += durationOf(durations[i]).beats
+    beatCursor += toBeats(durations[i])
     return { bar, startsBar: Math.abs(beat) < 1e-9 }
   })
 
@@ -114,26 +117,20 @@ export default function ProgressionBar({
                   <span style={{ width: `${Math.min(100, (dur.beats / ts.beatsPerBar) * 100)}%` }} />
                 </span>
                 <select
-                  value={durations[i]}
-                  onChange={(e) => onDuration(i, e.target.value)}
-                  title={`Length: ${dur.label} (${dur.beats} beat${dur.beats === 1 ? '' : 's'})`}
+                  value={presetFor(durations[i]) ? String(toBeats(durations[i])) : 'custom'}
+                  onChange={(e) => onDuration(i, Number(e.target.value))}
+                  title={`Length: ${dur.label} (${+toBeats(durations[i]).toFixed(2)} beat${toBeats(durations[i]) === 1 ? '' : 's'})`}
                   aria-label="Chord length"
                 >
+                  {/* A length dragged on the lyric timeline may not match any
+                      preset; show it rather than silently snapping the picker. */}
+                  {!presetFor(durations[i]) && <option value="custom">{dur.label}</option>}
                   {DURATIONS.map((d) => (
-                    <option key={d.id} value={d.id}>{d.label}</option>
+                    <option key={d.id} value={String(d.beats)}>{d.label}</option>
                   ))}
                 </select>
               </label>
 
-              <input
-                className="chip-lyric"
-                value={lyrics[i] ?? ''}
-                onChange={(e) => onLyric(i, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="lyric…"
-                aria-label={`Lyric on chord ${i + 1}`}
-                spellCheck={false}
-              />
 
               <div className="chip-controls" onClick={(e) => e.stopPropagation()}>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>

@@ -6,7 +6,7 @@
 // plus one track of chords — which is what a DAW expects to import.
 
 import { voiceChord } from '../theory/chords.js'
-import { beatsOf, timeSignatureOf } from '../theory/rhythm.js'
+import { toBeats, timeSignatureOf } from '../theory/rhythm.js'
 import { flattenSong } from './song.js'
 
 const TICKS_PER_BEAT = 480
@@ -114,7 +114,7 @@ export function songToEvents(song, segments, { bottom = 48 } = {}) {
     lastLabel = label
     return {
       midis: voiceChord(item.chord, { inversion: item.inversion, bottom }),
-      beats: beatsOf(item.durationId),
+      beats: toBeats(item.durationId),
       marker: item.indexInSegment === 0 ? marker : null,
     }
   })
@@ -124,7 +124,7 @@ export function songToEvents(song, segments, { bottom = 48 } = {}) {
 export function progressionToEvents(progression, inversions, durations, { bottom = 48 } = {}) {
   return progression.map((chord, i) => ({
     midis: voiceChord(chord, { inversion: inversions[i] ?? 0, bottom }),
-    beats: beatsOf(durations[i] ?? '1'),
+    beats: toBeats(durations[i]),
   }))
 }
 

@@ -5,7 +5,7 @@ import { chordSymbol, chordName, chordNotes, voiceChord, inversionLabel, chordId
 import { pcOf, prettyName, noteName } from './theory/notes.js'
 import { suggestNext, analyzeChord } from './theory/suggest.js'
 import { generateProgression, FLAVOURS } from './theory/generate.js'
-import { DURATIONS, DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, TIME_SIGNATURES, beatsOf, timeSignatureOf } from './theory/rhythm.js'
+import { DURATIONS, DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, TIME_SIGNATURES, toBeats, timeSignatureOf, snapBeat, MIN_BEATS } from './theory/rhythm.js'
 import { transposeChord, transposeKey } from './theory/transpose.js'
 import { optimiseInversions, progressionMovement } from './theory/voicelead.js'
 import { scalesForChord, guideTones, commonTones } from './theory/scales.js'
@@ -37,6 +37,7 @@ import ExportDialog from './components/ExportDialog.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
 import ImportPanel from './components/ImportPanel.jsx'
+import LyricTimeline from './components/LyricTimeline.jsx'
 import { exportChart } from './lib/pdf.js'
 
 const initial = decodeState(window.location.hash)
@@ -52,7 +53,10 @@ export default function App() {
   // Parallel to `progression`: the voicing the user picked for each chord, and
   // the words sung on it. Both are per-slot, so they move with the chord.
   const [shapes, setShapes] = useState(initial?.shapes ?? [])
-  const [lyrics, setLyrics] = useState(initial?.lyrics ?? [])
+  // Which lyric line each chord sits over, and the lines of plain text.
+  const [lines, setLines] = useState(initial?.lines ?? [])
+  const [lyricLines, setLyricLines] = useState(initial?.lyricLines ?? [''])
+  const [editorView, setEditorView] = useState('chips')
   const [timeSignature, setTimeSignature] = useState(initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE)
   const [newChordDuration, setNewChordDuration] = useState(DEFAULT_DURATION)
   const [activeIndex, setActiveIndex] = useState((initial?.progression?.length ?? 1) - 1)
@@ -111,10 +115,11 @@ export default function App() {
     inversions,
     durations,
     shapes,
-    lyrics,
+    lines,
+    lyricLines,
     key: `${noteName(musicKey.tonic)}${musicKey.mode === 'minor' ? 'm' : ''}`,
     timeSignature,
-  }), [progression, inversions, durations, shapes, lyrics, musicKey, timeSignature])
+  }), [progression, inversions, durations, shapes, lines, lyricLines, musicKey, timeSignature])
 
   const applySnapshot = useCallback((snap) => {
     const minor = /m$/.test(snap.key)
@@ -125,7 +130,8 @@ export default function App() {
     setInversions(snap.inversions)
     setDurations(snap.durations)
     setShapes(snap.shapes)
-    setLyrics(snap.lyrics)
+    setLines(snap.lines ?? [])
+    setLyricLines(snap.lyricLines ?? [''])
     setTimeSignature(snap.timeSignature)
     setActiveIndex(Math.min(activeIndexRef.current, chords.length - 1))
     setPreview(null)
@@ -211,8 +217,8 @@ export default function App() {
   // --- effects ---------------------------------------------------------------
 
   useEffect(() => {
-    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyrics })
-  }, [musicKey, progression, inversions, durations, timeSignature, shapes, lyrics])
+    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines })
+  }, [musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -254,7 +260,8 @@ export default function App() {
       setInversions((iv) => [...iv.slice(0, insertAt), 0, ...iv.slice(insertAt)])
       setDurations((d) => [...d.slice(0, insertAt), newChordDuration, ...d.slice(insertAt)])
       setShapes((sh) => [...sh.slice(0, insertAt), null, ...sh.slice(insertAt)])
-      setLyrics((ly) => [...ly.slice(0, insertAt), '', ...ly.slice(insertAt)])
+      // A chord inserted mid-progression joins the line its neighbour is on.
+      setLines((ln) => [...ln.slice(0, insertAt), ln[insertAt - 1] ?? ln[insertAt] ?? 0, ...ln.slice(insertAt)])
       setPreview(null)
       setSelection(new Set())
       setGenerated(null)
@@ -277,7 +284,7 @@ export default function App() {
     setInversions((iv) => iv.filter((_, j) => j !== i))
     setDurations((d) => d.filter((_, j) => j !== i))
     setShapes((sh) => sh.filter((_, j) => j !== i))
-    setLyrics((ly) => ly.filter((_, j) => j !== i))
+    setLines((ln) => ln.filter((_, j) => j !== i))
     setActiveIndex((a) => Math.max(0, Math.min(a, progression.length - 2)))
     setPreview(null)
     setGenerated(null)
@@ -307,9 +314,9 @@ export default function App() {
       while (padded.length < progression.length) padded.push(null)
       return swap(padded)
     })
-    setLyrics((ly) => {
-      const padded = [...ly]
-      while (padded.length < progression.length) padded.push('')
+    setLines((ln) => {
+      const padded = [...ln]
+      while (padded.length < progression.length) padded.push(0)
       return swap(padded)
     })
     setActiveIndex(j)
@@ -347,11 +354,36 @@ export default function App() {
     playChord([midi], { duration: 0.9, timbre })
   }
 
-  const setLyricAt = (i, text) => {
-    setLyrics((ly) => {
-      const next = [...ly]
-      while (next.length < progression.length) next.push('')
-      next[i] = text
+  /**
+   * Ripple drag: moving chord `i` later lengthens the chord before it and
+   * carries everything after along unchanged, so only one duration changes.
+   * That is what makes it behave like sliding a divider.
+   */
+  const dragChord = (i, deltaBeats) => {
+    if (i <= 0 || !Number.isFinite(deltaBeats)) return
+    setDurations((d) => {
+      const next = [...d]
+      while (next.length < progression.length) next.push(DEFAULT_DURATION)
+      const previous = toBeats(next[i - 1])
+      // The previous chord absorbs the move, and can never vanish entirely.
+      const grown = Math.max(MIN_BEATS, previous + deltaBeats)
+      if (Math.abs(grown - previous) < 1e-9) return d
+      next[i - 1] = grown
+      return next
+    })
+  }
+
+  const moveChordToLine = (i, line) => {
+    if (line < 0) return
+    setLines((ln) => {
+      const next = [...ln]
+      while (next.length < progression.length) next.push(0)
+      next[i] = line
+      return next
+    })
+    setLyricLines((ls) => {
+      const next = [...ls]
+      while (next.length <= line) next.push('')
       return next
     })
   }
@@ -379,7 +411,7 @@ export default function App() {
     if (!chords.length) return
     const voiced = chords.map((c, i) => ({
       midis: voiceChord(c, { inversion: invs[i] ?? 0, bottom: 48 }),
-      beats: beatsOf(durs[i] ?? DEFAULT_DURATION),
+      beats: toBeats(durs[i]),
     }))
     setPlaying(true)
     playProgression(voiced, {
@@ -409,7 +441,8 @@ export default function App() {
     setInversions(invs)
     setDurations(durs)
     setShapes(result.progression.map(() => null))
-    setLyrics(result.progression.map(() => ''))
+    setLines(result.progression.map(() => 0))
+    setLyricLines([''])
     setActiveIndex(result.progression.length - 1)
     setPreview(null)
     setSelection(new Set())
@@ -475,7 +508,8 @@ export default function App() {
     setInversions(parsed.chords.map(() => 0))
     setDurations(parsed.durations)
     setShapes(parsed.chords.map(() => null))
-    setLyrics(parsed.chords.map(() => ''))
+    setLines(parsed.chords.map(() => 0))
+    setLyricLines([''])
     setActiveIndex(parsed.chords.length - 1)
     setPreview(null)
     setGenerated(null)
@@ -493,7 +527,8 @@ export default function App() {
       durations,
       timeSignature,
       shapes,
-      lyrics,
+      lines,
+      lyricLines,
     })
     setSegments((list) => [...list, segment])
   }
@@ -509,7 +544,8 @@ export default function App() {
     setInversions(live.inversions)
     setDurations(live.durations)
     setShapes(live.shapes)
-    setLyrics(live.lyrics)
+    setLines(live.lines)
+    setLyricLines(live.lyricLines.length ? live.lyricLines : [''])
     setTimeSignature(live.timeSignature)
     setActiveIndex(live.progression.length - 1)
     setPreview(null)
@@ -550,7 +586,7 @@ export default function App() {
     playProgression(
       items.map((item) => ({
         midis: voiceChord(item.chord, { inversion: item.inversion, bottom: 48 }),
-        beats: beatsOf(item.durationId),
+        beats: toBeats(item.durationId),
       })),
       {
         bpm,
@@ -659,8 +695,37 @@ export default function App() {
                 <strong>{generated.flavourLabel}</strong> in {keyName(musicKey)}, ending on {generated.cadenceLabel}.
               </p>
             )}
+            <div className="view-tabs">
+              {[
+                ['chips', 'Chords'],
+                ['lyrics', 'Lyrics & timing'],
+              ].map(([id, label]) => (
+                <button key={id} className={editorView === id ? 'on' : ''} onClick={() => setEditorView(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {editorView === 'lyrics' && progression.length > 0 && (
+              <LyricTimeline
+                progression={progression}
+                durations={durations}
+                lines={lines}
+                lyricLines={lyricLines}
+                musicKey={musicKey}
+                timeSignature={timeSignature}
+                activeIndex={activeIndex}
+                playingIndex={playingIndex}
+                onSelect={selectChord}
+                onLyricLines={setLyricLines}
+                onDragChord={dragChord}
+                onMoveChordToLine={moveChordToLine}
+                onRemove={removeChord}
+              />
+            )}
+
             <ProgressionBar
-              progression={progression}
+              progression={editorView === 'chips' ? progression : []}
               inversions={inversions}
               musicKey={musicKey}
               activeIndex={activeIndex}
@@ -676,8 +741,7 @@ export default function App() {
               onRedo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
-              lyrics={lyrics}
-              onLyric={setLyricAt}
+              hideWhenEmpty={editorView === 'lyrics'}
               shapes={shapes}
               tuningId={tuningId}
               durations={durations}
@@ -687,7 +751,8 @@ export default function App() {
                 setInversions([])
                 setDurations([])
                 setShapes([])
-                setLyrics([])
+                setLines([])
+                setLyricLines([''])
                 setActiveIndex(-1)
                 setPreview(null)
                 setGenerated(null)
@@ -1044,7 +1109,8 @@ export default function App() {
                         setInversions(s.progression.map(() => 0))
                         setDurations(s.progression.map(() => DEFAULT_DURATION))
                         setShapes(s.progression.map(() => null))
-                        setLyrics(s.progression.map(() => ''))
+                        setLines(s.progression.map(() => 0))
+                        setLyricLines([''])
                         setActiveIndex(s.progression.length - 1)
                         setPreview(null)
                       }}

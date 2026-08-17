@@ -7,7 +7,7 @@
 import { parseChord, chordId } from '../theory/chords.js'
 import { makeKey } from '../theory/keys.js'
 import { noteName } from '../theory/notes.js'
-import { DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, beatsOf } from '../theory/rhythm.js'
+import { DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, toBeats } from '../theory/rhythm.js'
 
 const SEGMENTS_KEY = 'picardy.segments.v1'
 const SONG_KEY = 'picardy.song.v1'
@@ -27,7 +27,7 @@ export function segmentHue(name) {
 const uid = () => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 /** Snapshot the editor into a storable segment. Chords are stored as symbols. */
-export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lyrics }) {
+export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lines, lyricLines }) {
   return {
     id: uid(),
     name: name || 'Untitled',
@@ -35,9 +35,11 @@ export function makeSegment({ name, key, progression, inversions, durations, tim
     timeSignature: timeSignature || DEFAULT_TIME_SIGNATURE,
     chords: progression.map(chordId),
     inversions: progression.map((_, i) => inversions[i] ?? 0),
-    durations: progression.map((_, i) => durations[i] ?? DEFAULT_DURATION),
+    durations: progression.map((_, i) => toBeats(durations[i])),
     shapes: progression.map((_, i) => shapes?.[i] ?? null),
-    lyrics: progression.map((_, i) => lyrics?.[i] ?? ''),
+    // Which lyric line each chord sits over, plus the lines themselves.
+    lines: progression.map((_, i) => lines?.[i] ?? 0),
+    lyricLines: [...(lyricLines ?? [])],
     at: Date.now(),
   }
 }
@@ -51,15 +53,16 @@ export function readSegment(segment) {
     key: makeKey(tonic, minor ? 'minor' : 'major'),
     progression,
     inversions: progression.map((_, i) => segment.inversions?.[i] ?? 0),
-    durations: progression.map((_, i) => segment.durations?.[i] ?? DEFAULT_DURATION),
+    durations: progression.map((_, i) => toBeats(segment.durations?.[i])),
     shapes: progression.map((_, i) => segment.shapes?.[i] ?? null),
-    lyrics: progression.map((_, i) => segment.lyrics?.[i] ?? ''),
+    lines: progression.map((_, i) => segment.lines?.[i] ?? 0),
+    lyricLines: [...(segment.lyricLines ?? [])],
     timeSignature: segment.timeSignature || DEFAULT_TIME_SIGNATURE,
   }
 }
 
 export function segmentBeats(segment) {
-  return (segment.durations ?? []).reduce((sum, d) => sum + beatsOf(d), 0)
+  return (segment.durations ?? []).reduce((sum, d) => sum + toBeats(d), 0)
 }
 
 /**
@@ -82,7 +85,7 @@ export function flattenSong(song, segments) {
           inversion: live.inversions[i],
           durationId: live.durations[i],
           shape: live.shapes[i],
-          lyric: live.lyrics[i],
+          line: live.lines[i],
           timeSignature: live.timeSignature,
           entryIndex,
           segmentId: segment.id,

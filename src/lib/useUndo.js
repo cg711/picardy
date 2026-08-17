@@ -46,7 +46,7 @@ export function useUndo(snapshot, apply) {
     const changed = Object.keys(snapshot).filter(
       (k) => JSON.stringify(before[k]) !== JSON.stringify(snapshot[k]),
     )
-    const textOnly = changed.length === 1 && changed[0] === 'lyrics'
+    const textOnly = changed.length === 1 && changed[0] === 'lyricLines'
     const recent = Date.now() - lastPushAt.current < COALESCE_MS
 
     if (!(textOnly && recent && undoStack.current.length)) {

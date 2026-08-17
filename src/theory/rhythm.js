@@ -15,21 +15,54 @@ export const DURATIONS = [
   { id: '1', label: '1/1', beats: 4 },
 ]
 
-export const DEFAULT_DURATION = '1'
+export const DEFAULT_DURATION = 4
+export const MIN_BEATS = 0.125
 
 const BY_ID = new Map(DURATIONS.map((d) => [d.id, d]))
 
-export function durationOf(id) {
-  return BY_ID.get(id) ?? BY_ID.get(DEFAULT_DURATION)
+/**
+ * Lengths are plain numbers of beats, because a chord dragged along a lyric can
+ * land anywhere and no fixed set of note values can express that. The presets
+ * above are a picker shortcut, and the old id strings are still accepted so
+ * sections and links saved before this change keep working.
+ */
+export function toBeats(value) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  const preset = BY_ID.get(value)
+  if (preset) return preset.beats
+  return DEFAULT_DURATION
 }
 
-export function beatsOf(id) {
-  return durationOf(id).beats
+/** The preset matching a length exactly, if there is one — used by the picker. */
+export function presetFor(beats) {
+  const n = toBeats(beats)
+  return DURATIONS.find((d) => Math.abs(d.beats - n) < 1e-9) ?? null
 }
+
+export function durationOf(value) {
+  return presetFor(value) ?? { id: 'custom', label: fractionLabel(toBeats(value)), beats: toBeats(value) }
+}
+
+/** "1/4", "3/8", "1.25 beats" — a readable label for an arbitrary length. */
+export function fractionLabel(beats) {
+  const preset = DURATIONS.find((d) => Math.abs(d.beats - beats) < 1e-9)
+  if (preset) return preset.label
+  const sixteenths = Math.round(beats * 4)
+  if (Math.abs(sixteenths / 4 - beats) < 1e-6) {
+    const whole = Math.floor(sixteenths / 4)
+    const rest = sixteenths % 4
+    if (!rest) return `${whole} beat${whole === 1 ? '' : 's'}`
+    const frac = ['', '¼', '½', '¾'][rest]
+    return whole ? `${whole}${frac} beats` : `${frac} beat`
+  }
+  return `${(+beats.toFixed(2))} beats`
+}
+
+export const beatsOf = toBeats
 
 /** Total length of a chord list, in quarter-note beats. */
-export function totalBeats(durationIds) {
-  return durationIds.reduce((sum, id) => sum + beatsOf(id), 0)
+export function totalBeats(durations) {
+  return durations.reduce((sum, d) => sum + toBeats(d), 0)
 }
 
 export const TIME_SIGNATURES = [
@@ -70,10 +103,10 @@ export function groupIntoBars(items, timeSignatureId) {
   }
 
   items.forEach((item, index) => {
-    let remaining = beatsOf(item.durationId)
+    let remaining = toBeats(item.durationId ?? item.beats)
     let tied = false
     // Guard against a zero/negative duration turning this into an infinite loop.
-    if (!(remaining > 0)) remaining = beatsOf(DEFAULT_DURATION)
+    if (!(remaining > 0)) remaining = DEFAULT_DURATION
 
     while (remaining > 0) {
       const space = perBar - filled
@@ -91,20 +124,46 @@ export function groupIntoBars(items, timeSignatureId) {
 }
 
 /** Does the chord list fill its bars exactly? */
-export function barsAreComplete(durationIds, timeSignatureId) {
+export function barsAreComplete(durations, timeSignatureId) {
   const perBar = timeSignatureOf(timeSignatureId).beatsPerBar
-  const total = totalBeats(durationIds)
-  return Math.abs(total % perBar) < 1e-9
+  const total = totalBeats(durations)
+  const remainder = total % perBar
+  return remainder < 1e-9 || Math.abs(remainder - perBar) < 1e-9
 }
 
 /** "3 bars + 2 beats" — used to tell the user where a segment ends. */
-export function describeLength(durationIds, timeSignatureId) {
+export function describeLength(durations, timeSignatureId) {
   const perBar = timeSignatureOf(timeSignatureId).beatsPerBar
-  const total = totalBeats(durationIds)
+  const total = totalBeats(durations)
   const whole = Math.floor(total / perBar + 1e-9)
   const rest = total - whole * perBar
   const barPart = `${whole} bar${whole === 1 ? '' : 's'}`
   if (rest < 1e-9) return barPart
   const beatPart = `${+rest.toFixed(2)} beat${rest === 1 ? '' : 's'}`
   return whole ? `${barPart} + ${beatPart}` : beatPart
+}
+
+/**
+ * Snap a beat position to the metre when it is close, and leave it alone
+ * otherwise — so a chord lands cleanly on a bar line or beat if you nudge it
+ * near one, but can still sit mid-word where a lyric needs it.
+ *
+ * @param tolerance how near, in beats, counts as "close"
+ */
+export function snapBeat(beats, timeSignatureId, tolerance = 0.18) {
+  const perBar = timeSignatureOf(timeSignatureId).beatsPerBar
+  // Strongest pull to bar lines, then beats, then eighths.
+  const grids = [
+    { size: perBar, pull: 1.6 },
+    { size: 1, pull: 1 },
+    { size: 0.5, pull: 0.6 },
+  ]
+  let best = null
+  for (const { size, pull } of grids) {
+    const nearest = Math.round(beats / size) * size
+    const distance = Math.abs(beats - nearest)
+    if (distance > tolerance * pull) continue
+    if (!best || distance < best.distance) best = { value: nearest, distance }
+  }
+  return best ? Math.max(0, best.value) : Math.max(0, beats)
 }

@@ -76,19 +76,20 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
 
     const repeats = Math.max(1, entry.repeats ?? 1)
     const heading = `${segment.name}${repeats > 1 ? `  (x${repeats})` : ''}`
+    const hasLyrics = (live.lyricLines ?? []).some((l) => l && l.trim())
+
     const bars = groupIntoBars(
       live.progression.map((chord, i) => ({
         chord,
         durationId: live.durations[i],
         inversion: live.inversions[i],
-        lyric: live.lyrics[i],
       })),
       live.timeSignature,
     )
 
-    const hasLyrics = live.lyrics.some((l) => l && l.trim())
-
-    const needed = 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * (hasLyrics ? 24 : 18)
+    const needed = hasLyrics
+      ? 10 + lineCount(live) * 15
+      : 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * 18
     if (y + needed > PAGE.h - MARGIN) {
       doc.addPage()
       y = MARGIN
@@ -108,7 +109,9 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
     )
     y += 4
 
-    y = drawBars(doc, bars, live.key, y, live.timeSignature, hasLyrics)
+    y = hasLyrics
+      ? drawLyricLines(doc, live, y)
+      : drawBars(doc, bars, live.key, y, live.timeSignature)
     y += 7
   }
 
@@ -154,21 +157,72 @@ function barsPerRow() {
   return 4
 }
 
-/** Trim a string to the width available, so lyrics never run into the next bar. */
-function fitText(doc, text, maxWidth) {
-  if (doc.getTextWidth(text) <= maxWidth) return text
-  let cut = text
-  while (cut.length > 1 && doc.getTextWidth(cut + '…') > maxWidth) cut = cut.slice(0, -1)
-  return cut + '…'
+function lineCount(live) {
+  return Math.max(live.lyricLines?.length ?? 1, ...live.lines.map((n) => n + 1), 1)
+}
+
+/**
+ * Chord-over-lyric layout: the words on one row, the chords above them placed
+ * where they fall in the line. Chords are positioned proportionally to their
+ * beat, which is what makes a chord land mid-word when that is where it was
+ * dragged to.
+ */
+function drawLyricLines(doc, live, startY) {
+  let y = startY + 3
+  const total = lineCount(live)
+
+  for (let line = 0; line < total; line++) {
+    // Chords on this line, with the beat each one starts at.
+    const onLine = []
+    let cursor = 0
+    live.progression.forEach((chord, i) => {
+      if ((live.lines[i] ?? 0) !== line) return
+      onLine.push({ chord, start: cursor, inversion: live.inversions[i] })
+      cursor += live.durations[i]
+    })
+    const lineBeats = cursor
+    const text = ascii(live.lyricLines?.[line] ?? '')
+    if (!onLine.length && !text) continue
+
+    if (y + 14 > PAGE.h - MARGIN) {
+      doc.addPage()
+      y = MARGIN
+    }
+
+    // The lyric sets the width to align against; a line with no words still
+    // gets a sensible span so its chords do not bunch up.
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
+    const textWidth = text ? doc.getTextWidth(text) : 0
+    const span = Math.max(textWidth, CONTENT_W * 0.4)
+
+    doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...ACCENT)
+    let lastRight = -Infinity
+    for (const item of onLine) {
+      const fraction = lineBeats > 0 ? item.start / lineBeats : 0
+      let x = MARGIN + fraction * span
+      const label = ascii(chordSymbol(item.chord))
+      const width = doc.getTextWidth(label)
+      // Never let two chords overlap, however tightly they were placed.
+      if (x < lastRight + 1.5) x = lastRight + 1.5
+      if (x + width > PAGE.w - MARGIN) break
+      doc.text(label, x, y)
+      lastRight = x + width
+    }
+
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
+    if (text) doc.text(text, MARGIN, y + 5)
+    y += text ? 12 : 8
+  }
+
+  return y
 }
 
 // --- the chart --------------------------------------------------------------
 
-function drawBars(doc, bars, key, startY, timeSignatureId, hasLyrics = false) {
+function drawBars(doc, bars, key, startY, timeSignatureId) {
   const perRow = barsPerRow(timeSignatureId)
   const barW = CONTENT_W / perRow
-  // A lyric line needs its own band under the numerals.
-  const barH = hasLyrics ? 22 : 16
+  const barH = 16
   let y = startY
 
   for (let i = 0; i < bars.length; i += perRow) {
@@ -199,14 +253,6 @@ function drawBars(doc, bars, key, startY, timeSignatureId, hasLyrics = false) {
 
         doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...MUTED)
         doc.text(ascii(romanNumeral(slot.chord, key, slot.inversion)), cx, y + 12)
-
-        // Words sit under the chord they are sung on, the way a chart reads.
-        // A tied continuation carries no new syllable.
-        if (hasLyrics && slot.lyric && !slot.tiedFromPrevious) {
-          doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...INK)
-          const room = (barW - 4) * Math.max(0.25, slot.beats / perBar)
-          doc.text(fitText(doc, ascii(slot.lyric), room), cx, y + 19)
-        }
         cursor += slot.beats
       })
     })

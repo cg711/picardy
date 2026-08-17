@@ -45,9 +45,9 @@ export default function Transport({
       </label>
       <label className="ctl" title="Length given to each chord you add from here on">
         <span className="lbl">New chord</span>
-        <select value={newChordDuration} onChange={(e) => onNewChordDuration(e.target.value)}>
+        <select value={String(newChordDuration)} onChange={(e) => onNewChordDuration(Number(e.target.value))}>
           {DURATIONS.map((d) => (
-            <option key={d.id} value={d.id}>{d.label}</option>
+            <option key={d.id} value={String(d.beats)}>{d.label}</option>
           ))}
         </select>
       </label>

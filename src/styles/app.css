@@ -708,3 +708,76 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 .undo-pair { display: flex; gap: 4px; }
 .undo-pair .btn { padding: 6px 10px; font-size: 14px; line-height: 1; }
+
+/* ---------- lyric timeline ---------- */
+
+.view-tabs {
+  display: flex; gap: 2px; margin: 12px 14px 0; padding: 2px;
+  background: #0e131b; border: 1px solid var(--border); border-radius: 8px;
+}
+.view-tabs button {
+  flex: 1; font: inherit; font-size: 12px; padding: 5px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+}
+.view-tabs button.on { background: var(--surface-2); color: var(--text); }
+
+.lyric-timeline { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.lyric-timeline.dragging { cursor: grabbing; user-select: none; }
+.tl-hint { margin: 0 0 4px; }
+.tl-hint kbd {
+  font: inherit; font-size: 10px; padding: 0 4px; border-radius: 4px;
+  border: 1px solid var(--border); background: #0e131b;
+}
+
+.tl-line { display: flex; gap: 8px; align-items: stretch; }
+.tl-lane-wrap { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 2px; }
+.tl-lane {
+  position: relative; height: 46px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tl-grid {
+  position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-soft);
+}
+.tl-grid.bar { background: #3f5170; }
+.tl-grid em {
+  position: absolute; top: -2px; left: 3px; font-style: normal; font-size: 9px;
+  color: var(--text-dim);
+}
+
+.tl-chord {
+  position: absolute; top: 12px; height: 32px;
+  display: flex; flex-direction: column; justify-content: center; gap: 0;
+  padding: 2px 6px; border-radius: 6px; cursor: grab; overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font: inherit; text-align: left; white-space: nowrap;
+}
+.tl-chord:hover { border-color: #3f5170; }
+.tl-chord.active { border-color: var(--accent); background: #12242a; }
+.tl-chord.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
+.tl-chord.anchored { cursor: default; border-style: dashed; }
+.tl-chord.grabbing { cursor: grabbing; border-color: var(--accent); z-index: 3; }
+.tl-symbol { font-size: 13px; font-weight: 600; line-height: 1.1; }
+.tl-roman { font-size: 9px; color: var(--accent); line-height: 1.1; }
+.tl-remove {
+  position: absolute; top: 1px; right: 3px; font-size: 11px; color: var(--text-dim);
+  cursor: pointer; line-height: 1;
+}
+.tl-remove:hover { color: var(--danger); }
+
+.tl-lyric {
+  display: block; font: inherit; font-size: 14px; line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #0e131b; color: var(--text); border: 1px solid var(--border-soft);
+  border-radius: 6px; padding: 5px 8px; resize: vertical; outline: none; min-height: 30px;
+}
+.tl-lyric:focus { border-color: var(--accent); }
+.tl-lyric::placeholder { color: #55637a; }
+
+.tl-line-actions { display: flex; flex-direction: column; gap: 2px; align-items: center; padding-top: 12px; }
+.tl-line-num { font-size: 9px; color: var(--text-dim); }
+.tl-line-actions button {
+  font: inherit; font-size: 10px; width: 20px; height: 18px; line-height: 1; cursor: pointer;
+  border: 1px solid var(--border-soft); background: #0e131b; color: var(--text-dim); border-radius: 4px;
+}
+.tl-line-actions button:hover { color: var(--text); border-color: var(--border); }

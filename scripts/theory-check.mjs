@@ -299,12 +299,17 @@ console.log('\n--- song arrangement ---')
     name: 'Bridge', key,
     progression: ['F#m', 'D', 'A', 'E'].map(parseChord),
     inversions: [0, 1, 0, 0], durations: ['2', '2', '1', '1'], timeSignature: '3/4',
+    lines: [0, 0, 1, 1], lyricLines: ['first line', 'second line'],
   })
   const back = readSegment(built)
   eq('  round-trip keeps the key', noteName(back.key.tonic) + ' ' + back.key.mode, 'F# minor')
   eq('  round-trip keeps the metre', back.timeSignature, '3/4')
   eq('  round-trip keeps inversions', back.inversions.join(','), '0,1,0,0')
-  eq('  round-trip keeps durations', back.durations.join(','), '2,2,1,1')
+  // Preset ids normalise to beats on the way in: '2' is a half note (2 beats),
+  // '1' a whole note (4).
+  eq('  round-trip normalises durations to beats', back.durations.join(','), '2,2,4,4')
+  eq('  round-trip keeps the lyric lines', back.lyricLines.join('|'), 'first line|second line')
+  eq('  round-trip keeps each chord\'s line', back.lines.join(','), '0,0,1,1')
   eq('  round-trip keeps chords', back.progression.map((c) => chordSymbol(c)).join(' '), 'F♯m D A E')
 }
 
@@ -510,12 +515,14 @@ console.log('\n--- pinned shapes ---')
   const segment = {
     id: 'a', name: 'Verse', key: 'C', timeSignature: '4/4',
     chords: ['C', 'C'], inversions: [0, 0], durations: ['1', '1'],
-    shapes: [encoded, null], lyrics: ['pinned', 'default'],
+    shapes: [encoded, null],
+    lines: [0, 1], lyricLines: ['first line', 'second line'],
   }
   const live = readSegment(segment)
   eq('  a section round-trips the pinned shape', live.shapes[0], encoded)
   eq('  and the unpinned slot stays empty', live.shapes[1], null)
-  eq('  and carries the lyrics', live.lyrics.join('|'), 'pinned|default')
+  eq('  and carries the lyric lines', live.lyricLines.join('|'), 'first line|second line')
+  eq('  and which line each chord sits on', live.lines.join(','), '0,1')
 
   // Two voicings of one chord must both survive into the legend.
   const flat = flattenSong([{ segmentId: 'a', repeats: 1 }], [segment])
