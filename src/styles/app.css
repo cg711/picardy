@@ -93,6 +93,15 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 /* The key, transpose, detect and share controls, sitting with the progression
    they act on. A row of its own rather than more panel-head: the head names the
    panel and holds the generator, this sets up what is in it. */
+/* Pulses beside the chord symbol while the panel is tracking the playhead. */
+.playing-dot {
+  display: inline-block; width: 7px; height: 7px; margin-left: 9px;
+  border-radius: 50%; background: var(--accent-2);
+  vertical-align: middle; animation: playing-pulse 1.1s ease-in-out infinite;
+}
+@keyframes playing-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .playing-dot { animation: none; } }
+
 .setup-bar {
   display: flex;
   align-items: center;
@@ -103,7 +112,6 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
   background: #ffffff04;
 }
 .setup-bar .key-picker { flex: 1 1 auto; }
-.setup-bar .share-btn { margin-left: auto; flex: none; }
 
 .brand { display: flex; align-items: baseline; gap: 10px; }
 .brand h1 { font-size: 18px; }

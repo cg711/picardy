@@ -150,8 +150,23 @@ export default function App() {
 
   // --- derived ---------------------------------------------------------------
 
-  const activeChord = preview ?? progression[activeIndex] ?? null
-  const activeInversion = preview ? displayInversion : (inversions[activeIndex] ?? 0)
+  // Which chord the right-hand column is describing. Normally the one you
+  // clicked — but while the progression plays it follows the sounding chord,
+  // because instruments showing a chord you are not hearing is just wrong.
+  // Playback wins over selection and reverts to it on stop, since playingIndex
+  // is -1 whenever nothing is sounding (including during the count-in bar).
+  //
+  // Song playback gets there another way: those chords come from a section and
+  // are not in this progression at all, so it sets `preview` instead.
+  const focusIndex = playingIndex >= 0 ? playingIndex : activeIndex
+  // Whenever the playhead is driving the panel — not only when it has landed
+  // somewhere other than the selection. Tying it to a difference made the cue
+  // blink off for the one chord that happened to be selected, which reads as a
+  // glitch rather than as information.
+  const followingPlayback = playingIndex >= 0
+
+  const activeChord = preview ?? progression[focusIndex] ?? null
+  const activeInversion = preview ? displayInversion : (inversions[focusIndex] ?? 0)
 
   const suggestions = useMemo(
     () => suggestNext(musicKey, progression.slice(0, activeIndex + 1)),
@@ -197,10 +212,10 @@ export default function App() {
   // A shape stored against this chord slot wins over the search order, but only
   // in the tuning it was chosen in.
   const storedShape = useMemo(() => {
-    if (preview || activeIndex < 0) return null
-    const frets = decodeShape(shapes[activeIndex], tuningId)
+    if (preview || focusIndex < 0) return null
+    const frets = decodeShape(shapes[focusIndex], tuningId)
     return frets ? shapeFromFrets(frets, tuning) : null
-  }, [shapes, activeIndex, tuningId, tuning, preview])
+  }, [shapes, focusIndex, tuningId, tuning, preview])
 
   const shape = voicingPick ?? storedShape ?? shownShapes[0] ?? null
   const displayKey = playbackKey ?? musicKey
@@ -211,7 +226,17 @@ export default function App() {
     [activeChord, displayKey],
   )
   const activeScale = scales.find((s) => s.id === scaleId) ?? scales[0] ?? null
-  const nextChord = activeIndex >= 0 ? progression[activeIndex + 1] ?? null : null
+  // Common tones are drawn against whatever comes after the chord on screen.
+  const nextChord = focusIndex >= 0 ? progression[focusIndex + 1] ?? null : null
+
+  // Which bar the playhead is in — the beats before it, over the bar length.
+  // Counting from the durations rather than the chord index because a chord can
+  // be shorter or longer than a bar, so the two are not the same number.
+  const playingBar = useMemo(() => {
+    if (focusIndex < 0) return 1
+    const before = durations.slice(0, focusIndex).reduce((sum, d) => sum + toBeats(d), 0)
+    return Math.floor(before / timeSignatureOf(timeSignature).beatsPerBar) + 1
+  }, [durations, focusIndex, timeSignature])
   const reharmOptions = useMemo(
     () => (activeIndex >= 0 && progression[activeIndex] ? reharmonise(progression, activeIndex, musicKey) : { replace: [], insert: [] }),
     [progression, activeIndex, musicKey],
@@ -680,9 +705,9 @@ export default function App() {
           <h1><Lockup /></h1>
           <span className="tagline">fretboard &amp; keyboard progression explorer</span>
         </div>
-        {/* Identity and navigation only. The key, transpose and share controls
-            all act on the progression, so they live with it rather than in a bar
-            that spans the whole app. */}
+        {/* The key and transpose controls moved down to the progression they act
+            on. Share stays: it copies a link to the whole app state, not to one
+            panel, so a bar that spans the app is where it belongs. */}
         <div className="topbar-right">
           <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
@@ -715,10 +740,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* Everything here reads or rewrites the progression below it: which
-                key the numerals are measured against, moving the music to a new
-                one, and the link that carries it. The muted key name that used to
-                sit in the head is gone — the picker is the key name now. */}
+            {/* Both of these read or rewrite the progression below: which key the
+                numerals are measured against, and moving the music to a new one.
+                The muted key name that used to sit in the head is gone — the
+                picker is the key name now. */}
             <div className="setup-bar">
               <KeyPicker
                 musicKey={musicKey}
@@ -970,11 +995,17 @@ export default function App() {
         <section className="col col-right">
           <div className="panel p-chord">
             <div className="panel-head">
-              <h2>{activeChord ? chordSymbol(activeChord) : 'No chord selected'}</h2>
+              <h2>
+                {activeChord ? chordSymbol(activeChord) : 'No chord selected'}
+                {/* Say so when the panel has left your selection to follow the
+                    playhead, or the change looks like the app losing your place. */}
+                {followingPlayback && <span className="playing-dot" title="Following playback" />}
+              </h2>
               {activeChord && (
                 <span className="muted">
                   {chordName(activeChord)} · {romanNumeral(activeChord, displayKey, activeInversion)} · {analysis.fnLabel}
                   {preview ? ' · preview' : ''}
+                  {followingPlayback ? ` · bar ${playingBar}` : ''}
                 </span>
               )}
             </div>
@@ -996,8 +1027,11 @@ export default function App() {
                       className={`inv-pill ${activeInversion === i ? 'on' : ''}`}
                       title={inversionLabel(activeChord, i)}
                       onClick={() => {
+                        // focusIndex, not activeIndex: what you edit is the chord
+                        // named above the button, which during playback is the
+                        // sounding one.
                         if (preview) setDisplayInversion(i)
-                        else if (activeIndex >= 0) setInversionAt(activeIndex, i)
+                        else if (focusIndex >= 0) setInversionAt(focusIndex, i)
                       }}
                     >
                       {i === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][i - 1] ?? `${i}th`}
@@ -1025,7 +1059,7 @@ export default function App() {
                       key={id}
                       className={detailTab === id ? 'on' : ''}
                       onClick={() => setDetailTab(id)}
-                      disabled={id === 'reharm' && (preview || activeIndex < 0)}
+                      disabled={id === 'reharm' && (preview || focusIndex < 0)}
                       title={id === 'reharm' && preview ? 'Select a chord in the progression first' : undefined}
                     >
                       {label}
@@ -1047,13 +1081,13 @@ export default function App() {
                   />
                 )}
 
-                {detailTab === 'reharm' && !preview && activeIndex >= 0 && (
+                {detailTab === 'reharm' && !preview && focusIndex >= 0 && (
                   <ReharmPanel
-                    chord={progression[activeIndex]}
+                    chord={progression[focusIndex]}
                     options={reharmOptions}
                     onPreview={previewChord}
-                    onReplace={(chord) => replaceChordAt(activeIndex, chord)}
-                    onInsert={(chord) => insertChordAt(activeIndex, chord)}
+                    onReplace={(chord) => replaceChordAt(focusIndex, chord)}
+                    onInsert={(chord) => insertChordAt(focusIndex, chord)}
                   />
                 )}
               </>
@@ -1162,11 +1196,11 @@ export default function App() {
                         setVoicingPick(s)
                         // Remember it against this chord so it survives leaving
                         // the chord, reloading, and reaches the PDF.
-                        if (!preview && activeIndex >= 0) {
+                        if (!preview && focusIndex >= 0) {
                           setShapes((sh) => {
                             const next = [...sh]
                             while (next.length < progression.length) next.push(null)
-                            next[activeIndex] = encodeShape(s, tuningId)
+                            next[focusIndex] = encodeShape(s, tuningId)
                             return next
                           })
                         }
