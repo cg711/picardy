@@ -50,9 +50,17 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
+  /* The body's background becomes the canvas background, which paints over the
+     whole document — but the gradients are still *sized* to the body box, and
+     `height: 100%` above pins that to the viewport. With the default
+     `repeat`, a page taller than the screen therefore tiles the glow, with a
+     hard seam at every viewport boundary. no-repeat paints it once; the colour
+     layer below always covers the full canvas, so there is nothing to fill in.
+     Both glows have faded out by ~290px, well inside any real viewport, so the
+     bottom edge of that one tile is never visible. */
   background:
-    radial-gradient(1200px 600px at 15% -10%, #241d13 0%, transparent 60%),
-    radial-gradient(900px 500px at 95% 0%, #1d1a22 0%, transparent 55%),
+    radial-gradient(1200px 600px at 15% -10%, #241d13 0%, transparent 60%) no-repeat,
+    radial-gradient(900px 500px at 95% 0%, #1d1a22 0%, transparent 55%) no-repeat,
     var(--bg);
   color: var(--text);
   font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Inter, Roboto, sans-serif;

@@ -6,10 +6,10 @@
 
 export const SITE = {
   /** Whoever is legally responsible: your own name until an entity exists. */
-  operator: '[your name or LLC]',
-  contact: '[your contact email]',
+  operator: 'Casey Gehling',
+  contact: 'picardy.bizz@gmail.com',
   /** Used only in the governing-law clause. */
-  jurisdiction: '[your state]',
+  jurisdiction: 'Minnesota',
   /** Bump this whenever either document changes in substance. */
   updated: '17 August 2026',
 }
