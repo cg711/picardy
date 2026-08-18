@@ -577,6 +577,11 @@ console.log('\n--- brand palette ---')
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8')
   eq('  theme-color is the panel colour', html.match(/theme-color"\s+content="(#[0-9a-f]{6})"/i)?.[1]?.toLowerCase(), brand.panel)
 
+  // Several scrapers refuse to resolve a root-relative og:image and just show no
+  // preview at all — which is invisible from the page itself, so assert it here.
+  const ogImage = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1]
+  eq('  og:image is an absolute URL', /^https:\/\//.test(ogImage ?? ''), true)
+
   // Chord-tone colours have to be told apart from each other and from the accent,
   // which paints scale dots on the same fretboard. WCAG contrast is the wrong
   // instrument for that — it only sees luminance, so two plainly different hues
