@@ -26,18 +26,15 @@ import {
 
 import { Lockup } from './brand/Mark.jsx'
 import KeyPicker from './components/KeyPicker.jsx'
-import ChordInput from './components/ChordInput.jsx'
-import RomanPicker from './components/RomanPicker.jsx'
 import ProgressionBar from './components/ProgressionBar.jsx'
-import Suggestions from './components/Suggestions.jsx'
 import Piano from './components/Piano.jsx'
 import Fretboard, { ChordBox } from './components/Fretboard.jsx'
 import Transport from './components/Transport.jsx'
-import Arrangement from './components/Arrangement.jsx'
+import Arrangement, { SaveSectionRow } from './components/Arrangement.jsx'
+import AddChordDialog from './components/AddChordDialog.jsx'
 import ExportDialog from './components/ExportDialog.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
-import ImportPanel from './components/ImportPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, linkProps } from './lib/router.js'
@@ -71,6 +68,12 @@ export default function App() {
   const [preview, setPreview] = useState(null)
   const [selection, setSelection] = useState(() => new Set())
   const [inputMode, setInputMode] = useState('text')
+  // Whether the add-a-chord panel is open. Where it will insert is not stored
+  // separately — it is always activeIndex + 1, which addChord and the suggestion
+  // engine already agree on, so the two cannot drift apart.
+  const [addOpen, setAddOpen] = useState(false)
+  // Instruments show one at a time now, so this is which one.
+  const [instrument, setInstrument] = useState('piano')
 
   const [tuningId, setTuningId] = useState('standard')
   const [lefty, setLefty] = useState(() => !!loadPrefs().lefty)
@@ -283,6 +286,21 @@ export default function App() {
   }, [song])
 
   // --- actions ---------------------------------------------------------------
+
+  /**
+   * Open the add-a-chord panel targeting a gap in the strip.
+   *
+   * addChord already inserts *after* activeIndex, and the suggestion engine
+   * already reads the progression up to activeIndex — which is exactly the
+   * context you want when inserting at `at`. So pointing activeIndex at the
+   * preceding chord makes one variable do both jobs, and the ranked list becomes
+   * "what follows the chord on the left of this gap" for free.
+   */
+  const openAddChord = (at) => {
+    setActiveIndex(at - 1)
+    setPreview(null)
+    setAddOpen(true)
+  }
 
   const addChord = useCallback(
     (chord) => {
@@ -767,6 +785,7 @@ export default function App() {
               {[
                 ['chips', 'Chords'],
                 ['lyrics', 'Lyrics & timing'],
+                ['sections', 'Sections & song'],
               ].map(([id, label]) => (
                 <button key={id} className={editorView === id ? 'on' : ''} onClick={() => setEditorView(id)}>
                   {label}
@@ -792,8 +811,69 @@ export default function App() {
               />
             )}
 
+            {editorView === 'sections' && (
+              <>
+              <Arrangement
+                segments={segments}
+                song={song}
+                bpm={bpm}
+                playingSongIndex={playingSongIndex}
+                playingSong={playingSong}
+                onLoad={loadSegment}
+                onRename={renameSegment}
+                onDeleteSegment={deleteSegment}
+                onAddToSong={addToSong}
+                onSetRepeats={setRepeats}
+                onMoveEntry={moveEntry}
+                onRemoveEntry={removeEntry}
+                onClearSong={() => setSong([])}
+                onPlaySong={playSong}
+                onStopSong={stopEverything}
+                onExport={() => setExporting(true)}
+                onExportMidi={exportMidi}
+              />
+              {/* Named sections are work you saved; Recent is work you didn't. Both
+                  answer "get me back to something I had", so they belong together
+                  rather than at opposite corners of the screen. */}
+              {history.length > 0 && (
+                <>
+                  <div className="sub-head">
+                    <h3>Recent</h3>
+                    <span className="muted">progressions you built earlier</span>
+                    <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
+                  </div>
+                  <ul className="history">
+                    {history.slice(0, 8).map((h, i) => (
+                      <li key={i}>
+                        <button
+                          onClick={() => {
+                            const s = historyToState(h)
+                            if (!s.key) return
+                            setMusicKey(s.key)
+                            setProgression(s.progression)
+                            setInversions(s.progression.map(() => 0))
+                            setDurations(s.progression.map(() => DEFAULT_DURATION))
+                            setShapes(s.progression.map(() => null))
+                            setLines(s.progression.map(() => 0))
+                            setLyricLines([''])
+                            setActiveIndex(s.progression.length - 1)
+                            setPreview(null)
+                          }}
+                        >
+                          <span className="hist-key">{h.key}</span>
+                          <span className="hist-chords">{h.chords.join(' – ')}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              </>
+            )}
+
             <ProgressionBar
               progression={editorView === 'chips' ? progression : []}
+              onAddAt={openAddChord}
               inversions={inversions}
               musicKey={musicKey}
               activeIndex={activeIndex}
@@ -809,7 +889,7 @@ export default function App() {
               onRedo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
-              hideWhenEmpty={editorView === 'lyrics'}
+              hideWhenEmpty={editorView !== 'chips'}
               shapes={shapes}
               tuningId={tuningId}
               durations={durations}
@@ -827,6 +907,12 @@ export default function App() {
                 stop()
               }}
             />
+
+            {/* Kept out of the Sections tab on purpose: this acts on the
+                progression, not on the library, so it should not hide behind the
+                tab that lists what you have already saved. */}
+            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} />
+
             <Transport
               playing={playing}
               onPlay={play}
@@ -851,148 +937,137 @@ export default function App() {
             />
           </div>
 
-          {/* Typing a chord, picking a numeral, spelling one on the instruments,
-              pasting a chart and taking a suggestion are five routes to the same
-              destination — a chord in the progression. They were two panels; the
-              suggestion list stays below the input rather than becoming a sixth
-              tab, so you can type and still see what the engine would pick. */}
-          <div className="panel grow p-add">
+        </section>
+
+        <section className="col col-right">
+          {/* One instrument at a time. Both show the same chord and both feed the
+              same pool of selected notes, so the toggle changes the view rather
+              than the state — switching mid-selection keeps the notes you picked
+              on the other instrument. */}
+          <div className="panel p-instruments">
             <div className="panel-head">
-              <h2>Add a chord</h2>
+              <h2>Instruments</h2>
               <div className="tabs">
-                {[
-                  ['text', 'Type'],
-                  ['roman', 'Numerals'],
-                  ['notes', 'From notes'],
-                  ['import', 'Paste chart'],
-                ].map(([id, label]) => (
-                  <button key={id} className={inputMode === id ? 'on' : ''} onClick={() => setInputMode(id)}>
+                {[['piano', 'Piano'], ['guitar', 'Guitar']].map(([id, label]) => (
+                  <button key={id} className={instrument === id ? 'on' : ''} onClick={() => setInstrument(id)}>
                     {label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {inputMode === 'text' && <ChordInput onAdd={addChord} musicKey={musicKey} />}
-            {inputMode === 'roman' && <RomanPicker musicKey={musicKey} onAdd={addChord} />}
-            {inputMode === 'import' && (
-              <ImportPanel timeSignature={timeSignature} onLoad={loadChart} />
+            {instrument === 'piano' && (
+            <Piano
+              chord={activeChord}
+              voicing={pianoVoicing}
+              selection={selection}
+              onToggleNote={toggleNote}
+              scalePcs={showScale && activeScale ? activeScale.pcs : null}
+              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
+            />
             )}
-            {inputMode === 'notes' && (
-              <div className="from-notes">
-                <p className="muted">
-                  Click notes on the piano or the fretboard in Instruments. The lowest note is treated as the bass.
-                </p>
-                <div className="sel-notes">
-                  {[...selection].sort((a, b) => a - b).map((m) => (
-                    <span key={m} className="pill tiny">{m}</span>
+
+            {instrument === 'guitar' && (
+            <>
+            <div className="sub-head">
+              <div className="fb-controls">
+                <select value={tuningId} onChange={(e) => setTuningId(e.target.value)}>
+                  {Object.entries(TUNINGS).map(([id, t]) => (
+                    <option key={id} value={id}>{t.name}</option>
                   ))}
-                  {selection.size > 0 && (
-                    <button className="btn ghost tiny" onClick={() => setSelection(new Set())}>Clear notes</button>
-                  )}
+                </select>
+                <div className="hand-toggle" role="group" aria-label="Handedness">
+                  {[[false, 'Right'], [true, 'Left']].map(([value, text]) => (
+                    <button
+                      key={text}
+                      className={lefty === value ? 'on' : ''}
+                      onClick={() => {
+                        setLefty(value)
+                        savePref('lefty', value)
+                      }}
+                      title={`${text}-handed — mirrors the neck and the chord boxes together`}
+                    >
+                      {text}
+                    </button>
+                  ))}
                 </div>
-                {identified.length > 0 ? (
-                  <ul className="ident-list">
-                    {identified.map((r, i) => (
-                      <li key={r.symbol}>
-                        <span className="ident-symbol">{r.symbol}</span>
-                        <span className="ident-roman">{romanNumeral(r.chord, musicKey)}</span>
-                        <span className="muted">
-                          {[
-                            r.missing ? `${r.missing} tone missing` : null,
-                            r.extra ? `${r.extra} extra note` : null,
-                          ].filter(Boolean).join(', ') || 'exact match'}
-                        </span>
-                        <button className="btn tiny primary" onClick={() => addChord(r.chord)}>Add</button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted">{selection.size < 2 ? 'Pick at least two notes.' : 'No chord matches those notes.'}</p>
+                <label className="check">
+                  <input type="checkbox" checked={showAllTones} onChange={(e) => setShowAllTones(e.target.checked)} />
+                  all chord tones
+                </label>
+                {shape && (
+                  <button
+                    className="btn ghost tiny"
+                    onClick={() => playChord(shape.midis, { timbre: 'guitar', strum: 0.03, duration: 2 })}
+                  >
+                    ▶ strum
+                  </button>
                 )}
               </div>
-            )}
+            </div>
 
-            <div className="sub-head">
-              <h3>What comes next</h3>
-              <span className="muted">
-                {progression.length && activeIndex >= 0
-                  ? `after ${chordSymbol(progression[activeIndex])}`
-                  : 'opening chord'}
-              </span>
-            </div>
-            <Suggestions suggestions={suggestions} onAdd={addChord} onPreview={previewChord} />
-          </div>
-          <div className="panel p-arrange">
-            <div className="panel-head">
-              <h2>Sections &amp; song</h2>
-              <span className="muted">
-                {segments.length ? `${segments.length} saved` : 'build a song from named sections'}
-              </span>
-            </div>
-            <Arrangement
-              segments={segments}
-              song={song}
-              bpm={bpm}
-              canSave={progression.length > 0}
-              playingSongIndex={playingSongIndex}
-              playingSong={playingSong}
-              onSave={saveSegment}
-              onLoad={loadSegment}
-              onRename={renameSegment}
-              onDeleteSegment={deleteSegment}
-              onAddToSong={addToSong}
-              onSetRepeats={setRepeats}
-              onMoveEntry={moveEntry}
-              onRemoveEntry={removeEntry}
-              onClearSong={() => setSong([])}
-              onPlaySong={playSong}
-              onStopSong={stopEverything}
-              onExport={() => setExporting(true)}
-              onExportMidi={exportMidi}
+            <Fretboard
+              chord={activeChord}
+              tuning={tuning}
+              shape={shape}
+              showAllTones={showAllTones}
+              selection={selection}
+              onToggleNote={toggleNote}
+              lefty={lefty}
+              scalePcs={showScale && activeScale ? activeScale.pcs : null}
+              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
             />
 
-            {/* Named sections are work you saved; Recent is work you didn't. Both
-                answer "get me back to something I had", so they belong together
-                rather than at opposite corners of the screen. */}
-            {history.length > 0 && (
-              <>
-                <div className="sub-head">
-                  <h3>Recent</h3>
-                  <span className="muted">progressions you built earlier</span>
-                  <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
+            {activeChord && (
+              <div className="voicings">
+                <div className="voicings-head">
+                  <span className="lbl">Voicings</span>
+                  <span className="muted small">
+                    {voicings.length
+                      ? showAllShapes
+                        ? `all ${voicings.length} playable shapes, in fret order${shape ? ` — ${voicingLabel(shape)}` : ''}`
+                        : `${voicings.length}${voicings.total > voicings.length ? ` of ${voicings.total}` : ''} playable shape${voicings.total === 1 ? '' : 's'}, spread across the neck${shape ? ` — ${voicingLabel(shape)}` : ''}`
+                      : 'no playable shape found in this tuning'}
+                  </span>
+                  {voicings.total > 12 && (
+                    <button className="btn ghost tiny" onClick={() => setShowAllShapes((v) => !v)}>
+                      {showAllShapes ? 'Show fewer' : `Show all ${voicings.total}`}
+                    </button>
+                  )}
                 </div>
-                <ul className="history">
-                  {history.slice(0, 8).map((h, i) => (
-                    <li key={i}>
-                      <button
-                        onClick={() => {
-                          const s = historyToState(h)
-                          if (!s.key) return
-                          setMusicKey(s.key)
-                          setProgression(s.progression)
-                          setInversions(s.progression.map(() => 0))
-                          setDurations(s.progression.map(() => DEFAULT_DURATION))
-                          setShapes(s.progression.map(() => null))
-                          setLines(s.progression.map(() => 0))
-                          setLyricLines([''])
-                          setActiveIndex(s.progression.length - 1)
-                          setPreview(null)
-                        }}
-                      >
-                        <span className="hist-key">{h.key}</span>
-                        <span className="hist-chords">{h.chords.join(' – ')}</span>
-                      </button>
-                    </li>
+                <div className={`box-row ${showAllShapes ? 'expanded' : ''}`}>
+                  {shownShapes.map((s) => (
+                    <ChordBox
+                      key={shapeKey(s)}
+                      shape={s}
+                      chord={activeChord}
+                      tuning={tuning}
+                      active={shape != null && shapeKey(s) === shapeKey(shape)}
+                      label={voicingLabel(s)}
+                      lefty={lefty}
+                      onClick={() => {
+                        setVoicingPick(s)
+                        // Remember it against this chord so it survives leaving
+                        // the chord, reloading, and reaches the PDF.
+                        if (!preview && focusIndex >= 0) {
+                          setShapes((sh) => {
+                            const next = [...sh]
+                            while (next.length < progression.length) next.push(null)
+                            next[focusIndex] = encodeShape(s, tuningId)
+                            return next
+                          })
+                        }
+                        playChord(s.midis, { timbre: 'guitar', strum: 0.03, duration: 2 })
+                      }}
+                    />
                   ))}
-                </ul>
-              </>
+                </div>
+              </div>
+            )}
+            </>
             )}
           </div>
 
-        </section>
-
-        <section className="col col-right">
           <div className="panel p-chord">
             <div className="panel-head">
               <h2>
@@ -1094,127 +1169,29 @@ export default function App() {
             )}
           </div>
 
-          {/* One panel, not two: both are the same chord seen from a different
-              instrument, both respond to the same selection, and the "From
-              notes" input treats clicks on either as one pool of notes. */}
-          <div className="panel p-instruments">
-            <div className="panel-head">
-              <h2>Instruments</h2>
-              <span className="muted">click keys or frets to select notes</span>
-            </div>
-
-            <div className="sub-head">
-              <h3>Piano</h3>
-            </div>
-            <Piano
-              chord={activeChord}
-              voicing={pianoVoicing}
-              selection={selection}
-              onToggleNote={toggleNote}
-              scalePcs={showScale && activeScale ? activeScale.pcs : null}
-              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
-            />
-
-            <div className="sub-head">
-              <h3>Guitar</h3>
-              <div className="fb-controls">
-                <select value={tuningId} onChange={(e) => setTuningId(e.target.value)}>
-                  {Object.entries(TUNINGS).map(([id, t]) => (
-                    <option key={id} value={id}>{t.name}</option>
-                  ))}
-                </select>
-                <div className="hand-toggle" role="group" aria-label="Handedness">
-                  {[[false, 'Right'], [true, 'Left']].map(([value, text]) => (
-                    <button
-                      key={text}
-                      className={lefty === value ? 'on' : ''}
-                      onClick={() => {
-                        setLefty(value)
-                        savePref('lefty', value)
-                      }}
-                      title={`${text}-handed — mirrors the neck and the chord boxes together`}
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
-                <label className="check">
-                  <input type="checkbox" checked={showAllTones} onChange={(e) => setShowAllTones(e.target.checked)} />
-                  all chord tones
-                </label>
-                {shape && (
-                  <button
-                    className="btn ghost tiny"
-                    onClick={() => playChord(shape.midis, { timbre: 'guitar', strum: 0.03, duration: 2 })}
-                  >
-                    ▶ strum
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <Fretboard
-              chord={activeChord}
-              tuning={tuning}
-              shape={shape}
-              showAllTones={showAllTones}
-              selection={selection}
-              onToggleNote={toggleNote}
-              lefty={lefty}
-              scalePcs={showScale && activeScale ? activeScale.pcs : null}
-              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
-            />
-
-            {activeChord && (
-              <div className="voicings">
-                <div className="voicings-head">
-                  <span className="lbl">Voicings</span>
-                  <span className="muted small">
-                    {voicings.length
-                      ? showAllShapes
-                        ? `all ${voicings.length} playable shapes, in fret order${shape ? ` — ${voicingLabel(shape)}` : ''}`
-                        : `${voicings.length}${voicings.total > voicings.length ? ` of ${voicings.total}` : ''} playable shape${voicings.total === 1 ? '' : 's'}, spread across the neck${shape ? ` — ${voicingLabel(shape)}` : ''}`
-                      : 'no playable shape found in this tuning'}
-                  </span>
-                  {voicings.total > 12 && (
-                    <button className="btn ghost tiny" onClick={() => setShowAllShapes((v) => !v)}>
-                      {showAllShapes ? 'Show fewer' : `Show all ${voicings.total}`}
-                    </button>
-                  )}
-                </div>
-                <div className={`box-row ${showAllShapes ? 'expanded' : ''}`}>
-                  {shownShapes.map((s) => (
-                    <ChordBox
-                      key={shapeKey(s)}
-                      shape={s}
-                      chord={activeChord}
-                      tuning={tuning}
-                      active={shape != null && shapeKey(s) === shapeKey(shape)}
-                      label={voicingLabel(s)}
-                      lefty={lefty}
-                      onClick={() => {
-                        setVoicingPick(s)
-                        // Remember it against this chord so it survives leaving
-                        // the chord, reloading, and reaches the PDF.
-                        if (!preview && focusIndex >= 0) {
-                          setShapes((sh) => {
-                            const next = [...sh]
-                            while (next.length < progression.length) next.push(null)
-                            next[focusIndex] = encodeShape(s, tuningId)
-                            return next
-                          })
-                        }
-                        playChord(s.midis, { timbre: 'guitar', strum: 0.03, duration: 2 })
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
         </section>
       </main>
+
+      <AddChordDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        insertAt={activeIndex + 1}
+        progression={progression}
+        musicKey={musicKey}
+        inputMode={inputMode}
+        onInputMode={setInputMode}
+        onAdd={addChord}
+        suggestions={suggestions}
+        onPreview={previewChord}
+        timeSignature={timeSignature}
+        onLoadChart={(parsed) => {
+          loadChart(parsed)
+          setAddOpen(false)
+        }}
+        selection={selection}
+        onClearNotes={() => setSelection(new Set())}
+        identified={identified}
+      />
 
       {exporting && (
         <ExportDialog

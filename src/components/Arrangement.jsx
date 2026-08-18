@@ -12,13 +12,37 @@ const chip = (hue) => ({
  * Saved segments plus the song they are arranged into. Segments are the
  * library; the song is an ordered playlist of references to them.
  */
+/**
+ * Saving the current progression as a section, on its own.
+ *
+ * Split out of the panel below it because it acts on the progression rather than
+ * on the library — so it stays visible whichever editor tab you are on, instead
+ * of hiding behind the one that lists what you already saved.
+ */
+export function SaveSectionRow({ canSave, onSave }) {
+  const [name, setName] = useState('Verse')
+  return (
+    <div className="save-row">
+      <select value={name} onChange={(e) => setName(e.target.value)} aria-label="Section type">
+        {SEGMENT_NAMES.map((n) => (
+          <option key={n} value={n}>{n}</option>
+        ))}
+      </select>
+      <button className="btn primary" onClick={() => onSave(name)} disabled={!canSave}>
+        Save as section
+      </button>
+      <span className="muted small">
+        {canSave ? 'Snapshots the chords, key and metre above' : 'Add some chords first'}
+      </span>
+    </div>
+  )
+}
+
 export default function Arrangement({
   segments,
   song,
   bpm,
-  canSave,
   playingSongIndex,
-  onSave,
   onLoad,
   onRename,
   onDeleteSegment,
@@ -33,7 +57,6 @@ export default function Arrangement({
   onExport,
   onExportMidi,
 }) {
-  const [name, setName] = useState('Verse')
   const [renaming, setRenaming] = useState(null)
   const [draftName, setDraftName] = useState('')
 
@@ -42,19 +65,12 @@ export default function Arrangement({
 
   return (
     <div className="arrangement">
-      <div className="save-row">
-        <select value={name} onChange={(e) => setName(e.target.value)} aria-label="Section type">
-          {SEGMENT_NAMES.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-        <button className="btn primary" onClick={() => onSave(name)} disabled={!canSave}>
-          Save as section
-        </button>
-        <span className="muted small">
-          {canSave ? 'Snapshots the chords, key and metre above' : 'Add some chords first'}
-        </span>
-      </div>
+      {segments.length === 0 && song.length === 0 && (
+        <p className="muted pad-sm">
+          Nothing saved yet. Use <strong>Save as section</strong> below to snapshot the current
+          progression, then arrange the sections into a song here.
+        </p>
+      )}
 
       {segments.length > 0 && (
         <>
@@ -108,6 +124,7 @@ export default function Arrangement({
         </>
       )}
 
+      {(segments.length > 0 || song.length > 0) && (
       <div className="sub-head">
         <span className="lbl">Song</span>
         {song.length > 0 && (
@@ -117,13 +134,12 @@ export default function Arrangement({
           </span>
         )}
       </div>
+      )}
 
       {song.length === 0 ? (
-        <p className="muted pad-sm">
-          {segments.length
-            ? 'Add sections to the song with “+ song”, then play the whole thing.'
-            : 'Save a section above to start building a song.'}
-        </p>
+        segments.length > 0 && (
+          <p className="muted pad-sm">Add sections to the song with “+ song”, then play the whole thing.</p>
+        )
       ) : (
         <>
           <ol className="song-list">

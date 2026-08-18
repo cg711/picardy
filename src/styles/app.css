@@ -138,10 +138,8 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
      this block, and a media query adds none of its own. */
   .layout > .col { display: contents; }
   .p-progression { order: 1; }
-  .p-add { order: 2; }
+  .p-instruments { order: 2; }
   .p-chord { order: 3; }
-  .p-instruments { order: 4; }
-  .p-arrange { order: 5; }
 }
 
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -963,4 +961,78 @@ a.brand { text-decoration: none; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .menu-pop { animation: none; }
   .hamburger i { transition: none; }
+}
+
+/* ---------- add-a-chord card, insert slots, and the panel ---------- */
+
+/* Same footprint as a chord chip so the strip reads as a row of cards with one
+   empty slot waiting at the end, rather than as a button bolted on. It scrolls
+   with the strip like any other card. */
+.add-card {
+  flex: 0 0 auto;
+  width: 124px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; color: var(--text-dim); cursor: pointer;
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+.add-card:hover { border-color: var(--accent); color: var(--accent); background: #ffffff05; }
+.add-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.add-card-plus { font-size: 26px; line-height: 1; font-weight: 300; }
+.add-card-label { font-size: 12px; }
+
+/* A slot at every gap. It holds its width at all times so hovering never
+   reflows the strip — only the mark inside it fades in. */
+.insert-slot {
+  flex: 0 0 auto;
+  width: 18px;
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0 -2px;
+  font: inherit; font-size: 14px; line-height: 1;
+  background: transparent; border: 0; border-radius: 6px;
+  color: var(--accent); cursor: pointer;
+  opacity: 0; transition: opacity 120ms, background 120ms;
+}
+.prog-strip:hover .insert-slot { opacity: 0.35; }
+.insert-slot:hover, .prog-strip:hover .insert-slot:hover { opacity: 1; background: #ffffff08; }
+.insert-slot:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.empty-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* Not a modal. "From notes" needs the instruments clickable, so there is no
+   backdrop and the panel sits over the left column, leaving the right one free. */
+.add-dialog {
+  position: fixed;
+  z-index: 50;
+  left: 16px;
+  top: 92px;
+  width: min(560px, calc(50vw - 32px));
+  max-height: calc(100vh - 120px);
+  display: flex; flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px #000000b0;
+}
+.add-dialog-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border-soft);
+}
+.add-dialog-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+.add-dialog-x { margin-left: auto; font-size: 16px; line-height: 1; padding: 2px 8px; }
+.add-dialog-tabs { margin: 10px 14px 0; }
+.add-dialog-body { overflow-y: auto; }
+.add-dialog-body .suggestions { max-height: none; }
+
+@media (max-width: 1100px) {
+  /* Stacked, there is no free column to sit beside — so take the full width and
+     dock to the bottom, which keeps the instruments above it reachable. */
+  .add-dialog {
+    left: 8px; right: 8px; width: auto;
+    top: auto; bottom: 8px;
+    max-height: 72vh;
+  }
 }

@@ -142,32 +142,45 @@ produces a bookmarkable link; recent progressions are kept in `localStorage`.
 
 ## How the screen is organised
 
-Five panels, grouped by the job they do rather than by the feature that built them.
+Three panels, grouped by the job they do rather than by the feature that built them.
 Left column is the work; right column is whatever chord is selected.
 
 ```
-PROGRESSION      the piece — chords or lyrics & timing, transport, Surprise me
-ADD A CHORD      type · numerals · from notes · paste chart, then what comes next
-SECTIONS & SONG  named sections, song order, recent, export
+PROGRESSION      key & transpose, then one of three views —
+                   Chords          the strip, with an add card and insert slots
+                   Lyrics & timing the timeline
+                   Sections & song saved sections, song order, recent
+                 then Save as section, then the transport
 
+INSTRUMENTS      piano or guitar, one at a time
 [Cmaj7]          the selected chord — voicing · what to play · reharmonise
-INSTRUMENTS      piano and guitar, both showing that chord
 ```
 
-The merges are the point. *Add a chord* and *what comes next* were two panels doing
-one job — five routes to the same destination — so the suggestion list now sits
-below the input rather than beside it; you can type a chord and still see what the
-engine would have picked. *Piano* and *Guitar* were one idea under two headers, and
-the "from notes" input treats clicks on either as a single pool of notes, which the
-old split actively obscured. *Recent* was stranded in the opposite corner from
-*Sections & song* despite both answering "get me back to something I had".
+**Adding a chord is a raised panel, not a section.** The strip ends in a dashed
+card with a plus, and every gap between chords holds a narrow insert slot, so where
+a chord goes is chosen by pointing at the gap rather than by selecting a chord first
+and reasoning about "after". Both open the same panel.
+
+That panel is deliberately **not a modal**. One of the five ways in is "click notes
+on the instruments", and a backdrop that swallowed pointer events would make that
+tab impossible to use — so there is no backdrop, and the panel sits over the left
+column, leaving the instruments live. It also stays open after each add, because
+adding is usually a run rather than a single act.
+
+Where it will insert is not stored anywhere. It is always `activeIndex + 1` — which
+`addChord` and the suggestion engine already agree on, so the ranked list reads
+"what follows the chord to the left of this gap" for free and the two cannot drift.
+
+*Save as section* stays outside the Sections tab on purpose: it acts on the
+progression, not on the library, so it should not hide behind the tab that lists
+what you have already saved.
 
 Stacked below 1100px the columns stop being a spatial grouping and become a reading
 order, so `display: contents` drops the wrappers and the panels re-flow into
-workflow order instead of column order: write, extend, inspect, see, arrange.
+workflow order instead of column order.
 
-Inside a merged panel, `.sub-head` names each part — a hairline and a quiet label,
-not a second run of panel chrome, which would just rebuild the borders the merge
+Inside a panel, `.sub-head` names each part — a hairline and a quiet label, not a
+second run of panel chrome, which would just rebuild the borders that grouping
 removed.
 
 ## Brand

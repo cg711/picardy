@@ -20,6 +20,7 @@ export default function ProgressionBar({
   onMove,
   onSurprise,
   onSmooth,
+  onAddAt,
   shapes = [],
   tuningId = 'standard',
   onUndo,
@@ -36,8 +37,12 @@ export default function ProgressionBar({
   useEffect(() => {
     // Keep the chord being played (or edited) in view — on a long progression
     // the strip would otherwise leave it scrolled off the end.
+    //
+    // Query by class rather than indexing children: the strip interleaves insert
+    // slots between the chips, so child index and chord index are not the same
+    // number any more.
     const strip = stripRef.current
-    const chip = strip?.children?.[focused]
+    const chip = strip?.querySelectorAll('.prog-chip')?.[focused]
     if (!strip || !chip) return
     const left = chip.offsetLeft - strip.offsetLeft
     const right = left + chip.offsetWidth
@@ -55,12 +60,13 @@ export default function ProgressionBar({
     return (
       <div className="progression empty">
         <p className="muted">
-          Nothing yet. Type a chord, click a roman numeral, or pick notes on an instrument — then the suggestion list
-          will start reading the context.
+          Nothing yet. Add a chord and the suggestion list will start reading the context — or let
+          the generator write you a whole progression.
         </p>
-        <button className="btn primary" onClick={onSurprise}>
-          🎲 Surprise me — generate one
-        </button>
+        <div className="empty-actions">
+          <button className="btn primary" onClick={() => onAddAt(0)}>+ Add a chord</button>
+          <button className="btn" onClick={onSurprise}>🎲 Surprise me — generate one</button>
+        </div>
       </div>
     )
   }
@@ -86,8 +92,19 @@ export default function ProgressionBar({
           const nTones = chordNotes(chord).length
           const dur = durationOf(durations[i])
           return (
+            <React.Fragment key={i}>
+              {/* A slot at every gap, including before the first chord. They hold
+                  their width at all times so the strip does not reflow on hover;
+                  only the mark inside them fades in. */}
+              <button
+                className="insert-slot"
+                onClick={() => onAddAt(i)}
+                title={`Insert a chord before ${chordSymbol(chord)}`}
+                aria-label={`Insert a chord before ${chordSymbol(chord)}`}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
             <div
-              key={i}
               className={`prog-chip ${i === activeIndex ? 'active' : ''} ${i === playingIndex ? 'playing' : ''} ${a.diatonic ? '' : 'chromatic'} ${barOf[i].startsBar ? 'bar-start' : ''}`}
               onClick={() => onSelect(i)}
             >
@@ -144,8 +161,20 @@ export default function ProgressionBar({
                 <button title="Move right" onClick={() => onMove(i, 1)} disabled={i === progression.length - 1}>›</button>
               </div>
             </div>
+            </React.Fragment>
           )
         })}
+
+        {/* The add card: same footprint as a chord chip, so the strip reads as a
+            row of cards with one empty slot waiting at the end. */}
+        <button
+          className="add-card"
+          onClick={() => onAddAt(progression.length)}
+          title="Add a chord to the end"
+        >
+          <span className="add-card-plus" aria-hidden="true">+</span>
+          <span className="add-card-label">Add chord</span>
+        </button>
       </div>
       <div className="prog-actions">
         <div className="undo-pair">
