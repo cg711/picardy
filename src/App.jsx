@@ -680,19 +680,11 @@ export default function App() {
           <h1><Lockup /></h1>
           <span className="tagline">fretboard &amp; keyboard progression explorer</span>
         </div>
-        <KeyPicker
-          musicKey={musicKey}
-          onChange={(k) => k && setMusicKey(k)}
-          canDetect={progression.length > 1}
-          onTranspose={transpose}
-          canTranspose={progression.length > 0}
-          onDetect={() => {
-            const k = detectKey(progression)
-            if (k) setMusicKey(k)
-          }}
-        />
+        {/* Identity and navigation only. The key, transpose and share controls
+            all act on the progression, so they live with it rather than in a bar
+            that spans the whole app. */}
         <div className="topbar-right">
-          <button className="btn ghost" onClick={copyShare} disabled={!progression.length}>
+          <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
           </button>
           <Menu route={route} />
@@ -705,7 +697,6 @@ export default function App() {
             <div className="panel-head">
               <h2>Progression</h2>
               <div className="head-right">
-                <span className="muted">{keyName(musicKey)}</span>
                 <select
                   className="flavour"
                   value={flavour}
@@ -723,6 +714,25 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {/* Everything here reads or rewrites the progression below it: which
+                key the numerals are measured against, moving the music to a new
+                one, and the link that carries it. The muted key name that used to
+                sit in the head is gone — the picker is the key name now. */}
+            <div className="setup-bar">
+              <KeyPicker
+                musicKey={musicKey}
+                onChange={(k) => k && setMusicKey(k)}
+                canDetect={progression.length > 1}
+                onTranspose={transpose}
+                canTranspose={progression.length > 0}
+                onDetect={() => {
+                  const k = detectKey(progression)
+                  if (k) setMusicKey(k)
+                }}
+              />
+            </div>
+
             {generated && (
               <p className="gen-note">
                 <strong>{generated.flavourLabel}</strong> in {keyName(musicKey)}, ending on {generated.cadenceLabel}.

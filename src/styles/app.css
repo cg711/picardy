@@ -90,6 +90,21 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
   z-index: 20;
 }
 
+/* The key, transpose, detect and share controls, sitting with the progression
+   they act on. A row of its own rather than more panel-head: the head names the
+   panel and holds the generator, this sets up what is in it. */
+.setup-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: #ffffff04;
+}
+.setup-bar .key-picker { flex: 1 1 auto; }
+.setup-bar .share-btn { margin-left: auto; flex: none; }
+
 .brand { display: flex; align-items: baseline; gap: 10px; }
 .brand h1 { font-size: 18px; }
 .tagline { color: var(--text-dim); font-size: 12px; }
