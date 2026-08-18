@@ -40,6 +40,10 @@ import ReharmPanel from './components/ReharmPanel.jsx'
 import ImportPanel from './components/ImportPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import { exportChart } from './lib/pdf.js'
+import { useRoute, linkProps } from './lib/router.js'
+import Menu from './components/Menu.jsx'
+import SiteFooter from './components/SiteFooter.jsx'
+import LegalPage from './pages/LegalPage.jsx'
 
 const initial = decodeState(window.location.hash)
 
@@ -47,6 +51,9 @@ const initial = decodeState(window.location.hash)
 const shapeKey = (s) => s.frets.map((f) => (f === null ? 'x' : f)).join('-')
 
 export default function App() {
+  // App stays mounted on the legal pages — it just renders a different body. That
+  // is what keeps a half-written progression alive while someone reads the terms.
+  const route = useRoute()
   const [musicKey, setMusicKey] = useState(initial?.key ?? makeKey('C', 'major'))
   const [progression, setProgression] = useState(initial?.progression ?? [])
   const [inversions, setInversions] = useState(initial?.inversions ?? [])
@@ -217,9 +224,13 @@ export default function App() {
 
   // --- effects ---------------------------------------------------------------
 
+  // Gated on the route so a legal URL stays clean. `route` is a dependency rather
+  // than just a guard: coming back from /terms re-runs this and rewrites the
+  // fragment from state that was never lost.
   useEffect(() => {
+    if (route !== 'app') return
     writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines })
-  }, [musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines])
+  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -642,6 +653,26 @@ export default function App() {
 
   // --- render ----------------------------------------------------------------
 
+  // Every hook above runs on every route; only the body below changes. Swapping
+  // the returned tree does not unmount this component, so the progression, the
+  // undo stack and the audio graph all survive a trip to the legal pages.
+  if (route !== 'app') {
+    return (
+      <div className="app">
+        <header className="topbar">
+          <a className="brand" {...linkProps('/')}>
+            <h1><Lockup /></h1>
+          </a>
+          <div className="topbar-right">
+            <Menu route={route} />
+          </div>
+        </header>
+        <LegalPage route={route} />
+        <SiteFooter route={route} />
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <header className="topbar">
@@ -664,6 +695,7 @@ export default function App() {
           <button className="btn ghost" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
           </button>
+          <Menu route={route} />
         </div>
       </header>
 
@@ -1140,12 +1172,7 @@ export default function App() {
         />
       )}
 
-      <footer className="foot">
-        <span className="muted">
-          Suggestions are ranked by how often each move appears in common-practice and jazz repertoire, then reweighted
-          against your actual progression — root motion, unresolved tendency tones, and voice leading.
-        </span>
-      </footer>
+      <SiteFooter route={route} />
     </div>
   )
 }

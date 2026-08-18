@@ -169,6 +169,33 @@ that check — it only sees luminance, so it scores an orange and a blue of equa
 identical. The suite measures perceptual distance in Lab instead (`deltaE`), and holds every tone to
 a minimum ΔE from the accent and from every other tone. Retune those by the numbers, not by eye.
 
+## Legal pages
+
+`/privacy` and `/terms`, reachable from the menu in the top bar and from the footer. They are
+drafts written to describe what the app actually does, and they have not been reviewed by a lawyer.
+
+Three facts have to come from you — who is legally responsible, a contact address, and which state's
+law governs. They live in `src/pages/site.js`. While any of them is still a placeholder the pages
+render a banner saying so and `npm run check` prints a warning, because a policy with
+`[your state]` still in it is worse than no policy at all.
+
+Both documents lean on the same architectural fact: there is no backend, so nothing you write is
+ever received, stored, or transmitted. That is worth keeping true. **Adding cloud sync or public
+song sharing would make the app a host of user-submitted lyrics**, which is a different legal
+posture entirely — DMCA safe harbour, a registered agent, a takedown process. Worth deciding
+deliberately rather than arriving at by accident.
+
+These are real paths rather than hash routes, because the hash is already the app's state channel
+and a legal URL needs to be something you can hand to an app store or a payment provider. A direct
+load of `/privacy` works because the host serves `index.html` for unknown paths — that is what
+`not_found_handling` is doing in `wrangler.jsonc`, and the check suite asserts it stays set. The
+router is thirty lines in `src/lib/router.js`; three pages, none of them with parameters, do not
+justify a dependency.
+
+The App component stays mounted across the switch and only swaps its body, so reading the terms
+halfway through writing a progression doesn't cost you the progression. The state fragment is
+stripped from the URL while you are on a legal page and rewritten from memory when you come back.
+
 ## Deploying
 
 `npm run build` emits a fully static `dist/` — no server, no environment variables, no secrets in
@@ -219,6 +246,10 @@ src/
     theme.js      the palette recipe — one hue in, every colour out; plus the
                   contrast and perceptual-distance maths the check suite asserts
     Mark.jsx      the mark and the lockup
+  pages/
+    site.js       the operator/contact/jurisdiction the legal pages need
+    Privacy.jsx   privacy policy — draft, describes the app's actual behaviour
+    Terms.jsx     terms of service — draft
   lib/            URL/share encoding, colour tokens, segment + song model,
                   PDF export, MIDI writer, chart text import
 ```

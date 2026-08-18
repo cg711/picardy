@@ -23,6 +23,8 @@ const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
+const { PAGES, routeFor, pageFor } = await import(B + 'lib/routes.js')
+const { unfinished: placeholders } = await import(B + 'pages/site.js')
 const { readFile } = await import('node:fs/promises')
 
 let fails = 0
@@ -603,6 +605,31 @@ console.log('\n--- brand palette ---')
   eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
   eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
   console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
+}
+
+console.log('\n--- routes ---')
+{
+  eq('  / is the app', routeFor('/'), 'app')
+  eq('  /privacy', routeFor('/privacy'), 'privacy')
+  eq('  /terms', routeFor('/terms'), 'terms')
+  // A trailing slash is the same page — hosts and hand-typed URLs disagree about it.
+  eq('  /privacy/ is the same page', routeFor('/privacy/'), 'privacy')
+  eq('  unknown paths fall back to the app', routeFor('/nope'), 'app')
+  eq('  every page round-trips', PAGES.every((p) => pageFor(p.route).path === p.path), true)
+
+  // The SPA fallback is what makes a typed /privacy work at all; without it the
+  // host 404s and the menu link only works from inside the app.
+  const wrangler = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
+  eq('  the host serves index.html for unknown paths', /not_found_handling"\s*:\s*"single-page-application"/.test(wrangler), true)
+  // Relative asset URLs would break under /privacy/; see vite.config.js.
+  const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8')
+  eq('  asset URLs are root-absolute', /base:\s*'\/'/.test(viteConfig), true)
+}
+
+// A warning rather than a failure: shipping with placeholders is the author's
+// call, but it should never happen without them having read this.
+if (placeholders().length) {
+  console.log(`\nWARNING: the legal pages still have placeholders (${placeholders().join(', ')}) — see src/pages/site.js`)
 }
 
 console.log(`\n${fails === 0 ? 'ALL CHECKS PASSED' : fails + ' FAILURES'}`)
