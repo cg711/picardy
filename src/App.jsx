@@ -701,7 +701,7 @@ export default function App() {
 
       <main className="layout">
         <section className="col col-left">
-          <div className="panel">
+          <div className="panel p-progression">
             <div className="panel-head">
               <h2>Progression</h2>
               <div className="head-right">
@@ -816,37 +816,12 @@ export default function App() {
             />
           </div>
 
-          <div className="panel">
-            <div className="panel-head">
-              <h2>Sections &amp; song</h2>
-              <span className="muted">
-                {segments.length ? `${segments.length} saved` : 'build a song from named sections'}
-              </span>
-            </div>
-            <Arrangement
-              segments={segments}
-              song={song}
-              bpm={bpm}
-              canSave={progression.length > 0}
-              playingSongIndex={playingSongIndex}
-              playingSong={playingSong}
-              onSave={saveSegment}
-              onLoad={loadSegment}
-              onRename={renameSegment}
-              onDeleteSegment={deleteSegment}
-              onAddToSong={addToSong}
-              onSetRepeats={setRepeats}
-              onMoveEntry={moveEntry}
-              onRemoveEntry={removeEntry}
-              onClearSong={() => setSong([])}
-              onPlaySong={playSong}
-              onStopSong={stopEverything}
-              onExport={() => setExporting(true)}
-              onExportMidi={exportMidi}
-            />
-          </div>
-
-          <div className="panel">
+          {/* Typing a chord, picking a numeral, spelling one on the instruments,
+              pasting a chart and taking a suggestion are five routes to the same
+              destination — a chord in the progression. They were two panels; the
+              suggestion list stays below the input rather than becoming a sixth
+              tab, so you can type and still see what the engine would pick. */}
+          <div className="panel grow p-add">
             <div className="panel-head">
               <h2>Add a chord</h2>
               <div className="tabs">
@@ -871,7 +846,7 @@ export default function App() {
             {inputMode === 'notes' && (
               <div className="from-notes">
                 <p className="muted">
-                  Click notes on the piano or the fretboard below. The lowest note is treated as the bass.
+                  Click notes on the piano or the fretboard in Instruments. The lowest note is treated as the bass.
                 </p>
                 <div className="sel-notes">
                   {[...selection].sort((a, b) => a - b).map((m) => (
@@ -902,11 +877,9 @@ export default function App() {
                 )}
               </div>
             )}
-          </div>
 
-          <div className="panel grow">
-            <div className="panel-head">
-              <h2>What comes next</h2>
+            <div className="sub-head">
+              <h3>What comes next</h3>
               <span className="muted">
                 {progression.length && activeIndex >= 0
                   ? `after ${chordSymbol(progression[activeIndex])}`
@@ -915,10 +888,77 @@ export default function App() {
             </div>
             <Suggestions suggestions={suggestions} onAdd={addChord} onPreview={previewChord} />
           </div>
+          <div className="panel p-arrange">
+            <div className="panel-head">
+              <h2>Sections &amp; song</h2>
+              <span className="muted">
+                {segments.length ? `${segments.length} saved` : 'build a song from named sections'}
+              </span>
+            </div>
+            <Arrangement
+              segments={segments}
+              song={song}
+              bpm={bpm}
+              canSave={progression.length > 0}
+              playingSongIndex={playingSongIndex}
+              playingSong={playingSong}
+              onSave={saveSegment}
+              onLoad={loadSegment}
+              onRename={renameSegment}
+              onDeleteSegment={deleteSegment}
+              onAddToSong={addToSong}
+              onSetRepeats={setRepeats}
+              onMoveEntry={moveEntry}
+              onRemoveEntry={removeEntry}
+              onClearSong={() => setSong([])}
+              onPlaySong={playSong}
+              onStopSong={stopEverything}
+              onExport={() => setExporting(true)}
+              onExportMidi={exportMidi}
+            />
+
+            {/* Named sections are work you saved; Recent is work you didn't. Both
+                answer "get me back to something I had", so they belong together
+                rather than at opposite corners of the screen. */}
+            {history.length > 0 && (
+              <>
+                <div className="sub-head">
+                  <h3>Recent</h3>
+                  <span className="muted">progressions you built earlier</span>
+                  <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
+                </div>
+                <ul className="history">
+                  {history.slice(0, 8).map((h, i) => (
+                    <li key={i}>
+                      <button
+                        onClick={() => {
+                          const s = historyToState(h)
+                          if (!s.key) return
+                          setMusicKey(s.key)
+                          setProgression(s.progression)
+                          setInversions(s.progression.map(() => 0))
+                          setDurations(s.progression.map(() => DEFAULT_DURATION))
+                          setShapes(s.progression.map(() => null))
+                          setLines(s.progression.map(() => 0))
+                          setLyricLines([''])
+                          setActiveIndex(s.progression.length - 1)
+                          setPreview(null)
+                        }}
+                      >
+                        <span className="hist-key">{h.key}</span>
+                        <span className="hist-chords">{h.chords.join(' – ')}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
         </section>
 
         <section className="col col-right">
-          <div className="panel">
+          <div className="panel p-chord">
             <div className="panel-head">
               <h2>{activeChord ? chordSymbol(activeChord) : 'No chord selected'}</h2>
               {activeChord && (
@@ -1010,10 +1050,17 @@ export default function App() {
             )}
           </div>
 
-          <div className="panel">
+          {/* One panel, not two: both are the same chord seen from a different
+              instrument, both respond to the same selection, and the "From
+              notes" input treats clicks on either as one pool of notes. */}
+          <div className="panel p-instruments">
             <div className="panel-head">
-              <h2>Piano</h2>
-              <span className="muted">click keys to select notes</span>
+              <h2>Instruments</h2>
+              <span className="muted">click keys or frets to select notes</span>
+            </div>
+
+            <div className="sub-head">
+              <h3>Piano</h3>
             </div>
             <Piano
               chord={activeChord}
@@ -1023,11 +1070,9 @@ export default function App() {
               scalePcs={showScale && activeScale ? activeScale.pcs : null}
               guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
             />
-          </div>
 
-          <div className="panel">
-            <div className="panel-head">
-              <h2>Guitar</h2>
+            <div className="sub-head">
+              <h3>Guitar</h3>
               <div className="fb-controls">
                 <select value={tuningId} onChange={(e) => setTuningId(e.target.value)}>
                   {Object.entries(TUNINGS).map(([id, t]) => (
@@ -1124,38 +1169,6 @@ export default function App() {
             )}
           </div>
 
-          {history.length > 0 && (
-            <div className="panel">
-              <div className="panel-head">
-                <h2>Recent</h2>
-                <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
-              </div>
-              <ul className="history">
-                {history.slice(0, 8).map((h, i) => (
-                  <li key={i}>
-                    <button
-                      onClick={() => {
-                        const s = historyToState(h)
-                        if (!s.key) return
-                        setMusicKey(s.key)
-                        setProgression(s.progression)
-                        setInversions(s.progression.map(() => 0))
-                        setDurations(s.progression.map(() => DEFAULT_DURATION))
-                        setShapes(s.progression.map(() => null))
-                        setLines(s.progression.map(() => 0))
-                        setLyricLines([''])
-                        setActiveIndex(s.progression.length - 1)
-                        setPreview(null)
-                      }}
-                    >
-                      <span className="hist-key">{h.key}</span>
-                      <span className="hist-chords">{h.chords.join(' – ')}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </section>
       </main>
 

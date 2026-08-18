@@ -104,8 +104,21 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
   flex: 1;
 }
 
+/* Stacked, the two columns stop being a spatial grouping and become a reading
+   order — and column order is the wrong order to read in. `display: contents`
+   drops the column wrappers so every panel becomes a direct child, which lets
+   them run in workflow order instead: write it, extend it, inspect what is
+   selected, see it on the instruments, then arrange and export. */
 @media (max-width: 1100px) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
+  .layout { display: flex; flex-direction: column; }
+  /* Child selector for specificity: the base `.col` rule is declared *below*
+     this block, and a media query adds none of its own. */
+  .layout > .col { display: contents; }
+  .p-progression { order: 1; }
+  .p-add { order: 2; }
+  .p-chord { order: 3; }
+  .p-instruments { order: 4; }
+  .p-arrange { order: 5; }
 }
 
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -136,6 +149,28 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .panel-head .tabs, .panel-head .fb-controls { margin-left: auto; }
 .panel-head > .btn { margin-left: auto; }
 .panel-head > span.muted:nth-child(2) { margin-left: auto; text-align: right; }
+
+/* A divider inside a merged panel. Grouping panels by job means two or three
+   things now share one box, and they still need naming — but a second run of
+   panel-head chrome would just rebuild the borders the merge removed. So: a hair
+   rule, a quieter label, no background. */
+.sub-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 13px 14px 7px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+.sub-head h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim); font-weight: 600; white-space: nowrap;
+}
+.sub-head .muted { font-size: 12px; }
+.sub-head .fb-controls, .sub-head > .btn { margin-left: auto; }
+/* Both a note and a button: the note takes the slack, the button sits at the end. */
+.sub-head > span.muted:nth-child(2) { margin-left: auto; text-align: right; }
+.sub-head > span.muted:nth-child(2) ~ .btn { margin-left: 0; }
 
 .foot {
   padding: 14px 20px 28px; max-width: 900px; font-size: 12px;

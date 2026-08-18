@@ -140,6 +140,36 @@ bass and updates the figured bass on the roman numeral (`V7` → `V7 6/5`).
 metre, and timbre control. The progression lives in the URL hash, so the *Share link* button
 produces a bookmarkable link; recent progressions are kept in `localStorage`.
 
+## How the screen is organised
+
+Five panels, grouped by the job they do rather than by the feature that built them.
+Left column is the work; right column is whatever chord is selected.
+
+```
+PROGRESSION      the piece — chords or lyrics & timing, transport, Surprise me
+ADD A CHORD      type · numerals · from notes · paste chart, then what comes next
+SECTIONS & SONG  named sections, song order, recent, export
+
+[Cmaj7]          the selected chord — voicing · what to play · reharmonise
+INSTRUMENTS      piano and guitar, both showing that chord
+```
+
+The merges are the point. *Add a chord* and *what comes next* were two panels doing
+one job — five routes to the same destination — so the suggestion list now sits
+below the input rather than beside it; you can type a chord and still see what the
+engine would have picked. *Piano* and *Guitar* were one idea under two headers, and
+the "from notes" input treats clicks on either as a single pool of notes, which the
+old split actively obscured. *Recent* was stranded in the opposite corner from
+*Sections & song* despite both answering "get me back to something I had".
+
+Stacked below 1100px the columns stop being a spatial grouping and become a reading
+order, so `display: contents` drops the wrappers and the panels re-flow into
+workflow order instead of column order: write, extend, inspect, see, arrange.
+
+Inside a merged panel, `.sub-head` names each part — a hairline and a quiet label,
+not a second run of panel chrome, which would just rebuild the borders the merge
+removed.
+
 ## Brand
 
 The identity is a single number. Every surface colour is the brand hue — amber, 36° — at a fixed
