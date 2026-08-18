@@ -22,6 +22,8 @@ const { analyseProgression } = await import(B + 'theory/analyze.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
+const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
+const { readFile } = await import('node:fs/promises')
 
 let fails = 0
 const eq = (label, got, want) => {
@@ -528,6 +530,79 @@ console.log('\n--- pinned shapes ---')
   const flat = flattenSong([{ segmentId: 'a', repeats: 1 }], [segment])
   const distinct = new Set(flat.map((item) => `${chordId(item.chord)}|${item.shape ?? ''}`))
   eq('  the same chord with two shapes stays two legend entries', distinct.size, 2)
+}
+
+console.log('\n--- brand palette ---')
+{
+  // theme.js claims the recipe keeps every hue legible. That claim is only worth
+  // making if something checks it, so check it for all ten, not just amber.
+  let worstBody = Infinity
+  let worstButton = Infinity
+  let worstDim = Infinity
+  for (const { id, hue } of HUES) {
+    const t = makeTheme(hue)
+    worstBody = Math.min(worstBody, contrastRatio(t.ink, t.bg))
+    worstButton = Math.min(worstButton, contrastRatio(t.accentInk, t.accent))
+    worstDim = Math.min(worstDim, contrastRatio(t.dim, t.panel))
+    if (contrastRatio(t.ink, t.bg) < 4.5 || contrastRatio(t.accentInk, t.accent) < 4.5) {
+      eq(`  ${id} is legible`, false, true)
+    }
+  }
+  // AAA for body text, AA for the accent button and for muted text on a panel.
+  eq('  body text on background clears AAA everywhere', worstBody >= 7, true)
+  eq('  ink on the accent clears AA everywhere', worstButton >= 4.5, true)
+  eq('  muted text on a panel clears AA everywhere', worstDim >= 4.5, true)
+  console.log(`     worst of ${HUES.length} hues — body ${worstBody.toFixed(2)}:1, accent ${worstButton.toFixed(2)}:1, dim ${worstDim.toFixed(2)}:1`)
+
+  // The CSS ships literal hex, so it can drift from the recipe silently. These
+  // pin the two together: change the hue in theme.js and this tells you which
+  // custom properties in app.css still need updating.
+  const brand = makeTheme(BRAND_HUE)
+  const css = await readFile(new URL('../src/styles/app.css', import.meta.url), 'utf8')
+  const cssVar = (name) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1]?.toLowerCase()
+  eq('  --hue matches the brand hue', css.match(/--hue:\s*(\d+)/)?.[1], String(BRAND_HUE))
+  eq('  --accent matches the recipe', cssVar('accent'), brand.accent)
+  eq('  --accent-2 is the recipe\'s cool', cssVar('accent-2'), brand.cool)
+  eq('  --bg matches the recipe', cssVar('bg'), brand.bg)
+  eq('  --surface-1 is the panel colour', cssVar('surface-1'), brand.panel)
+  eq('  --border is the panel edge', cssVar('border'), brand.panelEdge)
+  eq('  --ink matches the recipe', cssVar('ink'), brand.ink)
+  eq('  --text-dim matches the recipe', cssVar('text-dim'), brand.dim)
+  eq('  --string matches the recipe', cssVar('string'), brand.string)
+
+  // theme-color in index.html is what mobile browser chrome paints, so it has to
+  // be the panel colour or the app appears to have a seam at the top.
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8')
+  eq('  theme-color is the panel colour', html.match(/theme-color"\s+content="(#[0-9a-f]{6})"/i)?.[1]?.toLowerCase(), brand.panel)
+
+  // Chord-tone colours have to be told apart from each other and from the accent,
+  // which paints scale dots on the same fretboard. WCAG contrast is the wrong
+  // instrument for that — it only sees luminance, so two plainly different hues
+  // can "fail" it and two near-identical yellows can pass. Perceptual distance is
+  // the question actually being asked, so measure it in Lab.
+  const tones = Object.fromEntries(
+    [...css.matchAll(/--tone-([a-z]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2].toLowerCase()]),
+  )
+  eq('  every chord-tone colour is defined', Object.keys(tones).length, 10)
+
+  let nearestToAccent = [Infinity, '']
+  for (const [name, hex] of Object.entries(tones)) {
+    const d = deltaE(hex, brand.accent)
+    if (d < nearestToAccent[0]) nearestToAccent = [d, name]
+  }
+  let closestPair = [Infinity, '']
+  const names = Object.keys(tones)
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const d = deltaE(tones[names[i]], tones[names[j]])
+      if (d < closestPair[0]) closestPair = [d, `${names[i]}/${names[j]}`]
+    }
+  }
+  // 30 and 18 are where these stopped being confusable at dot size on the
+  // fretboard — below them the amber accent starts reading as a chord tone.
+  eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
+  eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
+  console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
 }
 
 console.log(`\n${fails === 0 ? 'ALL CHECKS PASSED' : fails + ' FAILURES'}`)

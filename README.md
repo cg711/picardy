@@ -140,26 +140,58 @@ bass and updates the figured bass on the roman numeral (`V7` → `V7 6/5`).
 metre, and timbre control. The progression lives in the URL hash, so the *Share link* button
 produces a bookmarkable link; recent progressions are kept in `localStorage`.
 
+## Brand
+
+The identity is a single number. Every surface colour is the brand hue — amber, 36° — at a fixed
+saturation and lightness, so `src/brand/theme.js` can generate the whole palette from one input and
+any of the ten hues in `HUES` produces a usable theme rather than only the shipped one. The CSS
+carries literal hex for speed, which means it can drift from the recipe silently, so `npm run check`
+recomputes the palette and asserts each custom property still matches, along with the contrast
+ratios the recipe is supposed to guarantee — AAA for body text and AA for ink on the accent, across
+all ten hues, not just amber.
+
+The mark is a P that is an upside-down half note: stem on the left, notehead as the bowl, the
+counter of the letter doing double duty as the hole in the note. It is drawn in `src/brand/Mark.jsx`
+for the app and re-drawn with jsPDF primitives in `src/lib/pdf.js` for the footer of every exported
+chart — the notehead as a 30-segment rotated polyline, because jsPDF has no rotated-ellipse
+primitive and a plain thick line does not read as a note.
+
+`public/` holds the favicon, the touch icon and the 1200×630 link preview. The preview is composed
+by `scripts/og-image.py` from the brand kit's own rendered lockup — the kit ships a square app icon
+under that name, which every scraper crops. The result is committed, so the build never reaches for
+the sibling directory.
+
+Chord-tone colours are deliberately *not* brand colours: they have to be told apart from each
+other, which is a different problem from matching an identity. Making amber the accent crowded them,
+since the accent paints scale dots on the same fretboard as the tone dots, so the 6th, the 13th and
+the polychord upper structure were moved out of its way. WCAG contrast is the wrong instrument for
+that check — it only sees luminance, so it scores an orange and a blue of equal lightness as
+identical. The suite measures perceptual distance in Lab instead (`deltaE`), and holds every tone to
+a minimum ΔE from the accent and from every other tone. Retune those by the numbers, not by eye.
+
 ## Deploying
 
 `npm run build` emits a fully static `dist/` — no server, no environment variables, no secrets in
-the bundle. State lives in the URL hash and `localStorage`, so there is no SPA rewrite rule to
-configure and no backend to host. `vite.config.js` sets `base: './'`, so the same build works at a
-domain root or under a subpath.
+the bundle. State lives in the URL hash and `localStorage`, so there is no backend to host.
+`vite.config.js` sets `base: './'`, so the same build works at a domain root or under a subpath.
 
 `npm run preview` serves the built bundle locally on port 4173 to check it before shipping.
 
-Drag `dist/` onto [Netlify Drop](https://app.netlify.com/drop) for an instant URL, or from the
-project directory:
+The deployed setup is Cloudflare's git integration: it builds on push to `main` and serves `dist/`
+from an assets-only Worker. `wrangler.jsonc` declares that explicitly rather than letting Wrangler
+infer a framework — auto-detection sees Vite and demands 6.0+, which is a version bump this app has
+no other reason to make. Set the build command to `npm run check && npm run build` so a broken
+theory suite fails the deploy instead of shipping.
+
+`.github/workflows/ci.yml` runs the install, the check suite and the build on pull requests. It
+deliberately does not deploy: two publishers racing on the same branch is how a stale bundle wins.
+
+Other hosts work from the same `dist/`:
 
 ```bash
-npx wrangler pages deploy dist          # Cloudflare Pages
 npx vercel deploy dist --prod           # Vercel
 npx netlify deploy --dir=dist --prod    # Netlify CLI
 ```
-
-If you connect a git repo instead, the build command is `npm run build` and the publish directory
-is `dist`.
 
 ## Layout
 
@@ -183,6 +215,10 @@ src/
     identify.js   reverse lookup — notes to chord symbol
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
   audio/synth.js  Web Audio polysynth
+  brand/
+    theme.js      the palette recipe — one hue in, every colour out; plus the
+                  contrast and perceptual-distance maths the check suite asserts
+    Mark.jsx      the mark and the lockup
   lib/            URL/share encoding, colour tokens, segment + song model,
                   PDF export, MIDI writer, chart text import
 ```

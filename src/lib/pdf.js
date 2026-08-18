@@ -15,10 +15,11 @@ const PAGE = { w: 210, h: 297 } // A4 portrait, millimetres
 const MARGIN = 15
 const CONTENT_W = PAGE.w - MARGIN * 2
 
-const INK = [17, 24, 39]
-const MUTED = [110, 120, 135]
-const RULE = [190, 196, 205]
-const ACCENT = [15, 118, 110]
+// Brand palette, converted to the RGB triples jsPDF wants.
+const INK = [28, 24, 18]
+const MUTED = [122, 114, 102]
+const RULE = [201, 194, 182]
+const ACCENT = [166, 111, 20]
 
 /** Strip the unicode accidentals jsPDF's standard fonts can't render. */
 const ascii = (s) =>
@@ -115,8 +116,11 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
     y += 7
   }
 
-  doc.setFont('helvetica', 'normal').setFontSize(7).setTextColor(...MUTED)
-  doc.text('Made with Picardy', MARGIN, PAGE.h - 8)
+  // The mark, then the wordmark — the same P/notehead the app shows, drawn at
+  // print size with the brand's own stroke weight.
+  drawMark(doc, MARGIN, PAGE.h - 13, 6)
+  doc.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...INK)
+  doc.text('PICARDY', MARGIN + 8, PAGE.h - 8.4, { charSpace: 0.35 })
 
   return doc
 }
@@ -126,6 +130,51 @@ export async function exportChart(options) {
   const doc = await buildChart(options)
   doc.save(`${sanitiseFilename(options.title ?? 'chart')}.pdf`)
   return doc
+}
+
+/**
+ * The mark, scaled into a box of `size` mm with its top-left at (x, y).
+ *
+ * Geometry copied exactly from the brand kit — stem, notehead tilted −20°, a
+ * 13.5 stroke in a 100-unit box. All three are load-bearing: the tilt is what
+ * makes it read as music rather than as a letter, and the ellipse has to overlap
+ * the stem or the two shapes read as a bar standing next to an O.
+ *
+ * jsPDF has no rotated-ellipse primitive, so the notehead is stroked as a closed
+ * polyline. Thirty segments is indistinguishable from a curve at print sizes.
+ */
+function drawMark(doc, x, y, size) {
+  const k = size / 100
+  doc.setLineCap('round')
+  doc.setLineJoin('round')
+  doc.setLineWidth(13.5 * k)
+
+  doc.setDrawColor(...INK)
+  doc.line(x + 28 * k, y + 24 * k, x + 28 * k, y + 89 * k)
+
+  doc.setDrawColor(...ACCENT)
+  const cx = x + 53 * k
+  const cy = y + 34 * k
+  const rx = 21.5 * k
+  const ry = 17 * k
+  const angle = (-20 * Math.PI) / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const SEGMENTS = 30
+
+  let previous = null
+  for (let i = 0; i <= SEGMENTS; i++) {
+    const t = (i / SEGMENTS) * Math.PI * 2
+    const ex = rx * Math.cos(t)
+    const ey = ry * Math.sin(t)
+    const point = [cx + ex * cos - ey * sin, cy + ex * sin + ey * cos]
+    if (previous) doc.line(previous[0], previous[1], point[0], point[1])
+    previous = point
+  }
+
+  doc.setLineWidth(0.2)
+  doc.setLineCap('butt')
+  doc.setLineJoin('miter')
 }
 
 function sanitiseFilename(title) {

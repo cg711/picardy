@@ -24,6 +24,7 @@ import {
   makeSegment, readSegment, flattenSong, loadSegments, saveSegments, loadSong, saveSong, uniqueName,
 } from './lib/song.js'
 
+import { Lockup } from './brand/Mark.jsx'
 import KeyPicker from './components/KeyPicker.jsx'
 import ChordInput from './components/ChordInput.jsx'
 import RomanPicker from './components/RomanPicker.jsx'
@@ -645,7 +646,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <h1>Picardy</h1>
+          <h1><Lockup /></h1>
           <span className="tagline">fretboard &amp; keyboard progression explorer</span>
         </div>
         <KeyPicker

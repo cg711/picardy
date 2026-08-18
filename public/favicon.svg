@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Picardy">
+  <title>Picardy</title>
+
+    <rect width="64" height="64" rx="14" fill="#1c1812" />
+    <g transform="translate(6.962 6.135) scale(0.491)">
+    <g fill="none" stroke-linecap="round">
+      <path d="M 28 24 L 28 89" stroke="#f6f5f3" stroke-width="13.5" />
+      <ellipse cx="53" cy="34" rx="21.5" ry="17"
+               transform="rotate(-20 53 34)"
+               stroke="#f2b354" stroke-width="13.5" />
+    </g></g>
+</svg>

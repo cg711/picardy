@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Picardy">
+  <title>Picardy</title>
+
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1c1812" />
+        <stop offset="1" stop-color="#100d09" />
+      </linearGradient>
+    </defs>
+    <rect width="1024" height="1024" rx="228" fill="url(#bg)" />
+    <rect x="1" y="1" width="1022" height="1022" rx="227" fill="none"
+          stroke="#393228" stroke-width="2" />
+    <g opacity="0.07"><line x1="0" y1="470" x2="1024" y2="470" stroke="#f6f5f3" stroke-width="1.6" /><line x1="0" y1="488.4" x2="1024" y2="488.4" stroke="#f6f5f3" stroke-width="2.7" /><line x1="0" y1="506.8" x2="1024" y2="506.8" stroke="#f6f5f3" stroke-width="3.8000000000000003" /><line x1="0" y1="525.2" x2="1024" y2="525.2" stroke="#f6f5f3" stroke-width="4.9" /><line x1="0" y1="543.6" x2="1024" y2="543.6" stroke="#f6f5f3" stroke-width="6" /><line x1="0" y1="562" x2="1024" y2="562" stroke="#f6f5f3" stroke-width="7.1" /><line x1="57.473" y1="456" x2="57.473" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="111.721" y1="456" x2="111.721" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="162.923" y1="456" x2="162.923" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="211.252" y1="456" x2="211.252" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="256.869" y1="456" x2="256.869" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="299.925" y1="456" x2="299.925" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="340.564" y1="456" x2="340.564" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="378.923" y1="456" x2="378.923" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="415.129" y1="456" x2="415.129" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="449.302" y1="456" x2="449.302" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="481.558" y1="456" x2="481.558" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="512.003" y1="456" x2="512.003" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="540.74" y1="456" x2="540.74" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="567.863" y1="456" x2="567.863" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="593.464" y1="456" x2="593.464" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="617.629" y1="456" x2="617.629" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="640.437" y1="456" x2="640.437" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="661.965" y1="456" x2="661.965" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="682.284" y1="456" x2="682.284" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><line x1="701.464" y1="456" x2="701.464" y2="576" stroke="#f6f5f3" stroke-width="3.5" /><circle cx="137.322" cy="516" r="9" fill="#f6f5f3" /><circle cx="234.061" cy="516" r="9" fill="#f6f5f3" /><circle cx="320.245" cy="516" r="9" fill="#f6f5f3" /><circle cx="397.026" cy="516" r="9" fill="#f6f5f3" /></g>
+    <g transform="translate(178.156 167.132) scale(6.543)">
+    <g fill="none" stroke-linecap="round">
+      <path d="M 28 24 L 28 89" stroke="#f6f5f3" stroke-width="13.5" />
+      <ellipse cx="53" cy="34" rx="21.5" ry="17"
+               transform="rotate(-20 53 34)"
+               stroke="#f2b354" stroke-width="13.5" />
+    </g></g>
+</svg>
