@@ -20,7 +20,7 @@ export default function SiteFooter({ route }) {
       <nav className="foot-links" aria-label="Site">
         {PAGES.filter((page) => page.route !== route).map((page) => (
           <a key={page.path} {...linkProps(page.path)}>
-            {page.route === 'app' ? 'The app' : page.label}
+            {page.route === 'app' ? 'Progression Tool' : page.label}
           </a>
         ))}
       </nav>

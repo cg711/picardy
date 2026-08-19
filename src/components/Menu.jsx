@@ -94,7 +94,7 @@ export default function Menu({ route }) {
                 close(false)
               }}
             >
-              {page.route === 'app' ? 'The app' : page.label}
+              {page.route === 'app' ? 'Progression Tool' : page.label}
             </a>
           ))}
         </div>
