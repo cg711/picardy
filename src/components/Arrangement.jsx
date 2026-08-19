@@ -252,6 +252,11 @@ export default function Arrangement({
                     {s.key} · {describeLength(s.durations, s.timeSignature)}
                   </div>
 
+                  {/* The picker replaces the controls rather than joining them, so the
+                      chip keeps its fixed height while you are choosing. */}
+                  {picking === s.id ? (
+                    <HuePicker current={hue} onPick={(h) => onSetHue(s.id, h)} onClose={() => setPicking(null)} />
+                  ) : (
                   <div className="song-chip-controls">
                     <button
                       className="hue-swatch"
@@ -274,9 +279,6 @@ export default function Arrangement({
                       + song
                     </button>
                   </div>
-
-                  {picking === s.id && (
-                    <HuePicker current={hue} onPick={(h) => onSetHue(s.id, h)} onClose={() => setPicking(null)} />
                   )}
                 </div>
               )

@@ -39,6 +39,14 @@
      chord" rather than as one more degree. */
   --tone-upper: #f5f5f4;
 
+  /* One card size for every strip: chord chips, the add and surprise
+     placeholders, song sections and the section library. They sit in rows next
+     to each other, so any of them sizing to its own content makes the row look
+     broken — and each holds different content, so left alone they all differ.
+     Fixed, not min: the point is that they cannot drift. */
+  --chip-w: 124px;
+  --chip-h: 176.5px;
+
   --radius: 10px;
   color-scheme: dark;
 }
@@ -286,7 +294,8 @@ select { cursor: pointer; }
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  width: 124px;
+  width: var(--chip-w);
+  height: var(--chip-h);
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -889,7 +898,11 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .lyric-timeline.dragging { cursor: col-resize; user-select: none; }
 
 .tl-lyric {
-  display: block; font: inherit; font-size: 14px; line-height: 1.4;
+  /* Full width of the lane above it. A textarea carries a `cols` default, so
+     without this it sizes to roughly 20 characters and the words stop lining up
+     with the chords they sit under — which is the entire point of this view. */
+  display: block; width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 14px; line-height: 1.4;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: #14110c; color: var(--text); border: 1px solid var(--border-soft);
   border-radius: 6px; padding: 5px 8px; resize: vertical; outline: none; min-height: 30px;
@@ -897,7 +910,14 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .tl-lyric:focus { border-color: var(--accent); }
 .tl-lyric::placeholder { color: #6e6355; }
 
-.tl-line-actions { display: flex; flex-direction: column; gap: 2px; align-items: center; padding-top: 12px; }
+/* Fixed width so every lane starts and ends at the same x. The buttons here vary
+   per line — the first line has no "move up" — and letting the column size to
+   them made each lane a different width, so chords on line 2 no longer sat above
+   the same point in the bar as chords on line 1. */
+.tl-line-actions {
+  display: flex; flex-direction: column; gap: 2px; align-items: center;
+  padding-top: 12px; width: 26px; flex: none;
+}
 .tl-line-num { font-size: 9px; color: var(--text-dim); }
 .tl-line-actions button {
   font: inherit; font-size: 10px; width: 20px; height: 18px; line-height: 1; cursor: pointer;
@@ -999,7 +1019,8 @@ a.brand { text-decoration: none; color: inherit; }
    with the strip like any other card. */
 .add-card {
   flex: 0 0 auto;
-  width: 124px;
+  width: var(--chip-w);
+  height: var(--chip-h);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   font: inherit; color: var(--text-dim); cursor: pointer;
   background: transparent;
@@ -1118,7 +1139,8 @@ a.brand { text-decoration: none; color: inherit; }
 .song-chip {
   position: relative;
   flex: 0 0 auto;
-  width: 124px;
+  width: var(--chip-w);
+  height: var(--chip-h);
   display: flex; flex-direction: column; gap: 4px;
   padding: 8px;
   border: 1px solid;
@@ -1258,7 +1280,7 @@ a.brand { text-decoration: none; color: inherit; }
 .empty-chord { border-style: dashed; }
 .die-card {
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
-  gap: 6px; width: 150px; padding: 8px;
+  gap: 6px; width: var(--chip-w); height: var(--chip-h); padding: 8px;
   border: 1.5px dashed var(--border); border-radius: 9px; background: transparent;
 }
 .die-face {
@@ -1298,3 +1320,18 @@ a.brand { text-decoration: none; color: inherit; }
 /* Blank-state copy reads at the same size wherever it appears. */
 .arrangement > .pad-sm { font-size: 12.5px; line-height: 1.55; padding: 4px 14px 8px; }
 .tl-hint { font-size: 12.5px; line-height: 1.55; }
+
+/* ---------- fixed-size cards ---------- */
+
+/* Every card is now a fixed height, so the controls row is pinned to the bottom
+   and the slack falls in the middle — otherwise a chip with less content just
+   trails an empty gap under it. */
+.chip-controls, .song-chip-controls { margin-top: auto; }
+/* Flow text takes the slack rather than the gap doing it. */
+.song-flow { flex: 0 1 auto; }
+.song-chip-meta { margin-top: 2px; }
+/* Both strips leave room for the bar badge that hangs above a chip. */
+.song-strip { padding-top: 11px; }
+/* Inside a fixed card the swatches have to fit the width they are given. */
+.song-chip .hue-picker { margin-top: auto; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; }
+.song-chip .hue-dot { border-width: 2px; }
