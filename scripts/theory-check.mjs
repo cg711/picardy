@@ -5,7 +5,7 @@
 // are easier to eyeball than to encode.
 
 const B = '../src/'
-const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord } = await import(B + 'theory/chords.js')
+const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort } = await import(B + 'theory/chords.js')
 const { makeKey, romanNumeral, detectKey, scaleNotes } = await import(B + 'theory/keys.js')
 const { prettyName, noteName } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
@@ -113,6 +113,34 @@ for (const sym of ['C', 'G', 'Am', 'F', 'Cmaj7', 'F#m7b5', 'Bb13', 'D/F#', 'Cadd
 }
 const cShapes = findVoicings(parseChord('C'), { tuning: TUNINGS.standard.strings, limit: 5 })
 console.log('  top C shape:', cShapes[0].frets.map((f) => (f === null ? 'x' : f)).join(''), '/', voicingLabel(cShapes[0]))
+
+console.log('\n--- bass and inversion labels ---')
+{
+  // A slash bass is stated by the symbol, so it wins over the inversion index.
+  // Reading the bass off notes[inversion] is how D/F♯ came to be described as
+  // "root position — D in the bass".
+  const dslash = parseChord('D/F#')
+  eq('  D/F# reports F# in the bass', prettyName(bassOf(dslash).note), 'F♯')
+  eq('  and calls it the 1st inversion', bassOf(dslash).index, 1)
+  eq('  in words', inversionLabel(dslash, 0), '1st inversion — F♯ in the bass')
+  eq('  and short', inversionShort(dslash, 0), '1st inv')
+  // Even if something sets the inversion to 0, the sounding bass is unchanged.
+  eq('  an inversion setting cannot override the symbol', inversionLabel(dslash, 2), '1st inversion — F♯ in the bass')
+  // The bass really is the lowest note voiced.
+  const voiced = voiceChord(dslash, { bottom: 48 })
+  eq('  and it is the lowest note voiced', voiced[0] % 12, 6)
+
+  // A bass that is not a chord tone at all keeps its own description.
+  const pedal = parseChord('C/D')
+  eq('  C/D bass is not a chord tone', bassOf(pedal).isChordTone, false)
+  eq('  so it is not called an inversion', inversionShort(pedal, 0), 'D bass')
+
+  // Plain chords still work off the inversion index.
+  const plain = parseChord('C')
+  eq('  plain C root position', inversionLabel(plain, 0), 'root position — C in the bass')
+  eq('  plain C 1st inversion', inversionLabel(plain, 1), '1st inversion — E in the bass')
+  eq('  plain C 2nd inversion', inversionShort(plain, 2), '2nd inv')
+}
 
 console.log('\n--- inversions on guitar ---')
 const g = parseChord('C')

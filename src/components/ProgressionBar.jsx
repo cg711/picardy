@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { chordSymbol, chordNotes, inversionLabel } from '../theory/chords.js'
+import { chordSymbol, chordNotes, inversionLabel, inversionShort, bassOf } from '../theory/chords.js'
 import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
@@ -116,6 +116,7 @@ export default function ProgressionBar({
           const inv = inversions[i] ?? 0
           const nTones = chordNotes(chord).length
           const dur = durationOf(durations[i])
+          const bass = bassOf(chord, inv)
           return (
             <React.Fragment key={i}>
               {/* A slot at every gap, including before the first chord. They hold
@@ -179,14 +180,23 @@ export default function ProgressionBar({
                   are on, so an inversion set on a chip was invisible from the
                   chip. The bass note is what you actually hear change, so it is
                   what the row shows. */}
+              {/* A slash chord's bass is fixed by its own symbol — D/F♯ is F♯ in
+                  the bass — so the picker shows where that lands and stops
+                  offering choices it cannot honour. */}
               <label className="chip-inversion" onClick={(e) => e.stopPropagation()}>
                 <span className="lbl">Inv</span>
                 <select
-                  value={inv}
+                  value={bass.isChordTone ? bass.index : -1}
+                  disabled={bass.fromSymbol}
                   onChange={(e) => onInvert(i, Number(e.target.value))}
-                  title={inversionLabel(chord, inv)}
+                  title={
+                    bass.fromSymbol
+                      ? `${inversionLabel(chord, inv)} — set by the chord symbol`
+                      : inversionLabel(chord, inv)
+                  }
                   aria-label="Inversion"
                 >
+                  {!bass.isChordTone && <option value={-1}>{prettyName(bass.note)} bass</option>}
                   {Array.from({ length: nTones }, (_, n) => (
                     <option key={n} value={n}>
                       {n === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][n - 1] ?? `${n}th`}
@@ -199,8 +209,11 @@ export default function ProgressionBar({
 
               <div className="chip-controls" onClick={(e) => e.stopPropagation()}>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>
-                <span className={`chip-inv-badge${inv > 0 ? ' on' : ''}`} title={inversionLabel(chord, inv)}>
-                  {inv === 0 ? 'root pos.' : `${['1st', '2nd', '3rd', '4th', '5th'][inv - 1] ?? `${inv}th`} inv`}
+                <span
+                  className={`chip-inv-badge${bass.index > 0 || !bass.isChordTone ? ' on' : ''}`}
+                  title={inversionLabel(chord, inv)}
+                >
+                  {inversionShort(chord, inv)}
                 </span>
                 <button title="Move right" onClick={() => onMove(i, 1)} disabled={i === progression.length - 1}>›</button>
               </div>

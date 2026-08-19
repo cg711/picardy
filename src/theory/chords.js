@@ -307,14 +307,47 @@ export function inversionCount(chord) {
   return chordNotes(chord).length
 }
 
-export function inversionLabel(chord, inversion) {
+/**
+ * Which note is actually sounding in the bass, and where it sits in the chord.
+ *
+ * An explicit slash bass wins over the inversion index: D/F♯ has F♯ in the bass
+ * whatever `inversion` happens to be set to, because the symbol says so and
+ * voiceChord puts it there. Reading the bass off `notes[inversion]` instead is
+ * how the readouts came to call D/F♯ "root position — D in the bass".
+ *
+ * A bass that is not a chord tone at all — the D under C/D, or the lower root of
+ * a polychord — gets `index: -1` rather than being forced onto a chord tone.
+ */
+export function bassOf(chord, inversion = 0) {
   const notes = chordNotes(chord)
   const n = notes.length
-  if (!n) return ''
+  if (!n) return { note: null, index: -1, isChordTone: false, fromSymbol: false }
+  if (chord?.bass) {
+    const index = notes.findIndex((e) => pcOf(e.note) === pcOf(chord.bass))
+    return { note: chord.bass, index, isChordTone: index >= 0, fromSymbol: true }
+  }
   const i = ((inversion % n) + n) % n
-  const names = ['root position', '1st inversion', '2nd inversion', '3rd inversion', '4th inversion', '5th inversion']
-  const bassEntry = notes[i]
-  return `${names[i] ?? `${i}th inversion`} — ${prettyName(bassEntry.note)} in the bass`
+  return { note: notes[i].note, index: i, isChordTone: true, fromSymbol: false }
+}
+
+const INVERSION_NAMES = [
+  'root position', '1st inversion', '2nd inversion', '3rd inversion', '4th inversion', '5th inversion',
+]
+
+/** How an inversion is described in words, e.g. "1st inversion — F♯ in the bass". */
+export function inversionLabel(chord, inversion) {
+  const { note, index, isChordTone } = bassOf(chord, inversion)
+  if (!note) return ''
+  if (!isChordTone) return `${prettyName(note)} in the bass — below the chord, not one of its tones`
+  return `${INVERSION_NAMES[index] ?? `${index}th inversion`} — ${prettyName(note)} in the bass`
+}
+
+/** The short form used on a chip: "root pos.", "1st inv", "F♯ bass". */
+export function inversionShort(chord, inversion) {
+  const { note, index, isChordTone } = bassOf(chord, inversion)
+  if (!note) return ''
+  if (!isChordTone) return `${prettyName(note)} bass`
+  return index === 0 ? 'root pos.' : `${['1st', '2nd', '3rd', '4th', '5th'][index - 1] ?? `${index}th`} inv`
 }
 
 /** Figured-bass shorthand shown next to roman numerals. */
