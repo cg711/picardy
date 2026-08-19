@@ -74,8 +74,11 @@ export default function Piano({
     }
   }
 
+  // Pointer rather than mouse: touch devices do not deliver mousedown reliably,
+  // so the keys were dead on a phone. The keyboard does not scroll, so a plain
+  // press is enough here — no tap-vs-swipe test like the fretboard needs.
   const handle = (midi) => (ev) => {
-    ev.preventDefault()
+    if (ev.pointerType === 'mouse') ev.preventDefault()
     onToggleNote && onToggleNote(midi)
   }
 
@@ -85,7 +88,7 @@ export default function Piano({
         {whites.map((midi) => {
           const { entry, inVoicing, selected, isBass, inScale, isGuide } = cellFor(midi)
           return (
-            <g key={midi} data-midi={midi} onMouseDown={handle(midi)} className="key-group">
+            <g key={midi} data-midi={midi} onPointerDown={handle(midi)} className="key-group">
               <rect
                 x={layout.whiteX.get(midi)}
                 y={0}
@@ -129,7 +132,7 @@ export default function Piano({
         {blacks.map(({ midi, x }) => {
           const { entry, inVoicing, selected, isBass, inScale, isGuide } = cellFor(midi)
           return (
-            <g key={midi} data-midi={midi} onMouseDown={handle(midi)} className="key-group">
+            <g key={midi} data-midi={midi} onPointerDown={handle(midi)} className="key-group">
               <rect
                 x={x}
                 y={0}

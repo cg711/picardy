@@ -39,6 +39,33 @@ export default function Fretboard({
   const yFor = (s) => TOP + STRING_GAP * (nStrings - 1 - s)
   const xFor = (f) => mx(f === 0 ? NUT_X - 17 : NUT_X + FRET_W * (f - 1) + FRET_W / 2)
 
+  /**
+   * Tap-to-select that survives touch.
+   *
+   * mousedown is not delivered reliably on touch devices, so picking notes did
+   * not work on a phone at all. Pointer events cover mouse, touch and pen — but
+   * firing on pointerdown alone would select a note every time you swiped the
+   * neck sideways, and the neck is wider than the screen so swiping it is the
+   * normal way to move around. Hence: remember where the press started, and only
+   * count it as a tap if the finger came up in roughly the same place.
+   */
+  const pressRef = useRef(null)
+  const tap = (midi) => ({
+    onPointerDown: (e) => {
+      // Stops the text-selection drag on mouse; left alone on touch so the
+      // browser can still scroll the neck.
+      if (e.pointerType === 'mouse') e.preventDefault()
+      pressRef.current = { x: e.clientX, y: e.clientY, midi }
+    },
+    onPointerUp: (e) => {
+      const press = pressRef.current
+      pressRef.current = null
+      if (!press || press.midi !== midi) return
+      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) return
+      onToggleNote && onToggleNote(midi)
+    },
+  })
+
   const inShape = (s, f) => shape && shape.frets[s] === f
   const shapeMuted = (s) => shape && shape.frets[s] === null
   const scaleSet = new Set(scalePcs ?? [])
@@ -125,6 +152,51 @@ export default function Fretboard({
           }),
         )}
 
+        {/*
+          A hit target at every position on the neck.
+
+          The dots below are drawn from fretboardMap, which only returns entries
+          for chord *tones* — so hanging the click handler off them meant you
+          could only pick notes already in the chord, and with no chord selected
+          the neck had no hit targets at all. That is precisely backwards for the
+          "from notes" input, whose whole job is spelling a chord you have not
+          entered yet. These sit underneath, so a chord-tone dot still handles its
+          own click and nothing here changes what the neck looks like.
+        */}
+        <g className="fret-hits">
+          {tuning.map((open, s) =>
+            Array.from({ length: maxFret + 1 }, (_, f) => {
+              const midi = open + f
+              return (
+                <circle
+                  key={`h${s}-${f}`}
+                  cx={xFor(f)}
+                  cy={yFor(s)}
+                  r={13}
+                  {...tap(midi)}
+                >
+                  <title>{`String ${nStrings - s}, fret ${f}`}</title>
+                </circle>
+              )
+            }),
+          )}
+        </g>
+
+        {/* A note picked by hand that is not a chord tone still has to show, or
+            clicking the neck looks like it did nothing. */}
+        {tuning.map((open, s) =>
+          Array.from({ length: maxFret + 1 }, (_, f) => {
+            const midi = open + f
+            if (!selection.has(midi) || grid[s][f]) return null
+            return (
+              <g key={`p${s}-${f}`} className="picked-note" pointerEvents="none">
+                <circle cx={xFor(f)} cy={yFor(s)} r={f === 0 ? 10 : 11} />
+                <circle cx={xFor(f)} cy={yFor(s)} r={14} className="sel-ring" />
+              </g>
+            )
+          }),
+        )}
+
         {grid.map((row, s) =>
           row.map((entry, f) => {
             if (!entry) return null
@@ -137,10 +209,7 @@ export default function Fretboard({
               <g
                 key={`n${s}-${f}`}
                 className="fret-dot"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  onToggleNote && onToggleNote(midi)
-                }}
+                {...tap(midi)}
               >
                 <circle
                   cx={xFor(f)}
@@ -172,7 +241,7 @@ export default function Fretboard({
           const active = inShape(s, 0)
           if (!active && !showAllTones) return null
           return (
-            <g key={`o${s}`} className="fret-dot" onMouseDown={(e) => { e.preventDefault(); onToggleNote && onToggleNote(entry.midi) }}>
+            <g key={`o${s}`} className="fret-dot" {...tap(entry.midi)}>
               <circle
                 cx={xFor(0)}
                 cy={yFor(s)}

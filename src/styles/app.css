@@ -133,10 +133,19 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
    them run in workflow order instead: write it, extend it, inspect what is
    selected, see it on the instruments, then arrange and export. */
 @media (max-width: 1100px) {
-  .layout { display: flex; flex-direction: column; }
+  /* align-items must be reset: the grid rule sets `start`, which in a *column*
+     flex container stops cross-axis stretching, so every panel sized itself to
+     its widest content instead of to the screen. That is what was throwing the
+     whole page into a horizontal scroll on a phone. */
+  .layout { display: flex; flex-direction: column; align-items: stretch; }
   /* Child selector for specificity: the base `.col` rule is declared *below*
      this block, and a media query adds none of its own. */
   .layout > .col { display: contents; }
+  /* `.col` carried min-width: 0, and display:contents throws its box away — so
+     the panels became the flex items, inherited the default min-width: auto, and
+     refused to shrink below their content. A single wide chord strip then pushed
+     the whole page sideways. Put it back on what is now the flex item. */
+  .layout > .col > .panel { min-width: 0; }
   .p-progression { order: 1; }
   .p-instruments { order: 2; }
   .p-chord { order: 3; }
@@ -602,7 +611,11 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   border: 1px solid var(--border-soft); overflow: hidden;
 }
 .dur-meter span { display: block; height: 100%; background: var(--accent); }
-.prog-actions { display: flex; align-items: center; gap: 12px; }
+/* Wrap the row, not the labels. Without nowrap "Smooth voicing" broke across two
+   lines on a phone and dragged the whole row's height with it, which is what made
+   these buttons look unaligned. */
+.prog-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 8px; padding: 0 14px; }
+.prog-actions .btn { white-space: nowrap; }
 .length-note { font-size: 11px; color: var(--text-dim); }
 .length-note.partial { color: #fbbf24; }
 
@@ -1023,7 +1036,11 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .add-dialog-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
 .add-dialog-x { margin-left: auto; font-size: 16px; line-height: 1; padding: 2px 8px; }
-.add-dialog-tabs { margin: 10px 14px 0; }
+/* Five tabs do not fit one phone-width row. Let them wrap to two tidy rows
+   rather than scroll — all five stay visible — and stop the labels themselves
+   from breaking, which is what made the bar ragged. */
+.add-dialog-tabs { margin: 10px 14px 0; flex-wrap: wrap; }
+.add-dialog-tabs button { white-space: nowrap; }
 .add-dialog-body { overflow-y: auto; }
 .add-dialog-body .suggestions { max-height: none; }
 
@@ -1036,3 +1053,8 @@ a.brand { text-decoration: none; color: inherit; }
     max-height: 72vh;
   }
 }
+
+/* Invisible, but a real hit target — SVG elements with no fill receive no
+   pointer events, so the fill has to exist and be transparent. */
+.fret-hits circle { fill: #ffffff00; cursor: pointer; }
+.picked-note > circle:first-child { fill: var(--tone-ext); opacity: 0.85; }

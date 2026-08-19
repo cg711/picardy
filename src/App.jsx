@@ -67,7 +67,7 @@ export default function App() {
   const [activeIndex, setActiveIndex] = useState((initial?.progression?.length ?? 1) - 1)
   const [preview, setPreview] = useState(null)
   const [selection, setSelection] = useState(() => new Set())
-  const [inputMode, setInputMode] = useState('text')
+  const [inputMode, setInputMode] = useState('suggest')
   // Whether the add-a-chord panel is open. Where it will insert is not stored
   // separately — it is always activeIndex + 1, which addChord and the suggestion
   // engine already agree on, so the two cannot drift apart.

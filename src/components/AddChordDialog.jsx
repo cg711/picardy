@@ -7,6 +7,9 @@ import { chordSymbol } from '../theory/chords.js'
 import { romanNumeral } from '../theory/keys.js'
 
 const TABS = [
+  // First, and the default: the ranked list is the reason to open this at all.
+  // The other four are for when you already know what you want.
+  ['suggest', 'Suggestions'],
   ['text', 'Type'],
   ['roman', 'Numerals'],
   ['notes', 'From notes'],
@@ -86,6 +89,9 @@ export default function AddChordDialog({
       </div>
 
       <div className="add-dialog-body">
+        {inputMode === 'suggest' && (
+          <Suggestions suggestions={suggestions} onAdd={onAdd} onPreview={onPreview} />
+        )}
         {inputMode === 'text' && <ChordInput onAdd={onAdd} musicKey={musicKey} />}
         {inputMode === 'roman' && <RomanPicker musicKey={musicKey} onAdd={onAdd} />}
         {inputMode === 'import' && <ImportPanel timeSignature={timeSignature} onLoad={onLoadChart} />}
@@ -125,13 +131,6 @@ export default function AddChordDialog({
           </div>
         )}
 
-        <div className="sub-head">
-          <h3>What comes next</h3>
-          <span className="muted">
-            {before ? `after ${chordSymbol(before)}` : 'opening chord'}
-          </span>
-        </div>
-        <Suggestions suggestions={suggestions} onAdd={onAdd} onPreview={onPreview} />
       </div>
     </div>
   )
