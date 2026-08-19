@@ -142,69 +142,76 @@ console.log('\n--- bass and inversion labels ---')
   eq('  plain C 2nd inversion', inversionShort(plain, 2), '2nd inv')
 }
 
-console.log('\n--- pdf chart ---')
+console.log('\n--- lyrics under chords ---')
 {
+  const { layoutLine, lineFragments, distributeWords, lineText } = await import(B + 'lib/lyrics.js')
   const { buildChart } = await import(B + 'lib/pdf.js')
 
-  // Pull every drawn text run and its position out of the finished PDF, so this
-  // asserts what the file actually contains rather than what the code intended.
-  const runsOf = async (opts) => {
-    const doc = await buildChart(opts)
-    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1')
-    const out = []
-    const re = /([\d.-]+)\s+([\d.-]+)\s+Td\s*\(((?:[^()\\]|\\.)*)\)\s*Tj/g
-    let m
-    while ((m = re.exec(raw))) out.push({ x: +m[1], y: +m[2], s: m[3] })
-    return out
-  }
+  // A monospace stand-in: one unit per character, so positions are countable.
+  const measure = (t) => (t ?? '').length
+  const frag = (label, text) => ({ label, text, chord: parseChord(label) })
 
+  // The plain case: each chord sits at the start of its own words.
+  const simple = layoutLine({
+    leadIn: '', measure, spaceWidth: 1, gap: 1,
+    fragments: [frag('C', 'hello '), frag('Am', 'darkness')],
+  })
+  eq('  first chord starts the line', simple.placements[0].x, 0)
+  eq('  second sits where its words start', simple.placements[1].x, 'hello '.length)
+  eq('  and the words join in order', simple.lyricRow, 'hello darkness')
+
+  // A lead-in pushes the first chord along.
+  const lead = layoutLine({
+    leadIn: 'I have been ', measure, spaceWidth: 1, gap: 1,
+    fragments: [frag('C', 'waiting')],
+  })
+  eq('  a lead-in offsets the first chord', lead.placements[0].x, 'I have been '.length)
+
+  // Mid-word: two fragments with no space between them.
+  const midWord = layoutLine({
+    leadIn: '', measure, spaceWidth: 1, gap: 1,
+    fragments: [frag('C', 'wait'), frag('Am', 'ing')],
+  })
+  eq('  a chord can change mid-word', midWord.lyricRow, 'waiting')
+  eq('  and lands on the syllable', midWord.placements[1].x, 4)
+
+  // A label wider than its words must not let the next chord collide.
+  const tight = layoutLine({
+    leadIn: '', measure, spaceWidth: 1, gap: 1,
+    fragments: [frag('Cmaj7', 'a'), frag('G', 'b')],
+  })
+  eq('  a wide label pads the lyric instead of colliding', tight.placements[1].x >= 'Cmaj7'.length + 1, true)
+  eq('  and the words are still in order', tight.lyricRow.replace(/ +/g, ' '), 'a b')
+
+  // Pasting a line deals whole words out across the chords on it.
+  eq('  pasted words are split across the chords', distributeWords('one two three four', 2).map((s) => s.trim()).join('|'), 'one two|three four')
+  eq('  a remainder is spread, not dumped', distributeWords('a b c', 2).map((s) => s.trim()).join('|'), 'a b|c')
+  eq('  and no chords means nothing to split', distributeWords('a b', 0).length, 0)
+
+  // Now the same association through the real PDF: the chord must be drawn at
+  // the measured start of its own words, in the font the lyric is drawn in.
   const key = makeKey('C', 'major')
-  const chords = ['C', 'Am', 'F', 'G'].map(parseChord)
-  const segFor = (spans, shapes) => makeSegment({
-    name: 'Verse', key, progression: chords,
-    inversions: [0, 0, 0, 0], durations: [4, 4, 4, 4], timeSignature: '4/4',
-    shapes, lines: [0, 0, 0, 0], spans,
-    lyricLines: ['hello there my old friend'],
+  const seg = makeSegment({
+    name: 'Verse', key,
+    progression: ['C', 'Am'].map(parseChord),
+    inversions: [0, 0], durations: [4, 4], timeSignature: '4/4',
+    shapes: [null, null], lines: [0, 0],
+    lyrics: ['hello ', 'darkness'], leadIns: ['I have been '],
   })
+  const doc = await buildChart({ song: [{ segmentId: seg.id, repeats: 1 }], segments: [seg], instrument: 'none' })
+  const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1')
+  const runs = []
+  const re = /([\d.-]+)\s+([\d.-]+)\s+Td\s*\(((?:[^()\\]|\\.)*)\)\s*Tj/g
+  let m
+  while ((m = re.exec(raw))) runs.push({ x: +m[1], s: m[3] })
 
-  // Lyric placement follows spans, not durations. Durations are identical in
-  // both of these, so any difference in layout can only come from the spans.
-  const gaps = async (spans) => {
-    const seg = segFor(spans, [null, null, null, null])
-    const runs = await runsOf({ song: [{ segmentId: seg.id, repeats: 1 }], segments: [seg], instrument: 'none' })
-    const xs = runs.filter((r) => ['C', 'Am', 'F', 'G'].includes(r.s)).map((r) => r.x)
-    return xs.slice(1).map((x, i) => +(x - xs[i]).toFixed(1))
-  }
-
-  const even = await gaps([1, 1, 1, 1])
-  eq('  equal spans lay the chords out evenly', new Set(even).size, 1)
-  const weighted = await gaps([3, 1, 1, 1])
-  eq('  a 3:1:1 split spaces them 3:1:1', +(weighted[0] / weighted[1]).toFixed(2), 3)
-  eq('  and the later pair stay equal', weighted[1], weighted[2])
-  // A wider last chord compresses the rest, because the line is a fixed width
-  // divided proportionally — the same behaviour as the row on screen. The three
-  // leading gaps stay equal to each other, and shrink by 4/6.
-  const trailing = await gaps([1, 1, 1, 3])
-  eq('  a trailing span compresses the rest evenly', new Set(trailing).size, 1)
-  eq('  by exactly the change in total', +(trailing[0] / even[0]).toFixed(2), +(4 / 6).toFixed(2))
-
-  // The same chord pinned two ways is numbered; a chord with one shape is not.
-  const seg = segFor([1, 1, 1, 1], ['standard:x-3-2-0-1-0', null, null, null])
-  const twoWays = makeSegment({
-    name: 'Chorus', key, progression: chords,
-    inversions: [0, 0, 0, 0], durations: [4, 4, 4, 4], timeSignature: '4/4',
-    shapes: ['standard:8-10-10-9-8-8', null, null, null], lines: [0, 0, 0, 0], spans: [1, 1, 1, 1],
-    lyricLines: [''],
-  })
-  const runs = await runsOf({
-    song: [{ segmentId: seg.id, repeats: 1 }, { segmentId: twoWays.id, repeats: 1 }],
-    segments: [seg, twoWays], instrument: 'guitar',
-  })
-  const drawn = runs.map((r) => r.s)
-  eq('  two shapes of one chord are numbered', drawn.includes('1') && drawn.includes('2'), true)
-  // Am appears once with one shape, so it must not pick up a number.
-  const amIndex = drawn.indexOf('Am')
-  eq('  a chord with a single shape is left unnumbered', /^[0-9]$/.test(drawn[amIndex + 1] ?? ''), false)
+  const lyricRun = runs.find((r) => r.s.includes('darkness'))
+  eq('  the compiled line is printed whole', lyricRun.s.trim(), 'I have been hello darkness')
+  const cRun = runs.find((r) => r.s === 'C')
+  const amRun = runs.find((r) => r.s === 'Am')
+  // Both chords sit to the right of the line start, and Am to the right of C.
+  eq('  chords print in order along the line', cRun.x < amRun.x, true)
+  eq('  and the first is offset by the lead-in', cRun.x > lyricRun.x, true)
 }
 
 console.log('\n--- tunings ---')
@@ -434,7 +441,7 @@ console.log('\n--- song arrangement ---')
     name: 'Bridge', key,
     progression: ['F#m', 'D', 'A', 'E'].map(parseChord),
     inversions: [0, 1, 0, 0], durations: ['2', '2', '1', '1'], timeSignature: '3/4',
-    lines: [0, 0, 1, 1], lyricLines: ['first line', 'second line'],
+    lines: [0, 0, 1, 1], leadIns: ['first line', 'second line'], lyrics: ['a', 'b', 'c', 'd'],
   })
   const back = readSegment(built)
   eq('  round-trip keeps the key', noteName(back.key.tonic) + ' ' + back.key.mode, 'F# minor')
@@ -443,7 +450,8 @@ console.log('\n--- song arrangement ---')
   // Preset ids normalise to beats on the way in: '2' is a half note (2 beats),
   // '1' a whole note (4).
   eq('  round-trip normalises durations to beats', back.durations.join(','), '2,2,4,4')
-  eq('  round-trip keeps the lyric lines', back.lyricLines.join('|'), 'first line|second line')
+  eq('  round-trip keeps the lead-ins', back.leadIns.join('|'), 'first line|second line')
+  eq('  round-trip keeps the words under each chord', back.lyrics.join('|'), 'a|b|c|d')
   eq('  round-trip keeps each chord\'s line', back.lines.join(','), '0,0,1,1')
   eq('  round-trip keeps chords', back.progression.map((c) => chordSymbol(c)).join(' '), 'F♯m D A E')
 }
@@ -648,12 +656,13 @@ console.log('\n--- pinned shapes ---')
     id: 'a', name: 'Verse', key: 'C', timeSignature: '4/4',
     chords: ['C', 'C'], inversions: [0, 0], durations: ['1', '1'],
     shapes: [encoded, null],
-    lines: [0, 1], lyricLines: ['first line', 'second line'],
+    lines: [0, 1], lyricLines: ['first line', 'second line'],  // stored before lyrics moved onto chords
   }
   const live = readSegment(segment)
   eq('  a section round-trips the pinned shape', live.shapes[0], encoded)
   eq('  and the unpinned slot stays empty', live.shapes[1], null)
-  eq('  and carries the lyric lines', live.lyricLines.join('|'), 'first line|second line')
+  // Old sections keep their words: whole-line text becomes the line's lead-in.
+  eq('  an older section migrates its lyrics to lead-ins', live.leadIns.join('|'), 'first line|second line')
   eq('  and which line each chord sits on', live.lines.join(','), '0,1')
 
   // Two voicings of one chord must both survive into the legend.

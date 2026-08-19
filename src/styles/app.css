@@ -851,52 +851,6 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 }
 
 .tl-line { display: flex; gap: 8px; align-items: stretch; }
-.tl-lane-wrap { flex: 1; min-width: 0; padding-bottom: 2px; }
-/* The lane is a flex row now, not an absolute-positioned beat canvas: the chords
-   divide the full width between them, so it is proportion that matters and the
-   pixel scale does not. No horizontal scroll — a line always fits. */
-.tl-lane {
-  display: flex; align-items: stretch; height: 46px; margin-bottom: 2px;
-  border-bottom: 1px solid var(--border-soft);
-}
-.tl-empty { align-self: center; font-size: 11px; color: var(--text-dim); padding-left: 2px; }
-
-.tl-chord {
-  position: relative;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 2px 6px; margin: 6px 0; border-radius: 6px; overflow: hidden;
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
-  white-space: nowrap;
-}
-.tl-chord:hover { border-color: #574a39; }
-.tl-chord.active { border-color: var(--accent); background: #2a2113; }
-.tl-chord.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
-.tl-chord-face {
-  display: flex; flex-direction: column; justify-content: center; gap: 0;
-  font: inherit; text-align: left; background: none; border: 0; color: inherit;
-  padding: 0; cursor: pointer; min-width: 0; overflow: hidden;
-}
-.tl-symbol { font-size: 13px; font-weight: 600; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
-.tl-roman { font-size: 9px; color: var(--accent); line-height: 1.1; }
-.tl-remove {
-  position: absolute; top: 1px; right: 3px; font-size: 11px; color: var(--text-dim);
-  cursor: pointer; line-height: 1;
-}
-.tl-remove:hover { color: var(--danger); }
-
-/* The draggable boundary between two chords. Sits on the chord's trailing edge
-   and overhangs both sides, so there is a real grab area without a visible gap. */
-.tl-divider {
-  position: absolute; top: 0; bottom: 0; right: -5px; width: 10px; z-index: 2;
-  cursor: col-resize; touch-action: none;
-}
-.tl-divider::after {
-  content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: 2px;
-  border-radius: 2px; background: var(--border); transition: background 120ms;
-}
-.tl-divider:hover::after, .tl-divider.grabbing::after { background: var(--accent); }
-.lyric-timeline.dragging { cursor: col-resize; user-select: none; }
-
 .tl-lyric {
   /* Full width of the lane above it. A textarea carries a `cols` default, so
      without this it sizes to roughly 20 characters and the words stop lining up
@@ -1369,3 +1323,46 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .tuning-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tuning-readout { font-variant-numeric: tabular-nums; }
+
+/* ---------- lyrics under their chords ---------- */
+
+.lyric-editor { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.lyric-line { display: flex; flex-direction: column; gap: 5px; }
+.lyric-line-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lyric-preview {
+  font-size: 12px; color: var(--text-dim); font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+
+.lyric-paste { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.lyric-paste input { flex: 1 1 220px; min-width: 0; }
+
+/* The cells wrap like text, so a long line runs on rather than scrolling. */
+.lyric-row {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px;
+  padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px;
+  background: #00000028;
+}
+.lyric-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lyric-cell input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px; padding: 4px 6px; min-width: 0;
+  background: #14110c; border: 1px solid var(--border-soft); border-radius: 5px; color: var(--text);
+}
+.lyric-cell input:focus { border-color: var(--accent); outline: none; }
+.lyric-cell.active input { border-color: var(--accent); }
+.lyric-cell.playing input { box-shadow: 0 0 0 2px var(--accent-2) inset; }
+/* The lead-in is deliberately quieter — it belongs to the line, not to a chord. */
+.lyric-cell.lead-in input { background: #100d09; }
+.lyric-cell.lead-in .lyric-cell-chord { font-size: 9px; }
+
+.lyric-cell-chord { display: flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.1; }
+.lyric-chord-name {
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--accent);
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.lyric-chord-name:hover { text-decoration: underline; }
+.lyric-chord-roman { font-size: 9px; color: var(--text-dim); }
+.lyric-chord-x { font-size: 11px; color: var(--text-dim); cursor: pointer; line-height: 1; }
+.lyric-chord-x:hover { color: var(--danger); }
+.lyric-empty { font-size: 12px; align-self: center; }

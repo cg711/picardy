@@ -41,12 +41,14 @@ export function useUndo(snapshot, apply) {
     const before = last.current
     if (JSON.stringify(before) === JSON.stringify(snapshot)) return
 
-    // Which fields changed? If it is only the free-text one and the last entry
-    // was moments ago, replace that entry rather than stacking another.
+    // Which fields changed? If it is only free text and the last entry was
+    // moments ago, replace that entry rather than stacking another — typing a
+    // lyric should be one undo step, not one per keystroke.
     const changed = Object.keys(snapshot).filter(
       (k) => JSON.stringify(before[k]) !== JSON.stringify(snapshot[k]),
     )
-    const textOnly = changed.length === 1 && changed[0] === 'lyricLines'
+    const TEXT_FIELDS = new Set(['leadIns', 'lyrics'])
+    const textOnly = changed.length > 0 && changed.every((k) => TEXT_FIELDS.has(k))
     const recent = Date.now() - lastPushAt.current < COALESCE_MS
 
     if (!(textOnly && recent && undoStack.current.length)) {

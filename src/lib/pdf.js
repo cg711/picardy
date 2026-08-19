@@ -10,6 +10,7 @@ import { mod, pcOf, prettyName, noteName } from '../theory/notes.js'
 import { findVoicings, TUNINGS, decodeShape, shapeFromFrets } from '../theory/guitar.js'
 import { groupIntoBars, timeSignatureOf } from '../theory/rhythm.js'
 import { readSegment } from './song.js'
+import { lineFragments, layoutLine } from './lyrics.js'
 
 const PAGE = { w: 210, h: 297 } // A4 portrait, millimetres
 const MARGIN = 15
@@ -77,7 +78,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
 
     const repeats = Math.max(1, entry.repeats ?? 1)
     const heading = `${segment.name}${repeats > 1 ? `  (x${repeats})` : ''}`
-    const hasLyrics = (live.lyricLines ?? []).some((l) => l && l.trim())
+    const hasLyrics = (live.leadIns ?? []).some((l) => l && l.trim()) || (live.lyrics ?? []).some((l) => l && l.trim())
 
     const bars = groupIntoBars(
       live.progression.map((chord, i) => ({
@@ -258,71 +259,61 @@ function barsPerRow() {
 }
 
 function lineCount(live) {
-  return Math.max(live.lyricLines?.length ?? 1, ...live.lines.map((n) => n + 1), 1)
+  return Math.max(live.leadIns?.length ?? 1, ...live.lines.map((n) => n + 1), 1)
 }
 
 /**
  * Chord-over-lyric layout: the words on one row, the chords above them placed
  * where they fall in the line.
  *
- * Placement follows `spans` — the same per-chord widths the Lyrics & timing tab
- * lays out, where the chords on a line divide its full width between them. It
- * used to follow `durations` instead, which is how a chart could disagree with
- * the screen it was exported from: dragging a chord onto a syllable changes
- * where it sits without changing how long it lasts.
+ * A chord is drawn at the measured start of its own words, so it lands on the
+ * syllable it belongs to by construction. Nothing is positioned by fraction or
+ * proportion, which is why this cannot drift from the editor: both render the
+ * same chord-and-words pairs rather than two reconstructions of a layout.
  */
 function drawLyricLines(doc, live, startY, variants = new Map()) {
   let y = startY + 3
   const total = lineCount(live)
 
   for (let line = 0; line < total; line++) {
-    // Chords on this line, with the share of the line each one starts at.
-    const onLine = []
-    let cursor = 0
-    live.progression.forEach((chord, i) => {
-      if ((live.lines[i] ?? 0) !== line) return
-      const span = live.spans?.[i] > 0 ? live.spans[i] : 1
-      onLine.push({
-        chord,
-        start: cursor,
-        inversion: live.inversions[i],
-        variant: variants.get(variantKey(chord, live.shapes[i])),
-      })
-      cursor += span
-    })
-    const lineSpan = cursor
-    const text = ascii(live.lyricLines?.[line] ?? '')
-    if (!onLine.length && !text) continue
+    const { leadIn, fragments } = lineFragments(live.progression, live.lyrics, live.lines, live.leadIns, line)
+    const labelled = fragments.map((f) => ({
+      ...f,
+      text: ascii(f.text),
+      label: ascii(chordSymbol(f.chord)),
+      variant: variants.get(variantKey(f.chord, live.shapes[f.index])),
+    }))
+    if (!labelled.length && !ascii(leadIn)) continue
 
     if (y + 14 > PAGE.h - MARGIN) {
       doc.addPage()
       y = MARGIN
     }
 
-    // Every line is divided across the same full width, exactly as the lane on
-    // the Lyrics & timing tab is. Scaling to each line's own text instead made
-    // the same fraction land in a different place on every line — and made the
-    // chart disagree with the screen it came from, since on screen the lane is a
-    // constant width whatever the words happen to be.
-    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
-    const span = CONTENT_W
+    // Measured in the face the lyric is actually drawn in, so the chord lands
+    // over the syllable rather than near it.
+    doc.setFont('helvetica', 'normal').setFontSize(10)
+    const measure = (t) => (t ? doc.getTextWidth(t) : 0)
+    const { lyricRow, placements } = layoutLine({
+      leadIn: ascii(leadIn),
+      fragments: labelled,
+      measure,
+      // Room for the chord label plus a space, so two chords never touch.
+      gap: doc.getTextWidth(' '),
+      spaceWidth: doc.getTextWidth(' '),
+    })
 
     doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...ACCENT)
-    let lastRight = -Infinity
-    for (const item of onLine) {
-      const fraction = lineSpan > 0 ? item.start / lineSpan : 0
-      let x = MARGIN + fraction * span
-      const label = ascii(chordSymbol(item.chord))
-      const width = doc.getTextWidth(label)
-      // Never let two chords overlap, however tightly they were placed.
-      if (x < lastRight + 1.5) x = lastRight + 1.5
-      if (x + width > PAGE.w - MARGIN) break
-      lastRight = drawChordLabel(doc, label, item.variant, x, y, { size: 10, colour: ACCENT })
-    }
+    placements.forEach((place, n) => {
+      const item = labelled[n]
+      const x = MARGIN + place.x
+      if (x + doc.getTextWidth(item.label) > PAGE.w - MARGIN) return
+      drawChordLabel(doc, item.label, item.variant, x, y, { size: 10, colour: ACCENT })
+    })
 
     doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
-    if (text) doc.text(text, MARGIN, y + 5)
-    y += text ? 12 : 8
+    if (lyricRow.trim()) doc.text(lyricRow, MARGIN, y + 5)
+    y += lyricRow.trim() ? 12 : 8
   }
 
   return y

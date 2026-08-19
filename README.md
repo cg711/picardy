@@ -100,27 +100,23 @@ dependency.
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
-**Lyrics on a timeline.** Type or paste lyrics as plain text, one line per row, with a chord
-lane above each line. Chords sit on a beat grid drawn at a constant scale, so a bar is the same
-width on every line, and dragging one *ripples*: the chord before it lengthens and everything
-after slides along, which is what makes it feel like sliding a divider rather than editing two
-numbers. Chords snap to bar lines and beats when dragged near one and stay wherever you put them
-otherwise — holding ⌥ turns snapping off entirely, so a chord can land mid-word.
+**Lyrics under their chords.** Each chord owns a box holding the words sung on it, plus a lead-in
+for whatever comes before the first chord of a line. A chord change mid-word is two boxes —
+`wait` under one and `ing` under the next, no space between — which is the case every
+proportional scheme handles badly. Pasting a line splits it across that line's chords at word
+boundaries, since typing a lyric box at a time is slow and lyrics usually arrive as whole lines.
 
-That freedom is why lengths are stored as plain beat counts rather than note values: no fixed set
-of note values can express a chord that changes three-eighths of the way through a word. The
-note-value picker is still there as a shortcut, and old links and saved sections that used the
-preset ids are read back correctly.
+Alignment is stored as an association rather than a position: this chord goes with these syllables.
+There is no x, no width and no fraction anywhere in the model, and that is the point. The earlier
+design stored proportional widths, which meant the editor and the printed chart were two
+reconstructions of the same geometry under different widths and fonts — and they drifted, exactly as
+that arrangement invites. Both now render the same pairs, so the chart cannot disagree with the
+screen it came from.
 
-The PDF follows suit — sections with lyrics print as a real chord-over-lyric chart, with each
-chord placed at the point in the line where it falls, rather than as a bar grid. It reads the same
-`spans` the tab does and divides every line across the same full width, so the chart matches the
-screen it came from; scaling each line to its own text instead put the same fraction in a different
-place on every line.
-
-Where one chord is pinned to two different shapes, the legend numbers them — Cmaj7₁, Cmaj7₂ — and
-the chart carries the number too, so a symbol in the music points at the diagram it means. A chord
-with only one shape stays unnumbered, since a subscript that never varies is noise.
+The PDF draws each chord at the measured start of its own words, in the face the lyric is drawn in.
+Where a chord's label is wider than the syllable under it, the lyric is padded so the next chord
+starts clear of it rather than on top — the one thing a chord sheet does that ordinary text does
+not.
 
 **Tunings.** Twenty-two presets — standard and flattened, the dropped family, six open
 tunings, DADGAD and Orkney, plus 7- and 8-string, baritone and bass — or build your own, string by

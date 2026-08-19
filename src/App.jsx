@@ -65,9 +65,11 @@ export default function App() {
   const [shapes, setShapes] = useState(initial?.shapes ?? [])
   // Which lyric line each chord sits over, and the lines of plain text.
   const [lines, setLines] = useState(initial?.lines ?? [])
-  // Lyric-lane width per chord, independent of its beat length.
-  const [spans, setSpans] = useState(initial?.spans ?? [])
-  const [lyricLines, setLyricLines] = useState(initial?.lyricLines ?? [''])
+  // The words sung under each chord, and the words before the first chord of
+  // each line. Alignment is this association, not a position — which is what
+  // keeps the editor and the printed chart from ever disagreeing.
+  const [lyrics, setLyrics] = useState(initial?.lyrics ?? [])
+  const [leadIns, setLeadIns] = useState(initial?.leadIns ?? [''])
   const [editorView, setEditorView] = useState('chips')
   const [timeSignature, setTimeSignature] = useState(initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE)
   const [newChordDuration, setNewChordDuration] = useState(DEFAULT_DURATION)
@@ -153,11 +155,11 @@ export default function App() {
     durations,
     shapes,
     lines,
-    spans,
-    lyricLines,
+    lyrics,
+    leadIns,
     key: `${noteName(musicKey.tonic)}${musicKey.mode === 'minor' ? 'm' : ''}`,
     timeSignature,
-  }), [progression, inversions, durations, shapes, lines, spans, lyricLines, musicKey, timeSignature])
+  }), [progression, inversions, durations, shapes, lines, lyrics, leadIns, musicKey, timeSignature])
 
   const applySnapshot = useCallback((snap) => {
     const minor = /m$/.test(snap.key)
@@ -169,8 +171,8 @@ export default function App() {
     setDurations(snap.durations)
     setShapes(snap.shapes)
     setLines(snap.lines ?? [])
-    setSpans(snap.spans ?? [])
-    setLyricLines(snap.lyricLines ?? [''])
+    setLyrics(snap.lyrics ?? [])
+    setLeadIns(snap.leadIns ?? [''])
     setTimeSignature(snap.timeSignature)
     setActiveIndex(Math.min(activeIndexRef.current, chords.length - 1))
     setPreview(null)
@@ -285,8 +287,8 @@ export default function App() {
   // fragment from state that was never lost.
   useEffect(() => {
     if (route !== 'app') return
-    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines, spans })
-  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines, spans])
+    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics })
+  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -356,8 +358,8 @@ export default function App() {
       setShapes((sh) => [...sh.slice(0, insertAt), null, ...sh.slice(insertAt)])
       // A chord inserted mid-progression joins the line its neighbour is on.
       setLines((ln) => [...ln.slice(0, insertAt), ln[insertAt - 1] ?? ln[insertAt] ?? 0, ...ln.slice(insertAt)])
-      // A new chord takes an even share of its lyric line.
-      setSpans((w) => [...w.slice(0, insertAt), 1, ...w.slice(insertAt)])
+      // A new chord starts with no words under it.
+      setLyrics((w) => [...w.slice(0, insertAt), '', ...w.slice(insertAt)])
       setPreview(null)
       setSelection(new Set())
       setGenerated(null)
@@ -413,7 +415,7 @@ export default function App() {
     setDurations((d) => d.filter((_, j) => j !== i))
     setShapes((sh) => sh.filter((_, j) => j !== i))
     setLines((ln) => ln.filter((_, j) => j !== i))
-    setSpans((w) => w.filter((_, j) => j !== i))
+    setLyrics((w) => w.filter((_, j) => j !== i))
     setActiveIndex((a) => Math.max(0, Math.min(a, progression.length - 2)))
     setPreview(null)
     setGenerated(null)
@@ -443,9 +445,9 @@ export default function App() {
       while (padded.length < progression.length) padded.push(null)
       return swap(padded)
     })
-    setSpans((w) => {
+    setLyrics((w) => {
       const padded = [...w]
-      while (padded.length < progression.length) padded.push(1)
+      while (padded.length < progression.length) padded.push('')
       return swap(padded)
     })
     setLines((ln) => {
@@ -488,21 +490,22 @@ export default function App() {
     playChord([midi], { duration: 0.9, timbre })
   }
 
-  /**
-   * Move the lyric-lane boundary between two neighbouring chords.
-   *
-   * Only their two widths change and their sum is preserved, so the line stays
-   * exactly full and nothing after it shifts. Durations are deliberately
-   * untouched: aligning a chord to a syllable is a typographic decision, and it
-   * used to silently rewrite the rhythm.
-   */
-  const resizeSpans = (leftIndex, leftSpan, rightIndex, rightSpan) => {
-    if (!Number.isFinite(leftSpan) || !Number.isFinite(rightSpan)) return
-    setSpans((list) => {
+  /** The words sung under one chord. */
+  const setLyricAt = (i, text) => {
+    setLyrics((list) => {
       const next = [...list]
-      while (next.length < progression.length) next.push(1)
-      next[leftIndex] = leftSpan
-      next[rightIndex] = rightSpan
+      while (next.length < progression.length) next.push('')
+      next[i] = text
+      return next
+    })
+  }
+
+  /** The words before the first chord of a line. */
+  const setLeadInAt = (line, text) => {
+    setLeadIns((list) => {
+      const next = [...list]
+      while (next.length <= line) next.push('')
+      next[line] = text
       return next
     })
   }
@@ -515,7 +518,7 @@ export default function App() {
       next[i] = line
       return next
     })
-    setLyricLines((ls) => {
+    setLeadIns((ls) => {
       const next = [...ls]
       while (next.length <= line) next.push('')
       return next
@@ -576,8 +579,8 @@ export default function App() {
     setDurations(durs)
     setShapes(result.progression.map(() => null))
     setLines(result.progression.map(() => 0))
-    setSpans(result.progression.map(() => 1))
-    setLyricLines([''])
+    setLyrics(result.progression.map(() => ''))
+    setLeadIns([''])
     setActiveIndex(result.progression.length - 1)
     setPreview(null)
     setSelection(new Set())
@@ -644,8 +647,8 @@ export default function App() {
     setDurations(parsed.durations)
     setShapes(parsed.chords.map(() => null))
     setLines(parsed.chords.map(() => 0))
-    setSpans(parsed.chords.map(() => 1))
-    setLyricLines([''])
+    setLyrics(parsed.chords.map(() => ''))
+    setLeadIns([''])
     setActiveIndex(parsed.chords.length - 1)
     setPreview(null)
     setGenerated(null)
@@ -665,8 +668,8 @@ export default function App() {
       timeSignature,
       shapes,
       lines,
-      spans,
-      lyricLines,
+      lyrics,
+      leadIns,
     })
     setSegments((list) => [...list, segment])
     // Saving is otherwise silent — the section lands in a tab you may not be
@@ -695,8 +698,8 @@ export default function App() {
     setDurations(live.durations)
     setShapes(live.shapes)
     setLines(live.lines)
-    setSpans(live.spans ?? live.progression.map(() => 1))
-    setLyricLines(live.lyricLines.length ? live.lyricLines : [''])
+    setLyrics(live.lyrics ?? live.progression.map(() => ''))
+    setLeadIns(live.leadIns.length ? live.leadIns : [''])
     setTimeSignature(live.timeSignature)
     setActiveIndex(live.progression.length - 1)
     setPreview(null)
@@ -833,7 +836,7 @@ export default function App() {
         </div>
         {/* The key and transpose controls moved down to the progression they act
             on. Share stays: it copies a link to the whole app state, not to one
-            panel, so a bar that spans the app is where it belongs. */}
+            panel, so a bar that lyrics the app is where it belongs. */}
         <div className="topbar-right">
           <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
@@ -912,14 +915,15 @@ export default function App() {
               <LyricTimeline
                 progression={progression}
                 lines={lines}
-                spans={spans}
-                lyricLines={lyricLines}
+                lyrics={lyrics}
+                leadIns={leadIns}
                 musicKey={musicKey}
                 activeIndex={activeIndex}
                 playingIndex={playingIndex}
                 onSelect={selectChord}
-                onLyricLines={setLyricLines}
-                onResize={resizeSpans}
+                onLyric={setLyricAt}
+                onLeadIn={setLeadInAt}
+                onAddLine={() => setLeadIns((l) => [...l, ''])}
                 onMoveChordToLine={moveChordToLine}
                 onRemove={removeChord}
               />
@@ -983,8 +987,8 @@ export default function App() {
                 setDurations([])
                 setShapes([])
                 setLines([])
-                setSpans([])
-                setLyricLines([''])
+                setLyrics([])
+                setLeadIns([''])
                 setActiveIndex(-1)
                 setPreview(null)
                 setGenerated(null)
@@ -1051,8 +1055,8 @@ export default function App() {
                         setDurations(s.progression.map(() => DEFAULT_DURATION))
                         setShapes(s.progression.map(() => null))
                         setLines(s.progression.map(() => 0))
-                        setSpans(s.progression.map(() => 1))
-                        setLyricLines([''])
+                        setLyrics(s.progression.map(() => ''))
+                        setLeadIns([''])
                         setActiveIndex(s.progression.length - 1)
                         setPreview(null)
                       }}

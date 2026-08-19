@@ -45,7 +45,7 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, lyricLines, lines, spans }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
@@ -57,13 +57,11 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
   if (timeSignature && timeSignature !== DEFAULT_TIME_SIGNATURE) params.set('t', timeSignature)
   // Only carried when actually set, so a plain link stays short.
   if (shapes?.some(Boolean)) params.set('v', shapes.map((x) => x ?? '').join('~'))
-  if (lyricLines?.some((l) => l && l.trim())) params.set('w', lyricLines.map((l) => l ?? '').join('~'))
+  // Words before the first chord of each line, and the words under each chord.
+  if (leadIns?.some((l) => l && l.trim())) params.set('w', leadIns.map((l) => l ?? '').join('~'))
+  if (lyrics?.some((l) => l && l.trim())) params.set('y', lyrics.map((l) => l ?? '').join('~'))
   if (lines?.some((n) => n)) params.set('n', lines.join(','))
-  // Lyric alignment widths. Only carried once somebody has dragged one, since an
-  // untouched line divides evenly and needs no data at all.
-  if (spans?.some((w) => Math.abs((w ?? 1) - 1) > 1e-6)) {
-    params.set('a', spans.map((w) => +(w ?? 1).toFixed(3)).join(','))
-  }
+
   return params.toString()
 }
 
@@ -99,8 +97,8 @@ export function decodeState(hash) {
   const timeSignature = params.get('t') || DEFAULT_TIME_SIGNATURE
 
   const shapes = (params.get('v') || '').split('~')
-  const lyricLines = params.get('w') ? params.get('w').split('~') : ['']
-  const spans = (params.get('a') || '').split(',').map((w) => Number(w)).filter((w) => !Number.isNaN(w))
+  const leadIns = params.get('w') ? params.get('w').split('~') : ['']
+  const lyrics = params.get('y') ? params.get('y').split('~') : []
 
   return {
     key,
@@ -110,8 +108,8 @@ export function decodeState(hash) {
     lines: (params.get('n') || '').split(',').map((n) => parseInt(n, 10) || 0),
     timeSignature,
     shapes: progression.map((_, i) => shapes[i] || null),
-    lyricLines,
-    spans: progression.map((_, i) => (spans[i] > 0 ? spans[i] : 1)),
+    leadIns,
+    lyrics: progression.map((_, i) => lyrics[i] ?? ''),
   }
 }
 
