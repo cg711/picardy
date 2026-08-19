@@ -285,9 +285,17 @@ select { cursor: pointer; }
 /* The bar badge hangs above each chip, and overflow-x:auto forces overflow-y
    to compute to auto as well — so the strip needs padding to scroll it into
    view rather than clipping it. */
+/* Wraps rather than scrolls.
+   The add card and the insert slots live *in* this strip, so anything that
+   scrolls out of it becomes unreachable — with eight chords the add card sat
+   past the right edge, and a click at it landed on the panel behind. Wrapping
+   means every chord, every gap and the add card are always on screen, and a long
+   progression reads as lines the way a lead sheet does.
+   row-gap leaves room for the bar badge, which hangs above each chip. */
 .prog-strip {
-  display: flex; align-items: stretch; gap: 8px;
-  overflow-x: auto; padding: 11px 2px 6px;
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  column-gap: 8px; row-gap: 18px;
+  padding: 11px 2px 6px;
 }
 
 .prog-chip {
@@ -1085,8 +1093,9 @@ a.brand { text-decoration: none; color: inherit; }
    act as arranging chords, one level up, so it should not look like a different
    mechanism. */
 .song-strip {
-  display: flex; align-items: stretch; gap: 8px;
-  overflow-x: auto; padding: 11px 14px 8px;
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  column-gap: 8px; row-gap: 18px;
+  padding: 11px 14px 8px;
 }
 /* Deliberately the same box as .prog-chip — same width, padding, radius and
    border — so arranging sections and arranging chords are visibly one gesture. */
