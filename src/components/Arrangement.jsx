@@ -29,10 +29,10 @@ export function SaveSectionRow({ canSave, onSave }) {
         ))}
       </select>
       <button className="btn primary" onClick={() => onSave(name)} disabled={!canSave}>
-        Save as section
+        Save progression as section
       </button>
       <span className="muted small">
-        {canSave ? 'Snapshots the chords, key and metre above' : 'Add some chords first'}
+        {canSave ? 'Snapshots the chords, key and metre' : 'Add some chords first'}
       </span>
     </div>
   )

@@ -149,6 +149,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
   .p-progression { order: 1; }
   .p-instruments { order: 2; }
   .p-chord { order: 3; }
+  .p-recent { order: 4; }
 }
 
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -622,7 +623,19 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 /* ---------- sections & song ---------- */
 
 .arrangement { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
-.save-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Sits with the transport as part of the controls block, so it needs that
+   block's padding and rule — standalone it had neither and floated loose against
+   the panel edge. */
+.save-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
+  background: #ffffff04;
+}
+.save-row .btn { white-space: nowrap; }
+/* Inside the Sections panel it is laid out by .arrangement, which brings its own
+   padding — so drop the block chrome there. */
+.arrangement .save-row { padding: 0; border-top: 0; background: none; }
 .sub-head { display: flex; align-items: baseline; gap: 10px; }
 .pad-sm { margin: 0; font-size: 12px; }
 
@@ -1015,20 +1028,34 @@ a.brand { text-decoration: none; color: inherit; }
 
 .empty-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-/* Not a modal. "From notes" needs the instruments clickable, so there is no
-   backdrop and the panel sits over the left column, leaving the right one free. */
-.add-dialog {
+/* A sidebar off the left edge. Not a modal: "From notes" needs the instruments
+   clickable, so there is no backdrop and taking only the left edge leaves the
+   right column — where the instruments live — completely clear.
+
+   Closed state is a transform plus visibility rather than display:none, so it can
+   animate both ways; visibility is what takes its contents out of the tab order
+   while it is off-screen, which opacity alone would not do. */
+.add-sidebar {
   position: fixed;
   z-index: 50;
-  left: 16px;
-  top: 92px;
-  width: min(560px, calc(50vw - 32px));
-  max-height: calc(100vh - 120px);
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(460px, 92vw);
   display: flex; flex-direction: column;
   background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 24px 60px #000000b0;
+  border-right: 1px solid var(--border);
+  box-shadow: 18px 0 60px #000000b0;
+
+  transform: translateX(-100%);
+  visibility: hidden;
+  /* Delay visibility until the slide-out finishes, so it does not vanish first. */
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 220ms;
+}
+.add-sidebar.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s;
 }
 .add-dialog-head {
   display: flex; align-items: baseline; gap: 10px;
@@ -1045,13 +1072,28 @@ a.brand { text-decoration: none; color: inherit; }
 .add-dialog-body .suggestions { max-height: none; }
 
 @media (max-width: 1100px) {
-  /* Stacked, there is no free column to sit beside — so take the full width and
-     dock to the bottom, which keeps the instruments above it reachable. */
-  .add-dialog {
-    left: 8px; right: 8px; width: auto;
-    top: auto; bottom: 8px;
-    max-height: 72vh;
+  /* Stacked, there is no column to sit beside, so it comes down from the top
+     across the full width instead of in from the side. */
+  .add-sidebar {
+    left: 0; right: 0; width: auto;
+    top: 0; bottom: auto;
+    max-height: 82vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: 0 18px 60px #000000b0;
+    transform: translateY(-100%);
   }
+  .add-sidebar.open { transform: none; }
+
+  /* Picking notes needs to see the instruments, and here they are underneath
+     rather than beside. Give back most of the screen so they can be scrolled
+     into the gap and tapped while the panel stays open. */
+  .add-sidebar.picking-notes { max-height: 46vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .add-sidebar, .add-sidebar.open { transition: visibility 0s; }
 }
 
 /* Invisible, but a real hit target — SVG elements with no fill receive no

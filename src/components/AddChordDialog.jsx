@@ -17,14 +17,20 @@ const TABS = [
 ]
 
 /**
- * Everything that puts a chord into the progression, in a panel raised over the
- * editor.
+ * Everything that puts a chord into the progression, in a sidebar that slides in
+ * from the left — or down from the top on a phone, where there is no room beside
+ * anything.
  *
  * Deliberately *not* a modal. One of the five ways in is "click notes on the
  * instruments", and a backdrop that swallows pointer events would make that tab
- * impossible to use. So there is no backdrop, the rest of the app stays live,
- * and the panel sits over the left column where "Add a chord" used to be —
- * which leaves the instruments in the right column visible and clickable.
+ * impossible to use. So there is no backdrop and the rest of the app stays live;
+ * on a wide screen the sidebar takes the left edge and leaves the instruments
+ * clear.
+ *
+ * It stays mounted and toggles a class rather than unmounting, because a
+ * component that returns null cannot animate on the way out. `visibility:
+ * hidden` while closed is what keeps its contents out of the tab order — the
+ * reason that property is used rather than opacity.
  *
  * It also stays open after a chord is added. Adding is usually a run, not a
  * single act: take a suggestion, see it land, take the next one.
@@ -59,15 +65,18 @@ export default function AddChordDialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  if (!open) return null
-
   const at = insertAt ?? progression.length
   const atEnd = at >= progression.length
   const before = progression[at - 1]
   const after = progression[at]
 
   return (
-    <div className="add-dialog" ref={panelRef} role="dialog" aria-label="Add a chord">
+    <div
+      className={`add-sidebar${open ? ' open' : ''}${inputMode === 'notes' ? ' picking-notes' : ''}`}
+      ref={panelRef}
+      role="dialog"
+      aria-label="Add a chord"
+    >
       <div className="add-dialog-head">
         <h2>Add a chord</h2>
         <span className="muted small">

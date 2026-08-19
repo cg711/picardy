@@ -302,6 +302,17 @@ export default function App() {
     setAddOpen(true)
   }
 
+  /**
+   * Adding closes the sidebar. Once a chord has gone in, the panel has done its
+   * job, and standing open only covers the progression you opened it to extend —
+   * the "from notes" tab in particular selects notes on an instrument the panel
+   * would otherwise be sitting on top of.
+   */
+  const addChordAndClose = (chord) => {
+    addChord(chord)
+    setAddOpen(false)
+  }
+
   const addChord = useCallback(
     (chord) => {
       if (!chord) return
@@ -793,6 +804,22 @@ export default function App() {
               ))}
             </div>
 
+            {/* The timeline lays words out against chords, so with no chords it
+                has nothing to lay them against — say so rather than render an
+                empty box that looks broken. */}
+            {editorView === 'lyrics' && progression.length === 0 && (
+              <div className="progression empty">
+                <p className="muted">
+                  No chords yet. Lyrics are placed against the progression, so add some chords
+                  first — then type the words here and drag each chord to the syllable it lands on.
+                </p>
+                <div className="empty-actions">
+                  <button className="btn primary" onClick={() => openAddChord(0)}>+ Add a chord</button>
+                  <button className="btn" onClick={surprise}>🎲 Surprise me — generate one</button>
+                </div>
+              </div>
+            )}
+
             {editorView === 'lyrics' && progression.length > 0 && (
               <LyricTimeline
                 progression={progression}
@@ -832,42 +859,6 @@ export default function App() {
                 onExport={() => setExporting(true)}
                 onExportMidi={exportMidi}
               />
-              {/* Named sections are work you saved; Recent is work you didn't. Both
-                  answer "get me back to something I had", so they belong together
-                  rather than at opposite corners of the screen. */}
-              {history.length > 0 && (
-                <>
-                  <div className="sub-head">
-                    <h3>Recent</h3>
-                    <span className="muted">progressions you built earlier</span>
-                    <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
-                  </div>
-                  <ul className="history">
-                    {history.slice(0, 8).map((h, i) => (
-                      <li key={i}>
-                        <button
-                          onClick={() => {
-                            const s = historyToState(h)
-                            if (!s.key) return
-                            setMusicKey(s.key)
-                            setProgression(s.progression)
-                            setInversions(s.progression.map(() => 0))
-                            setDurations(s.progression.map(() => DEFAULT_DURATION))
-                            setShapes(s.progression.map(() => null))
-                            setLines(s.progression.map(() => 0))
-                            setLyricLines([''])
-                            setActiveIndex(s.progression.length - 1)
-                            setPreview(null)
-                          }}
-                        >
-                          <span className="hist-key">{h.key}</span>
-                          <span className="hist-chords">{h.chords.join(' – ')}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
               </>
             )}
 
@@ -908,11 +899,6 @@ export default function App() {
               }}
             />
 
-            {/* Kept out of the Sections tab on purpose: this acts on the
-                progression, not on the library, so it should not hide behind the
-                tab that lists what you have already saved. */}
-            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} />
-
             <Transport
               playing={playing}
               onPlay={play}
@@ -935,7 +921,51 @@ export default function App() {
               onLoop={setLoop}
               disabled={!progression.length}
             />
+
+            {/* Down with the transport rather than floating between the strip and
+                it, where it had none of the panel's padding and read as loose.
+                Still outside the Sections tab on purpose: it acts on the
+                progression, not on the library, so it should not hide behind the
+                tab that lists what you have already saved. */}
+            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} />
           </div>
+
+          {/* Its own panel directly under the progression, rather than inside the
+              Sections tab: reopening earlier work is a way to *start*, so it
+              should be visible without first going looking for it. */}
+          {history.length > 0 && (
+            <div className="panel p-recent">
+              <div className="panel-head">
+                <h2>Recent</h2>
+                <span className="muted">progressions you built earlier</span>
+                <button className="btn ghost tiny" onClick={() => setHistory(clearHistory())}>Clear</button>
+              </div>
+              <ul className="history">
+                {history.slice(0, 8).map((h, i) => (
+                  <li key={i}>
+                    <button
+                      onClick={() => {
+                        const s = historyToState(h)
+                        if (!s.key) return
+                        setMusicKey(s.key)
+                        setProgression(s.progression)
+                        setInversions(s.progression.map(() => 0))
+                        setDurations(s.progression.map(() => DEFAULT_DURATION))
+                        setShapes(s.progression.map(() => null))
+                        setLines(s.progression.map(() => 0))
+                        setLyricLines([''])
+                        setActiveIndex(s.progression.length - 1)
+                        setPreview(null)
+                      }}
+                    >
+                      <span className="hist-key">{h.key}</span>
+                      <span className="hist-chords">{h.chords.join(' – ')}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
         </section>
 
@@ -1180,7 +1210,7 @@ export default function App() {
         musicKey={musicKey}
         inputMode={inputMode}
         onInputMode={setInputMode}
-        onAdd={addChord}
+        onAdd={addChordAndClose}
         suggestions={suggestions}
         onPreview={previewChord}
         timeSignature={timeSignature}
