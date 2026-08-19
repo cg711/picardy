@@ -901,13 +901,9 @@ export default function App() {
             {editorView === 'lyrics' && progression.length === 0 && (
               <div className="progression empty">
                 <p className="muted">
-                  No chords yet. Lyrics are placed against the progression, so add some chords
-                  first — then type the words here and drag each chord to the syllable it lands on.
+                  No chords yet. Every chord holds the words sung on it, so write the progression
+                  on the Chords tab first and each chord will turn up here with a box beneath it.
                 </p>
-                <div className="empty-actions">
-                  <button className="btn primary" onClick={() => openAddChord(0)}>+ Add a chord</button>
-                  <button className="btn" onClick={surprise}>🎲 Surprise me — generate one</button>
-                </div>
               </div>
             )}
 

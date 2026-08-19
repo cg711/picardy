@@ -1013,7 +1013,6 @@ a.brand { text-decoration: none; color: inherit; }
 .insert-slot:hover, .prog-strip:hover .insert-slot:hover { opacity: 1; background: #ffffff08; }
 .insert-slot:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 
-.empty-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
 /* A sidebar off the left edge. Not a modal: "From notes" needs the instruments
    clickable, so there is no backdrop and taking only the left edge leaves the
