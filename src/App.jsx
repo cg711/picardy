@@ -691,6 +691,10 @@ export default function App() {
     setActiveIndex(live.progression.length - 1)
     setPreview(null)
     setGenerated(null)
+    // Go where the thing you just loaded actually is. Loading a section only to
+    // stay on the song tab left the chords invisible — and the progression
+    // controls are hidden there, so there was nothing to edit them with either.
+    setEditorView('chips')
   }
 
   const renameSegment = (id, name) =>
