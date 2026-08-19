@@ -10,13 +10,6 @@ export default function LegalPage({ route }) {
   const page = pageFor(route)
   const Body = BODIES[route] ?? Privacy
 
-  // The tab title is the only per-page metadata worth keeping in sync. The OG
-  // tags stay on the app, which is what people actually share.
-  useEffect(() => {
-    document.title = page.title
-    return () => { document.title = pageFor('app').title }
-  }, [page.title])
-
   // navigate() already scrolls up, but it runs before this page exists and the
   // browser's own scroll restoration lands after it — so arriving from halfway
   // down the app drops you halfway down the policy. Do it once the page is real.

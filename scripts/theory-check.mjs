@@ -25,7 +25,7 @@ const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
-const { PAGES, routeFor, pageFor } = await import(B + 'lib/routes.js')
+const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
 const { readFile } = await import('node:fs/promises')
 
@@ -897,13 +897,22 @@ console.log('\n--- brand palette ---')
 
 console.log('\n--- routes ---')
 {
-  eq('  / is the app', routeFor('/'), 'app')
+  eq('  / is the landing page', routeFor('/'), 'home')
+  eq('  /tool is the app', routeFor('/tool'), 'app')
   eq('  /privacy', routeFor('/privacy'), 'privacy')
   eq('  /terms', routeFor('/terms'), 'terms')
   // A trailing slash is the same page — hosts and hand-typed URLs disagree about it.
   eq('  /exercises', routeFor('/exercises'), 'exercises')
   eq('  /privacy/ is the same page', routeFor('/privacy/'), 'privacy')
-  eq('  unknown paths fall back to the app', routeFor('/nope'), 'app')
+  eq('  unknown paths fall back to the front page', routeFor('/nope'), 'home')
+
+  // Every progression ever shared is a '/#k=…' link. Moving the tool to /tool
+  // would break all of them if the front door did not forward them on.
+  eq('  a shared progression at / goes to the tool', legacyToolPath('/', '#k=C&p=Cmaj7,G7'), '/tool')
+  eq('  …carrying nothing else about the URL', legacyToolPath('/', '#k=Am&p=Am'), TOOL_PATH)
+  eq('  a bare front page stays put', legacyToolPath('/', ''), null)
+  eq('  a fragment that is not a progression stays put', legacyToolPath('/', '#pricing'), null)
+  eq('  and no other page is forwarded', legacyToolPath('/exercises', '#k=C&p=C'), null)
   eq('  every page round-trips', PAGES.every((p) => pageFor(p.route).path === p.path), true)
 
   // The SPA fallback is what makes a typed /privacy work at all; without it the

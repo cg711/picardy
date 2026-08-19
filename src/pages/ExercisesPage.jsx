@@ -7,7 +7,7 @@ import { chordSymbol, voiceChord } from '../theory/chords.js'
 import { keyName } from '../theory/keys.js'
 import { playChord, playProgression, stopPlayback } from '../audio/synth.js'
 import { encodeState } from '../lib/share.js'
-import { pageFor } from '../lib/routes.js'
+import { TOOL_PATH } from '../lib/routes.js'
 import Piano from '../components/Piano.jsx'
 import Fretboard from '../components/Fretboard.jsx'
 
@@ -49,11 +49,7 @@ export default function ExercisesPage() {
   const answered = onInstrument ? picked !== null : chosen !== null
   const gotItRight = onInstrument ? checkNote(question, picked) : chosen === question?.answerIndex
 
-  useEffect(() => {
-    document.title = pageFor('exercises').title
-    window.scrollTo(0, 0)
-    return () => { document.title = pageFor('app').title }
-  }, [])
+  useEffect(() => { window.scrollTo(0, 0) }, [])
 
   // Leaving the page mid-drill should not leave a chord ringing.
   useEffect(() => () => stopPlayback(), [])
@@ -172,7 +168,7 @@ export default function ExercisesPage() {
   // single note has nothing for the progression editor to open.
   const openInTool = useMemo(() => {
     if (!question?.chords?.length || !question.key) return null
-    return `/#${encodeState({ key: question.key, progression: question.chords })}`
+    return `${TOOL_PATH}#${encodeState({ key: question.key, progression: question.chords })}`
   }, [question])
 
   /**

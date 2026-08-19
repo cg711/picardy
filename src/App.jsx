@@ -44,10 +44,21 @@ import ReharmPanel from './components/ReharmPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, linkProps } from './lib/router.js'
+import { legacyToolPath, pageFor } from './lib/routes.js'
 import Menu from './components/Menu.jsx'
 import SiteFooter from './components/SiteFooter.jsx'
 import LegalPage from './pages/LegalPage.jsx'
 import ExercisesPage from './pages/ExercisesPage.jsx'
+import HomePage from './pages/HomePage.jsx'
+
+// Before anything reads the URL: a shared progression that arrives at '/' is
+// forwarded to the tool, carrying its fragment. Every link ever generated points
+// at the old address, and replaceState keeps them working without a round trip
+// or an entry in the back history.
+{
+  const forwarded = legacyToolPath(window.location.pathname, window.location.hash)
+  if (forwarded) window.history.replaceState(null, '', `${forwarded}${window.location.hash}`)
+}
 
 const initial = decodeState(window.location.hash)
 
@@ -291,6 +302,11 @@ export default function App() {
     if (route !== 'app') return
     writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics })
   }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics])
+
+  // One place sets the tab title, for every route. Per-page effects that each
+  // restored "the app's title" on unmount meant a cold load and a navigation
+  // could disagree about what the same page is called.
+  useEffect(() => { document.title = pageFor(route).title }, [route])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -823,7 +839,9 @@ export default function App() {
             <Menu route={route} />
           </div>
         </header>
-        {route === 'exercises' ? <ExercisesPage /> : <LegalPage route={route} />}
+        {route === 'home' ? <HomePage />
+          : route === 'exercises' ? <ExercisesPage />
+            : <LegalPage route={route} />}
         <SiteFooter route={route} />
       </div>
     )
@@ -832,10 +850,11 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
+        {/* A link now that there is a front page to go back to. */}
+        <a className="brand" {...linkProps('/')}>
           <h1><Lockup /></h1>
           <span className="tagline">fretboard &amp; keyboard progression explorer</span>
-        </div>
+        </a>
         {/* The key and transpose controls moved down to the progression they act
             on. Share stays: it copies a link to the whole app state, not to one
             panel, so a bar that lyrics the app is where it belongs. */}

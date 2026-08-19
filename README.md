@@ -223,6 +223,18 @@ that check — it only sees luminance, so it scores an orange and a blue of equa
 identical. The suite measures perceptual distance in Lab instead (`deltaE`), and holds every tone to
 a minimum ΔE from the accent and from every other tone. Retune those by the numbers, not by eye.
 
+## Pages
+
+`/` is the landing page — what Picardy is, the tools, and links into them. `/tool` is the
+progression tool, `/exercises` the drills, `/privacy` and `/terms` the legal text. The menu in the
+top bar and the footer are both generated from `PAGES` in `src/lib/routes.js`, so a new page appears
+in both by adding one entry.
+
+The tool used to live at `/`, and every progression ever shared is a `/#k=…` link. Moving it would
+have broken all of them, so `legacyToolPath()` forwards a state fragment arriving at the front door
+to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
+pure and lives in `routes.js` so the check suite holds it to that promise.
+
 ## Legal pages
 
 `/privacy` and `/terms`, reachable from the menu in the top bar and from the footer. They are
@@ -243,7 +255,7 @@ These are real paths rather than hash routes, because the hash is already the ap
 and a legal URL needs to be something you can hand to an app store or a payment provider. A direct
 load of `/privacy` works because the host serves `index.html` for unknown paths — that is what
 `not_found_handling` is doing in `wrangler.jsonc`, and the check suite asserts it stays set. The
-router is thirty lines in `src/lib/router.js`; four pages, none of them with parameters, do not
+router is thirty lines in `src/lib/router.js`; five pages, none of them with parameters, do not
 justify a dependency.
 
 ## Exercises
@@ -346,6 +358,7 @@ src/
                   contrast and perceptual-distance maths the check suite asserts
     Mark.jsx      the mark and the lockup
   pages/
+    HomePage.jsx  the landing page at /
     site.js       the operator/contact/jurisdiction the legal pages need
     Privacy.jsx   privacy policy — draft, describes the app's actual behaviour
     Terms.jsx     terms of service — draft
