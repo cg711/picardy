@@ -1233,13 +1233,19 @@ a.brand { text-decoration: none; color: inherit; }
 /* Placeholders shaped like the cards they will become. */
 .empty-chord { border-style: dashed; }
 .die-card {
-  display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  display: flex; flex-direction: column; align-items: stretch;
   gap: 6px; width: var(--chip-w); height: var(--chip-h); padding: 8px;
   border: 1.5px dashed var(--border); border-radius: 9px; background: transparent;
 }
+/* Fills everything above the dropdown. The card cannot itself be a button — it
+   contains a <select> — so the button inside has to grow to the card's edges, or
+   the dotted outline promises a target far larger than the one that responds.
+   Roughly two thirds of this card used to do nothing when clicked. */
 .die-face {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  flex: 1; width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font: inherit; color: var(--text-dim); background: none; border: 0; cursor: pointer;
+  padding: 0; border-radius: 6px;
 }
 .die-card:hover { border-color: var(--accent); }
 .die-card:hover .die-face { color: var(--accent); }
