@@ -113,7 +113,14 @@ note-value picker is still there as a shortcut, and old links and saved sections
 preset ids are read back correctly.
 
 The PDF follows suit — sections with lyrics print as a real chord-over-lyric chart, with each
-chord placed at the point in the line where it falls, rather than as a bar grid.
+chord placed at the point in the line where it falls, rather than as a bar grid. It reads the same
+`spans` the tab does and divides every line across the same full width, so the chart matches the
+screen it came from; scaling each line to its own text instead put the same fraction in a different
+place on every line.
+
+Where one chord is pinned to two different shapes, the legend numbers them — Cmaj7₁, Cmaj7₂ — and
+the chart carries the number too, so a symbol in the music points at the diagram it means. A chord
+with only one shape stays unnumbered, since a subscript that never varies is noise.
 
 **Tunings.** Twenty-two presets — standard and flattened, the dropped family, six open
 tunings, DADGAD and Orkney, plus 7- and 8-string, baritone and bass — or build your own, string by

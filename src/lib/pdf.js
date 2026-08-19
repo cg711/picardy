@@ -58,7 +58,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
   y += 8
 
   // --- chord legend ----------------------------------------------------------
-  const distinct = collectChords(song, segments)
+  const { entries: distinct, variants } = collectChords(song, segments)
   if (instrument !== 'none' && distinct.length) {
     y = drawLegend(doc, distinct, y, { instrument, tuning, tuningId, lefty })
     y += 4
@@ -84,6 +84,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
         chord,
         durationId: live.durations[i],
         inversion: live.inversions[i],
+        variant: variants.get(variantKey(chord, live.shapes[i])),
       })),
       live.timeSignature,
     )
@@ -111,8 +112,8 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
     y += 4
 
     y = hasLyrics
-      ? drawLyricLines(doc, live, y)
-      : drawBars(doc, bars, live.key, y, live.timeSignature)
+      ? drawLyricLines(doc, live, y, variants)
+      : drawBars(doc, bars, live.key, y, live.timeSignature, variants)
     y += 7
   }
 
@@ -182,7 +183,18 @@ function sanitiseFilename(title) {
   return clean || 'chart'
 }
 
-/** Every distinct chord in the song, in first-appearance order. */
+/** The key under which one played instance of a chord counts as a variation. */
+const variantKey = (chord, shape) => `${chordId(chord)}|${shape ?? ''}`
+
+/**
+ * Every distinct chord in the song, in first-appearance order.
+ *
+ * "Distinct" means chord *and* pinned shape: the same chord played two ways
+ * deserves two diagrams rather than one that silently drops the other. Where a
+ * symbol does end up with more than one, each gets a number — C₁, C₂ — so the
+ * chart can point at the diagram it means. A chord with only one way of being
+ * played is left unnumbered, since a subscript that never varies is just noise.
+ */
 function collectChords(song, segments) {
   const byId = new Map(segments.map((s) => [s.id, s]))
   const seen = new Map()
@@ -191,15 +203,54 @@ function collectChords(song, segments) {
     if (!segment) continue
     const live = readSegment(segment)
     live.progression.forEach((chord, i) => {
-      // Keyed by chord *and* pinned shape: the same chord played two ways
-      // deserves two diagrams, not one that silently drops the other.
-      const id = `${chordId(chord)}|${live.shapes[i] ?? ''}`
+      const id = variantKey(chord, live.shapes[i])
       if (!seen.has(id)) {
-        seen.set(id, { chord, inversion: live.inversions[i], shape: live.shapes[i] })
+        seen.set(id, { id, chord, inversion: live.inversions[i], shape: live.shapes[i] })
       }
     })
   }
-  return [...seen.values()]
+
+  const entries = [...seen.values()]
+  // Number only the symbols that actually have more than one variation.
+  const countBySymbol = new Map()
+  for (const e of entries) {
+    const sym = chordId(e.chord)
+    countBySymbol.set(sym, (countBySymbol.get(sym) ?? 0) + 1)
+  }
+  const nextBySymbol = new Map()
+  const variants = new Map()
+  for (const e of entries) {
+    const sym = chordId(e.chord)
+    if (countBySymbol.get(sym) > 1) {
+      const n = (nextBySymbol.get(sym) ?? 0) + 1
+      nextBySymbol.set(sym, n)
+      e.variant = n
+      variants.set(e.id, n)
+    }
+  }
+  return { entries, variants }
+}
+
+/**
+ * A chord symbol with its variation number set as a real subscript.
+ *
+ * jsPDF has no rich text and the ASCII filter would strip a Unicode ₁, so the
+ * digit is drawn as a second, smaller run sitting below the baseline.
+ *
+ * @returns the x position just past what was drawn
+ */
+function drawChordLabel(doc, label, variant, x, y, { size = 10, bold = true, colour = INK } = {}) {
+  const text = ascii(label)
+  doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(size).setTextColor(...colour)
+  doc.text(text, x, y)
+  let right = x + doc.getTextWidth(text)
+  if (variant) {
+    doc.setFontSize(size * 0.68)
+    doc.text(String(variant), right + 0.3, y + size * 0.16)
+    right += 0.3 + doc.getTextWidth(String(variant))
+    doc.setFontSize(size)
+  }
+  return right
 }
 
 function barsPerRow() {
@@ -212,24 +263,34 @@ function lineCount(live) {
 
 /**
  * Chord-over-lyric layout: the words on one row, the chords above them placed
- * where they fall in the line. Chords are positioned proportionally to their
- * beat, which is what makes a chord land mid-word when that is where it was
- * dragged to.
+ * where they fall in the line.
+ *
+ * Placement follows `spans` — the same per-chord widths the Lyrics & timing tab
+ * lays out, where the chords on a line divide its full width between them. It
+ * used to follow `durations` instead, which is how a chart could disagree with
+ * the screen it was exported from: dragging a chord onto a syllable changes
+ * where it sits without changing how long it lasts.
  */
-function drawLyricLines(doc, live, startY) {
+function drawLyricLines(doc, live, startY, variants = new Map()) {
   let y = startY + 3
   const total = lineCount(live)
 
   for (let line = 0; line < total; line++) {
-    // Chords on this line, with the beat each one starts at.
+    // Chords on this line, with the share of the line each one starts at.
     const onLine = []
     let cursor = 0
     live.progression.forEach((chord, i) => {
       if ((live.lines[i] ?? 0) !== line) return
-      onLine.push({ chord, start: cursor, inversion: live.inversions[i] })
-      cursor += live.durations[i]
+      const span = live.spans?.[i] > 0 ? live.spans[i] : 1
+      onLine.push({
+        chord,
+        start: cursor,
+        inversion: live.inversions[i],
+        variant: variants.get(variantKey(chord, live.shapes[i])),
+      })
+      cursor += span
     })
-    const lineBeats = cursor
+    const lineSpan = cursor
     const text = ascii(live.lyricLines?.[line] ?? '')
     if (!onLine.length && !text) continue
 
@@ -238,24 +299,25 @@ function drawLyricLines(doc, live, startY) {
       y = MARGIN
     }
 
-    // The lyric sets the width to align against; a line with no words still
-    // gets a sensible span so its chords do not bunch up.
+    // Every line is divided across the same full width, exactly as the lane on
+    // the Lyrics & timing tab is. Scaling to each line's own text instead made
+    // the same fraction land in a different place on every line — and made the
+    // chart disagree with the screen it came from, since on screen the lane is a
+    // constant width whatever the words happen to be.
     doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
-    const textWidth = text ? doc.getTextWidth(text) : 0
-    const span = Math.max(textWidth, CONTENT_W * 0.4)
+    const span = CONTENT_W
 
     doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...ACCENT)
     let lastRight = -Infinity
     for (const item of onLine) {
-      const fraction = lineBeats > 0 ? item.start / lineBeats : 0
+      const fraction = lineSpan > 0 ? item.start / lineSpan : 0
       let x = MARGIN + fraction * span
       const label = ascii(chordSymbol(item.chord))
       const width = doc.getTextWidth(label)
       // Never let two chords overlap, however tightly they were placed.
       if (x < lastRight + 1.5) x = lastRight + 1.5
       if (x + width > PAGE.w - MARGIN) break
-      doc.text(label, x, y)
-      lastRight = x + width
+      lastRight = drawChordLabel(doc, label, item.variant, x, y, { size: 10, colour: ACCENT })
     }
 
     doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...INK)
@@ -268,7 +330,7 @@ function drawLyricLines(doc, live, startY) {
 
 // --- the chart --------------------------------------------------------------
 
-function drawBars(doc, bars, key, startY, timeSignatureId) {
+function drawBars(doc, bars, key, startY, timeSignatureId, variants = new Map()) {
   const perRow = barsPerRow(timeSignatureId)
   const barW = CONTENT_W / perRow
   const barH = 16
@@ -296,9 +358,10 @@ function drawBars(doc, bars, key, startY, timeSignatureId) {
       let cursor = 0
       bar.forEach((slot) => {
         const cx = x + 2.5 + (cursor / perBar) * (barW - 4)
-        doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...INK)
+        // A tied continuation is bracketed; the variation number, when the chord
+        // has more than one shape, rides on the symbol itself.
         const label = (slot.tiedFromPrevious ? '(' : '') + ascii(chordSymbol(slot.chord)) + (slot.tiedFromPrevious ? ')' : '')
-        doc.text(label, cx, y + 7)
+        drawChordLabel(doc, label, slot.variant, cx, y + 7, { size: 12, colour: INK })
 
         doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...MUTED)
         doc.text(ascii(romanNumeral(slot.chord, key, slot.inversion)), cx, y + 12)
@@ -333,8 +396,7 @@ function drawLegend(doc, entries, startY, { instrument, tuning, tuningId, lefty 
     }
     const x = MARGIN + col * cellW
 
-    doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...INK)
-    doc.text(ascii(chordSymbol(entry.chord)), x, y + 4)
+    drawChordLabel(doc, chordSymbol(entry.chord), entry.variant, x, y + 4, { size: 9, colour: INK })
 
     let dy = y + 7
     if (instrument === 'guitar' || both) {

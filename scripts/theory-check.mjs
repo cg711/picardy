@@ -142,6 +142,71 @@ console.log('\n--- bass and inversion labels ---')
   eq('  plain C 2nd inversion', inversionShort(plain, 2), '2nd inv')
 }
 
+console.log('\n--- pdf chart ---')
+{
+  const { buildChart } = await import(B + 'lib/pdf.js')
+
+  // Pull every drawn text run and its position out of the finished PDF, so this
+  // asserts what the file actually contains rather than what the code intended.
+  const runsOf = async (opts) => {
+    const doc = await buildChart(opts)
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1')
+    const out = []
+    const re = /([\d.-]+)\s+([\d.-]+)\s+Td\s*\(((?:[^()\\]|\\.)*)\)\s*Tj/g
+    let m
+    while ((m = re.exec(raw))) out.push({ x: +m[1], y: +m[2], s: m[3] })
+    return out
+  }
+
+  const key = makeKey('C', 'major')
+  const chords = ['C', 'Am', 'F', 'G'].map(parseChord)
+  const segFor = (spans, shapes) => makeSegment({
+    name: 'Verse', key, progression: chords,
+    inversions: [0, 0, 0, 0], durations: [4, 4, 4, 4], timeSignature: '4/4',
+    shapes, lines: [0, 0, 0, 0], spans,
+    lyricLines: ['hello there my old friend'],
+  })
+
+  // Lyric placement follows spans, not durations. Durations are identical in
+  // both of these, so any difference in layout can only come from the spans.
+  const gaps = async (spans) => {
+    const seg = segFor(spans, [null, null, null, null])
+    const runs = await runsOf({ song: [{ segmentId: seg.id, repeats: 1 }], segments: [seg], instrument: 'none' })
+    const xs = runs.filter((r) => ['C', 'Am', 'F', 'G'].includes(r.s)).map((r) => r.x)
+    return xs.slice(1).map((x, i) => +(x - xs[i]).toFixed(1))
+  }
+
+  const even = await gaps([1, 1, 1, 1])
+  eq('  equal spans lay the chords out evenly', new Set(even).size, 1)
+  const weighted = await gaps([3, 1, 1, 1])
+  eq('  a 3:1:1 split spaces them 3:1:1', +(weighted[0] / weighted[1]).toFixed(2), 3)
+  eq('  and the later pair stay equal', weighted[1], weighted[2])
+  // A wider last chord compresses the rest, because the line is a fixed width
+  // divided proportionally — the same behaviour as the row on screen. The three
+  // leading gaps stay equal to each other, and shrink by 4/6.
+  const trailing = await gaps([1, 1, 1, 3])
+  eq('  a trailing span compresses the rest evenly', new Set(trailing).size, 1)
+  eq('  by exactly the change in total', +(trailing[0] / even[0]).toFixed(2), +(4 / 6).toFixed(2))
+
+  // The same chord pinned two ways is numbered; a chord with one shape is not.
+  const seg = segFor([1, 1, 1, 1], ['standard:x-3-2-0-1-0', null, null, null])
+  const twoWays = makeSegment({
+    name: 'Chorus', key, progression: chords,
+    inversions: [0, 0, 0, 0], durations: [4, 4, 4, 4], timeSignature: '4/4',
+    shapes: ['standard:8-10-10-9-8-8', null, null, null], lines: [0, 0, 0, 0], spans: [1, 1, 1, 1],
+    lyricLines: [''],
+  })
+  const runs = await runsOf({
+    song: [{ segmentId: seg.id, repeats: 1 }, { segmentId: twoWays.id, repeats: 1 }],
+    segments: [seg, twoWays], instrument: 'guitar',
+  })
+  const drawn = runs.map((r) => r.s)
+  eq('  two shapes of one chord are numbered', drawn.includes('1') && drawn.includes('2'), true)
+  // Am appears once with one shape, so it must not pick up a number.
+  const amIndex = drawn.indexOf('Am')
+  eq('  a chord with a single shape is left unnumbered', /^[0-9]$/.test(drawn[amIndex + 1] ?? ''), false)
+}
+
 console.log('\n--- tunings ---')
 {
   const ids = Object.keys(TUNINGS)
