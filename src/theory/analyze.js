@@ -4,7 +4,15 @@ import { mod, pcOf, prettyName } from './notes.js'
 import { QUALITIES, chordSymbol, chordNotes } from './chords.js'
 import { romanNumeral, harmonicFunction, isDiatonic, detectKey, keyName, scalePcs } from './keys.js'
 
-/** Named cadence patterns, tested against the last chords of a phrase. */
+/**
+ * Named cadence patterns, tested against the last chords of a phrase.
+ *
+ * First match wins, so the order is load-bearing: every pattern must sit above
+ * the looser one it refines, or it can never fire. iv–I also satisfies the plain
+ * IV–I test, ♭VII7–i also satisfies the Aeolian test, and *any* arrival on V
+ * satisfies the half-cadence test — so minor plagal, backdoor and Phrygian half
+ * each have to come first.
+ */
 const CADENCES = [
   {
     id: 'perfect', label: 'perfect authentic cadence',
@@ -17,14 +25,14 @@ const CADENCES = [
     why: 'V to I. Conclusive, though a plain triad lands softer than a dominant seventh.',
   },
   {
-    id: 'plagal', label: 'plagal cadence',
-    test: (a, b, key) => degreeOf(a, key) === 5 && degreeOf(b, key) === 0,
-    why: 'IV to I — the "amen" ending. No leading tone, so it settles rather than resolves.',
-  },
-  {
     id: 'minorPlagal', label: 'minor plagal cadence',
     test: (a, b, key) => degreeOf(a, key) === 5 && isMinorish(a) && degreeOf(b, key) === 0,
     why: 'iv to I, borrowed from the parallel minor. The ♭6 falls a half step into the tonic chord.',
+  },
+  {
+    id: 'plagal', label: 'plagal cadence',
+    test: (a, b, key) => degreeOf(a, key) === 5 && degreeOf(b, key) === 0,
+    why: 'IV to I — the "amen" ending. No leading tone, so it settles rather than resolves.',
   },
   {
     id: 'deceptive', label: 'deceptive cadence',
@@ -32,9 +40,9 @@ const CADENCES = [
     why: 'The dominant sets up the tonic and then sidesteps it, which keeps the phrase open.',
   },
   {
-    id: 'half', label: 'half cadence',
-    test: (a, b, key) => degreeOf(b, key) === 7,
-    why: 'The phrase rests on the dominant instead of resolving — it expects an answer.',
+    id: 'backdoor', label: 'backdoor cadence',
+    test: (a, b, key) => degreeOf(a, key) === 10 && isDominant(a) && degreeOf(b, key) === 0,
+    why: '♭VII7 approaching the tonic from the flat side, its ♭7 falling into the tonic\'s third.',
   },
   {
     id: 'aeolian', label: 'Aeolian cadence',
@@ -42,14 +50,14 @@ const CADENCES = [
     why: '♭VII stepping down to the tonic. Modal rather than functional — no leading tone anywhere.',
   },
   {
-    id: 'backdoor', label: 'backdoor cadence',
-    test: (a, b, key) => degreeOf(a, key) === 10 && isDominant(a) && degreeOf(b, key) === 0,
-    why: '♭VII7 approaching the tonic from the flat side, its ♭7 falling into the tonic\'s third.',
-  },
-  {
     id: 'phrygianHalf', label: 'Phrygian half cadence',
     test: (a, b, key) => degreeOf(a, key) === 5 && isMinorish(a) && degreeOf(b, key) === 7 && key.mode === 'minor',
     why: 'iv to V in minor, with ♭6 falling a half step to the dominant.',
+  },
+  {
+    id: 'half', label: 'half cadence',
+    test: (a, b, key) => degreeOf(b, key) === 7,
+    why: 'The phrase rests on the dominant instead of resolving — it expects an answer.',
   },
 ]
 

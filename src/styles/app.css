@@ -161,9 +161,13 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
      the whole page sideways. Put it back on what is now the flex item. */
   .layout > .col > .panel { min-width: 0; }
   .p-progression { order: 1; }
-  .p-instruments { order: 2; }
-  .p-chord { order: 3; }
-  .p-recent { order: 4; }
+  /* Reading the progression back comes straight after writing it, and before
+     any panel about a single chord. Without an order of its own it would
+     default to 0 and sit above the progression it is describing. */
+  .p-analysis { order: 2; }
+  .p-instruments { order: 3; }
+  .p-chord { order: 4; }
+  .p-recent { order: 5; }
 }
 
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -813,6 +817,73 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .obs-mixture { border-left-color: #c084fc; }
 .obs-tonicisation { border-left-color: #fbbf24; }
 .obs-motion { border-left-color: var(--accent-2); }
+.obs-shape { border-left-color: #60a5fa; }
+.obs-palette { border-left-color: #4ade80; }
+.obs-ii-V { border-left-color: #fbbf24; }
+
+/* ---------- analysis panel ---------- */
+
+.p-analysis { display: flex; flex-direction: column; gap: 10px; }
+.p-analysis .empty-note {
+  margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  padding: 14px; border: 1px dashed var(--border); border-radius: 8px; text-align: center;
+}
+
+.key-mismatch {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 12.5px; color: #d8d0c4;
+  padding: 7px 10px; border-radius: 6px;
+  background: #fbbf2412; border: 1px solid #fbbf2440;
+}
+.key-mismatch strong { color: #fbbf24; font-weight: 600; }
+.key-mismatch .btn { margin-left: auto; }
+
+/* The map scrolls rather than wrapping: a phrase read left-to-right is the
+   whole point, and wrapping would put the cadence on a line of its own. */
+.fn-map {
+  display: flex; align-items: stretch; gap: 2px;
+  overflow-x: auto; padding-bottom: 4px;
+}
+.fn-cell {
+  flex: 0 0 auto; min-width: 62px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 8px 8px 7px; border-radius: 7px; cursor: pointer;
+  background: var(--fn-tint, #ffffff08);
+  border: 1px solid var(--border);
+  border-bottom: 3px solid var(--fn-ink, var(--border));
+  color: var(--text);
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.fn-cell:hover { background: #ffffff14; }
+.fn-cell.on { background: var(--fn-tint-on, #ffffff1c); border-color: var(--fn-ink, var(--accent)); }
+.fn-roman { font-size: 13px; font-weight: 700; color: var(--fn-ink, var(--text)); line-height: 1.1; }
+.fn-sym { font-size: 11px; color: var(--text-dim); line-height: 1.1; }
+
+.fn-T  { --fn-ink: #4ade80; --fn-tint: #4ade8012; --fn-tint-on: #4ade8026; }
+.fn-PD { --fn-ink: #60a5fa; --fn-tint: #60a5fa12; --fn-tint-on: #60a5fa26; }
+.fn-D  { --fn-ink: #fbbf24; --fn-tint: #fbbf2412; --fn-tint-on: #fbbf2426; }
+/* Chromatic overrides the function tint: that a chord is outside the key is the
+   louder fact, and the border-bottom still carries what it is doing. */
+.fn-cell.chromatic { --fn-tint: #c084fc16; --fn-tint-on: #c084fc2e; border-color: #c084fc55; }
+
+.fn-cadence {
+  margin-top: 3px; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--bg); background: var(--fn-ink, var(--accent));
+  padding: 1px 5px; border-radius: 999px; white-space: nowrap;
+}
+
+.fn-motion {
+  flex: 0 0 auto; align-self: center;
+  font-size: 9.5px; color: var(--text-dim); white-space: nowrap;
+  padding: 0 3px; opacity: 0.75;
+}
+
+.fn-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10.5px; color: var(--text-dim); }
+.fn-key { display: inline-flex; align-items: center; gap: 4px; }
+.fn-key::before {
+  content: ''; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--fn-ink, #c084fc);
+}
 
 /* ---------- transpose ---------- */
 

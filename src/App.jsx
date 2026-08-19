@@ -38,6 +38,7 @@ import Arrangement, { SaveSectionRow } from './components/Arrangement.jsx'
 import AddChordDialog from './components/AddChordDialog.jsx'
 import AddSectionDialog from './components/AddSectionDialog.jsx'
 import ExportDialog from './components/ExportDialog.jsx'
+import AnalysisPanel from './components/AnalysisPanel.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
@@ -1069,6 +1070,18 @@ export default function App() {
         </section>
 
         <section className="col col-right">
+          {/* Reads the whole progression, so it sits above the panels that read a
+              single chord — you look at what you have written before you look at
+              how to play any one part of it. */}
+          <AnalysisPanel
+            progression={progression}
+            musicKey={musicKey}
+            activeIndex={activeIndex}
+            playingIndex={playingIndex}
+            onSelect={setActiveIndex}
+            onUseKey={setMusicKey}
+          />
+
           {/* One instrument at a time. Both show the same chord and both feed the
               same pool of selected notes, so the toggle changes the view rather
               than the state — switching mid-selection keeps the notes you picked

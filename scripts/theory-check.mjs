@@ -600,6 +600,24 @@ console.log('\n--- analysis ---')
   // A minor-key V7 is normal, not borrowed colour.
   const minor = analyseProgression(parseChart('| Am | Dm | E7 | Am |').chords)
   eq('  minor V7 is not reported as chromatic', minor.observations.some((o) => o.kind === 'mixture'), false)
+
+  // The cadence table is first-match-wins, and each of these also satisfies a
+  // looser pattern in the same table: iv-I is also IV-I, bVII7-i is also the
+  // Aeolian bVII-i, and iv-V is also "lands on V". Reordering the table so a
+  // general pattern comes first makes the specific one unreachable — which is
+  // invisible in the output, since you still get *a* plausible cadence name.
+  const named = [
+    ['| C | F | Fm | C |', makeKey('C', 'major'), 'minor plagal cadence'],
+    ['| C | Am | F | C |', makeKey('C', 'major'), 'plagal cadence'],
+    ['| Am | Dm | E |', makeKey('A', 'minor'), 'Phrygian half cadence'],
+    ['| Am | G7 | Am |', makeKey('A', 'minor'), 'backdoor cadence'],
+    ['| Am | G | Am |', makeKey('A', 'minor'), 'Aeolian cadence'],
+    ['| C | F | G |', makeKey('C', 'major'), 'half cadence'],
+  ]
+  for (const [chart, key, want] of named) {
+    const a = analyseProgression(parseChart(chart).chords, key)
+    eq(`  ${chart} ends on the ${want}`, a.observations.some((o) => o.text.includes(want)), true)
+  }
 }
 
 console.log('\n--- chart import ---')
