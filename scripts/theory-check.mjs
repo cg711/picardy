@@ -26,6 +26,7 @@ const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
 const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
+const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
 const { readFile } = await import('node:fs/promises')
 
@@ -893,6 +894,36 @@ console.log('\n--- brand palette ---')
   eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
   eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
   console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
+}
+
+console.log('\n--- keeping the strip in view ---')
+{
+  // The numbers are a real measurement: eight chords at 1440px wide, the strip
+  // 649 across with 1360 of content, the last chip at 1100 and the add card
+  // running to 1360.
+  const strip = { scrollLeft: 589, clientWidth: 649 }
+  const lastChip = { left: 1100, right: 1224 }
+  const withCard = { left: 1100, right: 1360 }
+
+  // The chip is already visible, so holding only the chip does nothing at all —
+  // and the card sits past the right edge, still painted but clipped, looking
+  // present while clicks fall through it. That is the bug, twice.
+  eq('  the last chip is already in view', isFullyVisible({ ...strip, ...lastChip }), true)
+  eq('  so holding just the chip does not scroll', keepInView({ ...strip, ...lastChip }), null)
+  eq('  …leaving the add card out of view', isFullyVisible({ ...strip, ...withCard }), false)
+
+  // Including the card is the fix, and it keeps the chip visible too.
+  const withTail = keepInView({ ...strip, ...withCard })
+  eq('  holding the card as well scrolls further', withTail, 1360 - 649 + 12)
+  eq('  …and the card is fully in view',
+    isFullyVisible({ scrollLeft: withTail, clientWidth: 649, ...withCard }), true)
+  eq('  …and so is the chord it follows',
+    isFullyVisible({ scrollLeft: withTail, clientWidth: 649, ...lastChip }), true)
+
+  // The ordinary cases still behave.
+  eq('  something already visible stays put', keepInView({ scrollLeft: 100, clientWidth: 649, left: 200, right: 300 }), null)
+  eq('  something off the left scrolls back', keepInView({ scrollLeft: 400, clientWidth: 649, left: 100, right: 224 }), 88)
+  eq('  and never past the start', keepInView({ scrollLeft: 40, clientWidth: 649, left: 4, right: 128 }), 0)
 }
 
 console.log('\n--- routes ---')

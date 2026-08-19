@@ -4,6 +4,7 @@ import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
 import { DURATIONS, durationOf, toBeats, describeLength, barsAreComplete, timeSignatureOf, presetFor } from '../theory/rhythm.js'
+import { keepInView } from '../lib/scroll.js'
 
 export default function ProgressionBar({
   progression,
@@ -49,12 +50,29 @@ export default function ProgressionBar({
     const chip = strip?.querySelectorAll('.prog-chip')?.[focused]
     if (!strip || !chip) return
     const left = chip.offsetLeft - strip.offsetLeft
-    const right = left + chip.offsetWidth
-    if (left < strip.scrollLeft) strip.scrollTo({ left: left - 12, behavior: 'smooth' })
-    else if (right > strip.scrollLeft + strip.clientWidth) {
-      strip.scrollTo({ left: right - strip.clientWidth + 12, behavior: 'smooth' })
-    }
-  }, [focused])
+
+    // Editing the last chord means the next thing you reach for is the add card
+    // sitting just after it, so the region held in view has to include the card
+    // rather than stopping at the chip.
+    //
+    // Without this the strip parks with the card a few pixels past the right
+    // edge — and since adding a chord selects the one it just added, the card
+    // put itself out of reach every time it was used. It is still *drawn* at
+    // those coordinates, so it looks present while clicks land on whatever is
+    // underneath the strip's clipped overflow.
+    const tail = focused === progression.length - 1 ? strip.querySelector('.add-card') : null
+    const right = tail
+      ? tail.offsetLeft - strip.offsetLeft + tail.offsetWidth
+      : left + chip.offsetWidth
+
+    const target = keepInView({
+      scrollLeft: strip.scrollLeft,
+      clientWidth: strip.clientWidth,
+      left,
+      right,
+    })
+    if (target !== null) strip.scrollTo({ left: target, behavior: 'smooth' })
+  }, [focused, progression.length])
 
   // In the lyric view the chips are hidden, so the empty-state prompt would be
   // a second, contradictory one.
