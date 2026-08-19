@@ -57,7 +57,14 @@ export function SaveSectionRow({ canSave, onSave, savedNote }) {
   )
 }
 
-/** The colour swatches, revealed from a chip. */
+/**
+ * The colour swatches.
+ *
+ * Laid out inside the chip rather than floating above it: the strip scrolls
+ * horizontally, and `overflow-x: auto` forces `overflow-y` to compute to auto as
+ * well, so an absolutely positioned dropdown would be clipped by the very
+ * container it needs to escape. Growing the chip for a moment costs nothing.
+ */
 function HuePicker({ current, onPick, onClose }) {
   return (
     <div className="hue-picker" role="menu">
@@ -90,6 +97,7 @@ export default function Arrangement({
   onLoad,
   onRename,
   onDeleteSegment,
+  onAddToSong,
   onSetRepeats,
   onMoveEntry,
   onRemoveEntry,
@@ -195,46 +203,53 @@ export default function Arrangement({
             <h3>Sections</h3>
             <span className="muted small">click a name to load it into the editor</span>
           </div>
-          <ul className="segment-list">
+          {/* The same chip as the song strip above, minus the position badge and
+              the repeat count — the library holds sections, the song holds
+              placements of them. Sharing .song-chip is the point: it is the same
+              object seen in two places. */}
+          <div className="song-strip section-strip">
             {segments.map((s) => {
               const hue = segmentHue(s)
               return (
-                <li key={s.id} style={chip(hue)}>
-                  {renaming === s.id ? (
-                    <input
-                      className="rename"
-                      value={draftName}
-                      autoFocus
-                      onChange={(e) => setDraftName(e.target.value)}
-                      onBlur={() => {
-                        onRename(s.id, draftName.trim() || s.name)
-                        setRenaming(null)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') e.currentTarget.blur()
-                        if (e.key === 'Escape') setRenaming(null)
-                      }}
-                    />
-                  ) : (
-                    <button className="seg-name" onClick={() => onLoad(s.id)} title="Load into the editor">
-                      {s.name}
-                    </button>
-                  )}
-                  <span className="seg-meta">{chordFlow(s, 3) || 'empty'}</span>
-                  <div className="seg-actions">
-                    <div className="hue-wrap">
-                      <button
-                        className="hue-swatch"
-                        style={{ background: `hsl(${hue} 60% 52%)` }}
-                        title="Colour"
-                        aria-haspopup="menu"
-                        aria-expanded={picking === s.id}
-                        onClick={() => setPicking(picking === s.id ? null : s.id)}
+                <div key={s.id} className="song-chip section-chip" style={chip(hue)}>
+                  <div className="song-chip-top">
+                    {renaming === s.id ? (
+                      <input
+                        className="rename"
+                        value={draftName}
+                        autoFocus
+                        onChange={(e) => setDraftName(e.target.value)}
+                        onBlur={() => {
+                          onRename(s.id, draftName.trim() || s.name)
+                          setRenaming(null)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur()
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
                       />
-                      {picking === s.id && (
-                        <HuePicker current={hue} onPick={(h) => onSetHue(s.id, h)} onClose={() => setPicking(null)} />
-                      )}
-                    </div>
+                    ) : (
+                      <button className="song-name seg-name" onClick={() => onLoad(s.id)} title="Load into the editor">
+                        {s.name}
+                      </button>
+                    )}
+                    <button className="chip-x" onClick={() => onDeleteSegment(s.id)} title="Delete section">×</button>
+                  </div>
+
+                  <div className="song-flow" title={s.chords.join(' – ')}>{chordFlow(s) || 'empty'}</div>
+                  <div className="song-chip-meta">
+                    {s.key} · {describeLength(s.durations, s.timeSignature)}
+                  </div>
+
+                  <div className="song-chip-controls">
+                    <button
+                      className="hue-swatch"
+                      style={{ background: `hsl(${hue} 60% 52%)` }}
+                      title="Colour"
+                      aria-haspopup="menu"
+                      aria-expanded={picking === s.id}
+                      onClick={() => setPicking(picking === s.id ? null : s.id)}
+                    />
                     <button
                       onClick={() => {
                         setRenaming(s.id)
@@ -244,12 +259,18 @@ export default function Arrangement({
                     >
                       ✎
                     </button>
-                    <button className="danger" onClick={() => onDeleteSegment(s.id)} title="Delete section">×</button>
+                    <button className="add-to-song" onClick={() => onAddToSong(s.id)} title="Append to the song">
+                      + song
+                    </button>
                   </div>
-                </li>
+
+                  {picking === s.id && (
+                    <HuePicker current={hue} onPick={(h) => onSetHue(s.id, h)} onClose={() => setPicking(null)} />
+                  )}
+                </div>
               )
             })}
-          </ul>
+          </div>
         </>
       )}
     </div>

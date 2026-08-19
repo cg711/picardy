@@ -179,7 +179,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .panel-head > .muted { font-size: 12px; }
 .panel-head .tabs, .panel-head .fb-controls { margin-left: auto; }
 .panel-head > .btn { margin-left: auto; }
-.panel-head > span.muted:nth-child(2) { margin-left: auto; text-align: right; }
+.panel-head > span.muted:nth-child(2) { margin-left: 0; text-align: right; }
 
 /* A divider inside a merged panel. Grouping panels by job means two or three
    things now share one box, and they still need naming — but a second run of
@@ -639,31 +639,18 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .sub-head { display: flex; align-items: baseline; gap: 10px; }
 .pad-sm { margin: 0; font-size: 12px; }
 
-.segment-list, .song-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-.segment-list li, .song-list li {
-  display: flex; align-items: center; gap: 9px; padding: 6px 9px;
-  border: 1px solid transparent; border-radius: 8px; font-size: 13px;
-}
-.song-list li.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
-
+/* Both strips are now chips; all that survives from the old list layout is the
+   inline rename field and the name button inside a chip. */
 .seg-name {
   font: inherit; font-weight: 600; background: none; border: 0; color: inherit;
   cursor: pointer; padding: 0; text-align: left;
 }
 .seg-name:hover { text-decoration: underline; }
-.seg-meta { font-size: 11px; opacity: 0.72; margin-left: auto; white-space: nowrap; }
-.rename { font: inherit; font-size: 13px; padding: 2px 6px; width: 130px; }
-
-.seg-actions { display: flex; gap: 3px; }
-.segment-list .seg-actions { margin-left: 0; }
-.song-list .seg-actions { margin-left: auto; }
-.seg-actions button {
-  font: inherit; font-size: 11px; padding: 2px 7px; border-radius: 5px; cursor: pointer;
-  border: 1px solid currentColor; background: #0006; color: inherit; opacity: 0.85;
+.rename {
+  font: inherit; font-size: 13px; font-weight: 600; padding: 2px 6px;
+  width: 100%; min-width: 0;
+  background: #00000040; border: 1px solid var(--border-soft); border-radius: 5px; color: inherit;
 }
-.seg-actions button:hover:not(:disabled) { opacity: 1; background: #0009; }
-.seg-actions button:disabled { opacity: 0.3; cursor: default; }
-.seg-actions .danger:hover { color: var(--danger); }
 
 .song-pos {
   font-size: 10px; opacity: 0.6; min-width: 14px; text-align: right; font-variant-numeric: tabular-nums;
@@ -1150,20 +1137,20 @@ a.brand { text-decoration: none; color: inherit; }
 
 /* ---------- section colours ---------- */
 
-.hue-wrap { position: relative; display: inline-flex; }
 .hue-swatch {
-  width: 16px; height: 16px; padding: 0; border-radius: 50%;
-  border: 1px solid #00000060; cursor: pointer;
+  width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  border: 1px solid #00000060; cursor: pointer; flex: none;
 }
+/* Inside the chip, not floating over it: the strip scrolls horizontally, and
+   overflow-x:auto forces overflow-y to auto too, so an absolutely positioned
+   dropdown would be clipped by the container it needs to escape. */
 .hue-picker {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;
-  padding: 7px; border-radius: 9px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  box-shadow: 0 14px 34px #00000090;
+  margin-top: 2px; padding: 6px; border-radius: 7px;
+  background: #00000045; border: 1px solid var(--border-soft);
 }
 .hue-dot {
-  width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  width: 100%; aspect-ratio: 1; padding: 0; border-radius: 50%;
   border: 2px solid transparent; cursor: pointer;
 }
 .hue-dot.on { border-color: var(--ink); }
@@ -1192,3 +1179,16 @@ a.brand { text-decoration: none; color: inherit; }
 .pick-name { font-weight: 600; }
 .pick-meta { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
 .pick-flow { grid-column: 2 / -1; font-size: 12px; color: var(--text-dim); }
+
+/* The library reuses .song-chip, so only the differences live here: no position
+   badge, no repeat box, and a name that is a button rather than a label. */
+.section-strip { padding-top: 8px; }
+.section-chip .song-name {
+  font: inherit; font-size: 14px; font-weight: 600;
+  background: none; border: 0; color: inherit; cursor: pointer;
+  padding: 0; text-align: left; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.section-chip .song-name:hover { text-decoration: underline; }
+.section-chip .song-chip-top { margin-top: 0; }
+.section-chip .add-to-song { margin-left: auto; }

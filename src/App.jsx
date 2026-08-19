@@ -868,6 +868,7 @@ export default function App() {
                 onDeleteSegment={deleteSegment}
                 onOpenAddSection={() => setAddSectionOpen(true)}
                 onSetHue={setSegmentHue}
+                onAddToSong={addToSong}
                 onSetRepeats={setRepeats}
                 onMoveEntry={moveEntry}
                 onRemoveEntry={removeEntry}
