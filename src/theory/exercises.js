@@ -10,12 +10,14 @@
 // It also means the supply is unlimited. Twelve keys times seven degrees times
 // six question types, in every level, with no content to write.
 
-import { makeChord, chordSymbol, chordName, chordNotes } from './chords.js'
+import { makeChord, chordSymbol, chordName, chordNotes, QUALITIES, voiceChord } from './chords.js'
 import {
   makeKey, keyName, romanNumeral, harmonicFunction, isDiatonic, spellDegree, scalePcs,
 } from './keys.js'
-import { prettyName, pcOf, mod } from './notes.js'
+import { prettyName, pcOf, mod, pcName, midiName, parseNote, midiAtOrAbove } from './notes.js'
 import { cadenceAt, CADENCE_LABELS } from './analyze.js'
+import { INTERVALS, INTERVAL_EAR, intervalBetween, noteAtInterval } from './intervals.js'
+import { TUNINGS } from './guitar.js'
 
 /**
  * Seeded RNG (mulberry32), so a question is reproducible from its seed.
@@ -116,9 +118,105 @@ export const LEVELS = [
     blurb: 'Applied dominants, borrowed chords and tritone subs — everything that leaves the key.',
     types: ['numeral', 'fn', 'cadence', 'resolve', 'outsider'],
   },
+  {
+    id: 'intervals',
+    rank: 2,
+    label: 'Intervals',
+    blurb: 'Naming the distance between two notes — written, by ear, and found on the instrument.',
+    types: ['interval', 'earInterval', 'findInterval'],
+  },
+  {
+    id: 'ear',
+    rank: 2,
+    label: 'By ear',
+    blurb: 'Nothing written down. Listen, then name what you heard.',
+    types: ['earInterval', 'earChord'],
+  },
+  {
+    id: 'instrument',
+    rank: 2,
+    label: 'On the instrument',
+    blurb: 'Where the notes actually are, on a keyboard and on a fretboard.',
+    types: ['noteOn', 'findNote', 'findInterval'],
+  },
 ]
 
 export const levelById = (id) => LEVELS.find((l) => l.id === id) ?? LEVELS[0]
+
+// --- instruments -------------------------------------------------------------
+//
+// Ranges are chosen so every question is answerable inside the drawn instrument:
+// a perfect octave above the highest possible reference still has to be a key on
+// the keyboard, and a fret on the neck.
+
+export const GUITAR_TUNING = TUNINGS.standard.strings
+export const GUITAR_MAX_FRET = 12
+export const PIANO_LOW = 48
+export const PIANO_HIGH = 84
+
+const GUITAR_LOW = GUITAR_TUNING[0]
+const GUITAR_HIGH = GUITAR_TUNING[GUITAR_TUNING.length - 1] + GUITAR_MAX_FRET
+
+const RANGE = {
+  piano: { low: PIANO_LOW, high: PIANO_HIGH },
+  guitar: { low: GUITAR_LOW, high: GUITAR_HIGH },
+}
+
+/** Every place a MIDI note can be played on the drawn instrument. */
+export function positionsFor(instrument, midi) {
+  if (instrument === 'piano') return midi >= PIANO_LOW && midi <= PIANO_HIGH ? [midi] : []
+  const out = []
+  GUITAR_TUNING.forEach((open, string) => {
+    const fret = midi - open
+    if (fret >= 0 && fret <= GUITAR_MAX_FRET) out.push({ string, fret })
+  })
+  return out
+}
+
+/**
+ * Guitarists number strings from the thinnest down: the high E is string 1 and
+ * the low E is string 6. The arrays here run the other way, lowest first, which
+ * is the order the fretboard is drawn in — so anything shown to a player has to
+ * be flipped back.
+ */
+export const stringNumber = (index) => GUITAR_TUNING.length - index
+
+const positionText = (midi) =>
+  positionsFor('guitar', midi)
+    .map((p) => `string ${stringNumber(p.string)} fret ${p.fret}`)
+    .join(', or ')
+
+/**
+ * Where a note actually is, named concretely rather than restated.
+ *
+ * Octave numbers take a single spelling — "F♯ / G♭4" reads as a fraction. The
+ * prompt has already given both names; this only has to say which octave.
+ */
+function whereText(instrument, midi) {
+  if (instrument === 'guitar') return positionText(midi)
+  return `${pcName(mod(midi, 12), false).replace('#', '♯')}${Math.floor(midi / 12) - 1}`
+}
+
+/** Every octave of a pitch class inside the drawn range. */
+function allOf(instrument, pc) {
+  const { low, high } = RANGE[instrument]
+  const out = []
+  for (let m = low; m <= high; m++) if (mod(m, 12) === pc) out.push(m)
+  return out
+}
+
+/**
+ * A note name that does not depend on which enharmonic spelling you learned.
+ *
+ * A black key is F♯ to a guitarist and G♭ to a horn player, and both are looking
+ * at the same key. Asking someone to pick between them is a question about
+ * notation, not about where the note is.
+ */
+export function pcLabel(pc) {
+  const sharp = pcName(pc, false)
+  const flat = pcName(pc, true)
+  return sharp === flat ? sharp : `${sharp.replace('#', '♯')} / ${flat.replace('b', '♭')}`
+}
 
 // --- building blocks ---------------------------------------------------------
 
@@ -407,6 +505,194 @@ function outsiderQ(levelId, rng) {
   }
 }
 
+// --- intervals, ear and instrument -------------------------------------------
+
+/** Roots that spell every interval in the catalogue without a double accidental. */
+const INTERVAL_ROOTS = ['C', 'G', 'D', 'A', 'E', 'F', 'B', 'Bb', 'Eb', 'Ab']
+
+/**
+ * A root and an interval whose upper note spells cleanly.
+ *
+ * A diminished 5th above E♭ is B𝄫. That is correct, and it is not a question
+ * anyone learns anything from — so the pair is redrawn rather than asked.
+ */
+function pickInterval(rng, { maxRank = 2, pool = INTERVALS } = {}) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const spec = pick(pool.filter((i) => i.rank <= maxRank), rng)
+    const from = parseNote(pick(INTERVAL_ROOTS, rng))
+    const to = noteAtInterval(from, spec.generic, spec.semitones)
+    if (Math.abs(to.acc) > 1 || Math.abs(from.acc) > 1) continue
+    const named = intervalBetween(from, to, { octave: spec.generic === 8 })
+    // The catalogue and the namer have to agree, or the question is unanswerable.
+    if (!named || named.name !== spec.name) continue
+    return { spec, from, to, named }
+  }
+  return null
+}
+
+/**
+ * Interval names that cannot be confused by ear.
+ *
+ * An augmented 4th and a diminished 5th are the same sound. Offering both as
+ * options in a listening question makes it unanswerable — there is no hearing
+ * good enough to tell a notation choice apart.
+ */
+const audiblyDistinct = (specs) => {
+  const seen = new Set()
+  return specs.filter((s) => (seen.has(s.semitones) ? false : seen.add(s.semitones)))
+}
+
+function intervalQ(levelId, rng) {
+  const drawn = pickInterval(rng)
+  if (!drawn) return null
+  const { spec, from, to, named } = drawn
+
+  const others = shuffle(INTERVALS.filter((i) => i.name !== spec.name), rng)
+  const options = distinct([spec.name, ...others.map((i) => i.name)]).slice(0, 4)
+
+  return {
+    type: 'interval',
+    prompt: `What is the interval from ${prettyName(from)} up to ${prettyName(to)}?`,
+    options,
+    answer: spec.name,
+    play: [[midiAtOrAbove(pcOf(from), 60)], [midiAtOrAbove(pcOf(from), 60) + spec.semitones]],
+    explain: `${prettyName(from)} up to ${prettyName(to)} spans ${spec.generic === 8 ? 8 : spec.generic} letter names and ${spec.semitones} semitone${spec.semitones === 1 ? '' : 's'} — ${article(spec.name)} ${spec.name}.`,
+  }
+}
+
+function earIntervalQ(levelId, rng) {
+  // Only intervals that are distinct by ear, and only one of the two tritone
+  // spellings, so no two options can ever sound the same.
+  const pool = audiblyDistinct(INTERVALS)
+  const drawn = pickInterval(rng, { pool })
+  if (!drawn) return null
+  const { spec, from, to } = drawn
+
+  const base = midiAtOrAbove(pcOf(from), 57 + Math.floor(rng() * 8))
+  const others = shuffle(pool.filter((i) => i.semitones !== spec.semitones), rng)
+  const options = distinct([spec.name, ...others.map((i) => i.name)]).slice(0, 4)
+
+  return {
+    type: 'earInterval',
+    prompt: 'Two notes, low then high. What interval is it?',
+    options,
+    answer: spec.name,
+    play: [[base], [base + spec.semitones]],
+    secret: true,
+    autoPlay: true,
+    explain: `${prettyName(from)} up to ${prettyName(to)} — ${article(spec.name)} ${spec.name}, ${spec.semitones} semitone${spec.semitones === 1 ? '' : 's'}. ${INTERVAL_EAR[spec.name] ?? ''}`,
+  }
+}
+
+/** Qualities worth telling apart by ear, in rough order of how distinct they are. */
+const EAR_QUALITIES = ['maj', 'min', 'dim', 'aug', 'maj7', 'm7', 'dom7', 'm7b5', 'dim7', 'sus4']
+
+function earChordQ(levelId, rng) {
+  const qualityId = pick(EAR_QUALITIES, rng)
+
+  // A diminished 7th on E♭ spells E♭ G♭ B♭♭ D♭♭. Correct, and unreadable — the
+  // root is redrawn until the chord spells without a double accidental, since
+  // the printed notes are the whole of the explanation.
+  let chord = null
+  for (const name of shuffle(INTERVAL_ROOTS, rng)) {
+    const built = makeChord(parseNote(name), qualityId)
+    if (chordNotes(built).every((e) => Math.abs(e.note.acc) <= 1)) { chord = built; break }
+  }
+  if (!chord) return null
+
+  const answer = QUALITIES[qualityId].name
+  const others = shuffle(EAR_QUALITIES.filter((q) => q !== qualityId), rng)
+  const options = distinct([answer, ...others.map((q) => QUALITIES[q].name)]).slice(0, 4)
+
+  return {
+    type: 'earChord',
+    prompt: 'One chord. What quality is it?',
+    options,
+    answer,
+    chords: [chord],
+    play: [voiceChord(chord, { bottom: 52 })],
+    secret: true,
+    autoPlay: true,
+    explain: `${chordSymbol(chord)} — ${article(answer)} ${answer}: ${chordNotes(chord).map((e) => prettyName(e.note)).join(' ')}.`,
+  }
+}
+
+const pickInstrument = (rng) => (rng() < 0.5 ? 'piano' : 'guitar')
+
+const INSTRUMENT_NAME = { piano: 'keyboard', guitar: 'fretboard' }
+
+function noteOnQ(levelId, rng) {
+  const instrument = pickInstrument(rng)
+  const { low, high } = RANGE[instrument]
+  const reference = low + Math.floor(rng() * (high - low + 1))
+
+  const answer = pcLabel(mod(reference, 12))
+  const others = shuffle(Array.from({ length: 12 }, (_, pc) => pcLabel(pc)).filter((l) => l !== answer), rng)
+  const options = distinct([answer, ...others]).slice(0, 4)
+
+  return {
+    type: 'noteOn',
+    prompt: `Which note is highlighted on the ${INSTRUMENT_NAME[instrument]}?`,
+    options,
+    answer,
+    instrument,
+    reference,
+    play: [[reference]],
+    explain: `That is ${answer}, at ${whereText(instrument, reference)}.`,
+  }
+}
+
+function findNoteQ(levelId, rng) {
+  const instrument = pickInstrument(rng)
+  const pc = Math.floor(rng() * 12)
+  const label = pcLabel(pc)
+
+  return {
+    type: 'findNote',
+    prompt: `Find ${label} on the ${INSTRUMENT_NAME[instrument]}.`,
+    hint: instrument === 'guitar' ? 'Any string, any fret.' : 'Any octave.',
+    input: 'instrument',
+    instrument,
+    answerPcs: [pc],
+    answer: label,
+    explain: `Every one of these is ${label}: ${allOf(instrument, pc)
+      .flatMap((m) => (instrument === 'guitar' ? positionsFor('guitar', m).map((p) => `string ${stringNumber(p.string)} fret ${p.fret}`) : [whereText('piano', m)]))
+      .join(', ')}.`,
+  }
+}
+
+function findIntervalQ(levelId, rng) {
+  const instrument = pickInstrument(rng)
+  const { low, high } = RANGE[instrument]
+  const pool = audiblyDistinct(INTERVALS).filter((i) => i.semitones > 0)
+
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const spec = pick(pool, rng)
+    const reference = low + Math.floor(rng() * (high - low + 1))
+    const target = reference + spec.semitones
+    // The answer has to be reachable on the instrument being drawn, or the
+    // question is unanswerable however well you know the interval.
+    if (!positionsFor(instrument, target).length) continue
+
+    return {
+      type: 'findInterval',
+      prompt: `From the highlighted ${pcLabel(mod(reference, 12))}, find the note ${article(spec.name)} ${spec.name} above it.`,
+      hint: instrument === 'guitar' ? 'Any position sounding that note counts.' : null,
+      input: 'instrument',
+      instrument,
+      reference,
+      answerMidi: target,
+      answer: `${spec.name} above ${pcLabel(mod(reference, 12))}`,
+      // Before answering you may hear the note you are measuring from, and only
+      // that: playing the target as well would hand over the answer.
+      play: [[reference]],
+      playAnswer: [[reference], [target]],
+      explain: `${article(spec.name)[0].toUpperCase()}${article(spec.name).slice(1)} ${spec.name} is ${spec.semitones} semitone${spec.semitones === 1 ? '' : 's'}, so ${pcLabel(mod(reference, 12))} goes to ${pcLabel(mod(target, 12))}${instrument === 'guitar' ? ` — ${positionText(target)}` : ` — ${whereText('piano', target)}`}.`,
+    }
+  }
+  return null
+}
+
 const BUILDERS = {
   numeral: numeralQ,
   fn: fnQ,
@@ -414,6 +700,12 @@ const BUILDERS = {
   cadence: cadenceQ,
   resolve: resolveQ,
   outsider: outsiderQ,
+  interval: intervalQ,
+  earInterval: earIntervalQ,
+  earChord: earChordQ,
+  noteOn: noteOnQ,
+  findNote: findNoteQ,
+  findInterval: findIntervalQ,
 }
 
 export const TYPE_LABELS = {
@@ -423,6 +715,12 @@ export const TYPE_LABELS = {
   cadence: 'Cadences',
   resolve: 'Resolution',
   outsider: 'Outside the key',
+  interval: 'Intervals',
+  earInterval: 'Intervals by ear',
+  earChord: 'Chords by ear',
+  noteOn: 'Reading the instrument',
+  findNote: 'Finding notes',
+  findInterval: 'Intervals on the instrument',
 }
 
 /**
@@ -439,17 +737,38 @@ export function makeQuestion(levelId, rng = Math.random, { type = null } = {}) {
     const q = BUILDERS[chosen]?.(level.id, rng)
     if (!q) continue
 
+    const base = {
+      input: 'choice',
+      instrument: null,
+      reference: null,
+      play: null,
+      secret: false,
+      autoPlay: false,
+      hint: null,
+      ...q,
+      level: level.id,
+      typeLabel: TYPE_LABELS[q.type],
+    }
+
+    // Answered on an instrument: there is no list to shuffle, and the answer is
+    // a note rather than a string.
+    if (base.input === 'instrument') {
+      if (base.answerMidi == null && !base.answerPcs?.length) continue
+      return { ...base, options: [], answerIndex: -1 }
+    }
+
     const options = shuffle(q.options, rng)
     const answerIndex = options.indexOf(q.answer)
     if (answerIndex < 0) continue
 
-    return {
-      ...q,
-      level: level.id,
-      typeLabel: TYPE_LABELS[q.type],
-      options,
-      answerIndex,
-    }
+    return { ...base, options, answerIndex }
   }
   return null
+}
+
+/** Is a clicked note the right answer? The only place that rule lives. */
+export function checkNote(question, midi) {
+  if (question?.input !== 'instrument') return false
+  if (question.answerMidi != null) return midi === question.answerMidi
+  return (question.answerPcs ?? []).includes(mod(midi, 12))
 }

@@ -248,8 +248,9 @@ justify a dependency.
 
 ## Exercises
 
-`/exercises` is a drill page: multiple-choice questions on roman numerals, harmonic function, chord
-spelling, cadences, resolution, and spotting the chord that left the key.
+`/exercises` is a drill page. Six topics: harmony (roman numerals, function, chord spelling,
+cadences, resolution, spotting the chord that left the key), intervals written and by ear, chords by
+ear, and finding notes and intervals on a real keyboard and fretboard.
 
 Nothing is authored. `src/theory/exercises.js` builds each question from the engine and takes the
 right answer from whatever the engine says — `romanNumeral()` names the numeral, `cadenceAt()` names
@@ -258,15 +259,32 @@ the first time the engine was corrected and then contradict the app in front of 
 learn; this cannot. When the minor-plagal shadowing bug was fixed in `analyze.js`, the drill started
 asking about minor plagal cadences the same day, with no content change.
 
-Three levels gate the vocabulary — keys, seventh chords, chromatic harmony, and which cadence names
+Six topics gate the vocabulary — keys, seventh chords, chromatic harmony, and which cadence names
 are even offered as wrong answers. Distractors have to come from the same world as the answer: a
 Phrygian half cadence against a plain V–I in Basics is eliminable without knowing any theory.
 
-The generator takes a seeded RNG, which is what makes it testable. `npm run check` builds 4,320
-questions across every level and asserts each has exactly one correct answer, no duplicate options,
-no placeholder text, and — re-deriving from the engine rather than trusting the generator — that the
-marked answer is the right one. A generator that produces a broken question one draw in five hundred
-is exactly the failure that needs a seed to pin down.
+Two rules matter more than they look. A listening question must never print what it is about to
+play, and its options must never contain two things that sound the same — an augmented 4th and a
+diminished 5th are one sound and two spellings, so offering both makes the question unanswerable by
+any ear. And a find-the-note question plays only the note you measure *from* until it is over;
+playing the target would answer it. Both are asserted, not just intended.
+
+Instrument questions reuse the app's own `Piano` and `Fretboard`, which gained a `marks` prop —
+`midi -> 'ref' | 'right' | 'wrong'` — so a drill can point at a note without it being confused with
+one the player clicked. "Find any B♭" has a dozen right answers and lights up all of them. String
+numbers are flipped on the way out: the arrays run lowest-first, guitarists count from the thinnest.
+
+`src/theory/intervals.js` names the distance between two notes, keeping letter span and semitone
+count apart — C–E♭ and C–D♯ are the same keyboard distance and different intervals. Roots are
+redrawn until the upper note spells without a double accidental, because a diminished 5th above E♭
+is B𝄫 and nobody learns anything from being asked about it.
+
+The generator takes a seeded RNG, which is what makes it testable. `npm run check` builds 8,640
+questions across every topic and asserts each has exactly one correct answer, no duplicate options,
+no placeholder text, that every instrument answer is reachable on the instrument drawn, that no
+listening question leaks or is ambiguous — and, re-deriving from the engine rather than trusting the
+generator, that the marked answer is the right one. A generator that produces a broken question one
+draw in five hundred is exactly the failure that needs a seed to pin down.
 
 Progress is per level in `localStorage` (`picardy.exercises.v1`): streak, accuracy, and per-type
 accuracy so the weakest topics surface. No accounts, so nothing to sync and nothing to store.
@@ -320,6 +338,7 @@ src/
     guitar.js     fretboard voicing search and playability filtering
     identify.js   reverse lookup — notes to chord symbol
     exercises.js  question generator — every answer comes from the engine
+    intervals.js  naming the distance between two notes
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
   audio/synth.js  Web Audio polysynth
   brand/

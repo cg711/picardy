@@ -20,6 +20,10 @@ export default function Piano({
   showLabels = true,
   scalePcs = null,
   guideTonePcs = null,
+  // midi -> 'ref' | 'right' | 'wrong'. Used by the exercises to say which key
+  // the question is pointing at, separately from which one you clicked.
+  marks = null,
+  readout = true,
 }) {
   // Laid out in real units with a uniform preserveAspectRatio: stretching the
   // viewBox to fill the panel would squash the chord-tone dots into ellipses.
@@ -71,6 +75,7 @@ export default function Piano({
       // the chord tones still read as the primary layer.
       inScale: scaleSet.has(pc) && !entry,
       isGuide: guideSet.has(pc),
+      mark: marks?.get(midi) ?? null,
     }
   }
 
@@ -86,7 +91,7 @@ export default function Piano({
     <div className="piano">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="piano-svg" role="group" aria-label="Piano keyboard">
         {whites.map((midi) => {
-          const { entry, inVoicing, selected, isBass, inScale, isGuide } = cellFor(midi)
+          const { entry, inVoicing, selected, isBass, inScale, isGuide, mark } = cellFor(midi)
           return (
             <g key={midi} data-midi={midi} onPointerDown={handle(midi)} className="key-group">
               <rect
@@ -95,7 +100,7 @@ export default function Piano({
                 width={W}
                 height={HEIGHT}
                 rx={3}
-                className={`key white ${inVoicing ? 'in-voicing' : ''} ${selected ? 'selected' : ''} ${inScale ? 'in-scale' : ''}`}
+                className={`key white ${inVoicing ? 'in-voicing' : ''} ${selected ? 'selected' : ''} ${inScale ? 'in-scale' : ''} ${mark ? `mark-${mark}` : ''}`}
               />
               {inScale && (
                 <circle cx={layout.whiteX.get(midi) + W / 2} cy={HEIGHT - 22} r={3} className="scale-dot" />
@@ -130,7 +135,7 @@ export default function Piano({
         })}
 
         {blacks.map(({ midi, x }) => {
-          const { entry, inVoicing, selected, isBass, inScale, isGuide } = cellFor(midi)
+          const { entry, inVoicing, selected, isBass, inScale, isGuide, mark } = cellFor(midi)
           return (
             <g key={midi} data-midi={midi} onPointerDown={handle(midi)} className="key-group">
               <rect
@@ -139,7 +144,7 @@ export default function Piano({
                 width={blackW}
                 height={BLACK_H}
                 rx={2.5}
-                className={`key black ${inVoicing ? 'in-voicing' : ''} ${selected ? 'selected' : ''} ${inScale ? 'in-scale' : ''}`}
+                className={`key black ${inVoicing ? 'in-voicing' : ''} ${selected ? 'selected' : ''} ${inScale ? 'in-scale' : ''} ${mark ? `mark-${mark}` : ''}`}
               />
               {inScale && <circle cx={x + blackW / 2} cy={BLACK_H - 16} r={2.6} className="scale-dot on-black" />}
               {entry && inVoicing && isGuide && (
@@ -172,6 +177,10 @@ export default function Piano({
         })}
       </svg>
 
+      {/* The readout is about building a chord. In a drill the keyboard is the
+          answer sheet, and a standing invitation to "build a chord" is the wrong
+          instruction sitting under the question. */}
+      {readout && (
       <div className="piano-readout">
         {voicing.length ? (
           <>
@@ -191,6 +200,7 @@ export default function Piano({
           <span className="muted">Click keys to build a chord, or pick one from the suggestions.</span>
         )}
       </div>
+      )}
     </div>
   )
 }

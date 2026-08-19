@@ -18,6 +18,9 @@ export default function Fretboard({
   lefty = false,
   scalePcs = null,
   guideTonePcs = null,
+  // midi -> 'ref' | 'right' | 'wrong'. Lets the exercises point at a note
+  // without it being confused with one the player picked.
+  marks = null,
 }) {
   const grid = useMemo(() => fretboardMap(chord, tuning, maxFret), [chord, tuning, maxFret])
 
@@ -187,9 +190,10 @@ export default function Fretboard({
         {tuning.map((open, s) =>
           Array.from({ length: maxFret + 1 }, (_, f) => {
             const midi = open + f
-            if (!selection.has(midi) || grid[s][f]) return null
+            const mark = marks?.get(midi) ?? null
+            if ((!selection.has(midi) && !mark) || grid[s][f]) return null
             return (
-              <g key={`p${s}-${f}`} className="picked-note" pointerEvents="none">
+              <g key={`p${s}-${f}`} className={`picked-note${mark ? ` mark-${mark}` : ''}`} pointerEvents="none">
                 <circle cx={xFor(f)} cy={yFor(s)} r={f === 0 ? 10 : 11} />
                 <circle cx={xFor(f)} cy={yFor(s)} r={14} className="sel-ring" />
               </g>

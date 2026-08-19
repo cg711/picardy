@@ -1083,6 +1083,45 @@ a.brand { text-decoration: none; color: inherit; }
 
 .ex-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
+.ex-hint { margin: -6px 0 0; font-size: 12.5px; color: var(--text-dim); }
+
+/* In the app the neck holds a 720px minimum and scrolls, because fifteen frets
+   of chord dots need the room. A drill is the opposite case: the question is
+   "where is this note", so the whole neck has to be in view at once — and with
+   no dots on it, twelve frets scale down without crowding. Narrow screens put
+   the minimum back, or the tap targets shrink past being tappable. */
+.ex-instrument { margin: 0 -2px; }
+.ex-instrument .piano { max-width: 100%; padding-left: 0; padding-right: 0; }
+.ex-instrument .fretboard-wrap { padding-left: 0; padding-right: 0; }
+.ex-instrument .fretboard { min-width: 0; }
+@media (max-width: 640px) {
+  .ex-instrument .fretboard { min-width: 560px; }
+}
+
+.ex-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: var(--text-dim); }
+.ex-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.ex-legend li::before { content: ''; width: 9px; height: 9px; border-radius: 50%; }
+.ex-legend .mark-ref::before { background: var(--accent); }
+.ex-legend .mark-right::before { background: #4ade80; }
+.ex-legend .mark-wrong::before { background: #f87171; }
+.ex-legend .plain::before { display: none; }
+
+/* Marks on the instruments. The question's own note reads as the accent — the
+   same colour the app already uses for "this is the thing" — while the verdict
+   colours match the option buttons, so green means the same thing everywhere. */
+.key.white.mark-ref { fill: #f7dca6; }
+.key.black.mark-ref { fill: #7a5514; }
+.key.white.mark-right { fill: #86efac; }
+.key.black.mark-right { fill: #15803d; }
+.key.white.mark-wrong { fill: #fca5a5; }
+.key.black.mark-wrong { fill: #b91c1c; }
+
+.picked-note.mark-ref > circle:first-child { fill: var(--accent); opacity: 0.9; }
+.picked-note.mark-right > circle:first-child { fill: #4ade80; opacity: 0.95; }
+.picked-note.mark-right .sel-ring { stroke: #4ade80; }
+.picked-note.mark-wrong > circle:first-child { fill: #f87171; opacity: 0.95; }
+.picked-note.mark-wrong .sel-ring { stroke: #f87171; }
+
 .ex-bars { list-style: none; margin: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .ex-bars li { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
 .ex-bar-label { flex: 0 0 auto; width: 118px; color: var(--text-dim); }

@@ -5,9 +5,9 @@
 // are easier to eyeball than to encode.
 
 const B = '../src/'
-const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort } = await import(B + 'theory/chords.js')
+const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort, QUALITIES } = await import(B + 'theory/chords.js')
 const { makeKey, romanNumeral, detectKey, scaleNotes, harmonicFunction, isDiatonic } = await import(B + 'theory/keys.js')
-const { prettyName, noteName } = await import(B + 'theory/notes.js')
+const { prettyName, noteName, parseNote, pcOf: pcOfNote } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
 const { identifyChord } = await import(B + 'theory/identify.js')
@@ -19,7 +19,8 @@ const { optimiseInversions, progressionMovement } = await import(B + 'theory/voi
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression, cadenceAt } = await import(B + 'theory/analyze.js')
-const { makeQuestion, makeRng, LEVELS: EX_LEVELS } = await import(B + 'theory/exercises.js')
+const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
+const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
@@ -640,22 +641,74 @@ console.log('\n--- exercises ---')
         typesSeen.set(q.type, (typesSeen.get(q.type) ?? 0) + 1)
 
         const where = `${level.id}/${q.type} seed ${seed}`
-        if (new Set(q.options).size !== q.options.length) problems.push(`${where}: duplicate options — ${q.options.join(' | ')}`)
-        if (q.options.length < 3) problems.push(`${where}: only ${q.options.length} options`)
-        if (q.options[q.answerIndex] !== q.answer) problems.push(`${where}: answerIndex points at the wrong option`)
         if (!q.prompt || !q.explain) problems.push(`${where}: missing prompt or explanation`)
-        if (!q.chords?.length) problems.push(`${where}: no chords to play`)
         if (/undefined|NaN|\[object/.test(q.prompt + q.explain + q.options.join(''))) {
           problems.push(`${where}: placeholder leaked into the text`)
         }
+        // Something has to be presentable: chords to voice, notes to play, or an
+        // instrument to look at.
+        if (!q.chords?.length && !q.play?.length && !q.instrument) {
+          problems.push(`${where}: nothing to play and nothing to show`)
+        }
+
+        if (q.input === 'instrument') {
+          if (q.options.length) problems.push(`${where}: instrument question also carries options`)
+          const target = q.answerMidi ?? null
+          if (target != null && !positionsFor(q.instrument, target).length) {
+            problems.push(`${where}: the answer ${target} is not reachable on the ${q.instrument}`)
+          }
+          if (target != null && !checkNote(q, target)) problems.push(`${where}: checkNote rejects its own answer`)
+          if (q.answerPcs?.length) {
+            const anywhere = q.instrument === 'piano' ? 60 : 52
+            const m = anywhere - ((anywhere - q.answerPcs[0]) % 12 + 12) % 12
+            if (!checkNote(q, m)) problems.push(`${where}: checkNote rejects a note of the right pitch class`)
+          }
+          if (q.reference != null && !positionsFor(q.instrument, q.reference).length) {
+            problems.push(`${where}: the reference ${q.reference} is off the ${q.instrument}`)
+          }
+        } else {
+          if (new Set(q.options).size !== q.options.length) problems.push(`${where}: duplicate options — ${q.options.join(' | ')}`)
+          if (q.options.length < 3) problems.push(`${where}: only ${q.options.length} options`)
+          if (q.options[q.answerIndex] !== q.answer) problems.push(`${where}: answerIndex points at the wrong option`)
+        }
+
+        // A listening question must not print what it is about to play, and its
+        // options must not contain two things that sound identical.
+        if (q.secret) {
+          if (!q.play?.length) problems.push(`${where}: a listening question with nothing to hear`)
+          if (q.options.some((o) => q.prompt.includes(o))) problems.push(`${where}: the prompt gives the answer away`)
+        }
+        // Anything held back until after the answer must not be in the sound the
+        // question offers up front.
+        if (q.playAnswer && q.play) {
+          const upFront = new Set(q.play.flat())
+          if (q.answerMidi != null && upFront.has(q.answerMidi)) {
+            problems.push(`${where}: the answer note is audible before answering`)
+          }
+        }
+        if (q.type === 'earChord') {
+          // Two qualities that are the same pitch set from one root would be
+          // indistinguishable however good the ear.
+          const sets = q.options.map((name) => {
+            const id = Object.keys(QUALITIES).find((k) => QUALITIES[k].name === name)
+            return id ? chordNotes(makeChord(parseNote('C'), id)).map((e) => (pcOfNote(e.note))).sort((x, y) => x - y).join(',') : name
+          })
+          if (new Set(sets).size !== sets.length) problems.push(`${where}: two qualities sound alike — ${q.options.join(' | ')}`)
+        }
+        if (q.type === 'earInterval') {
+          const semis = q.options.map((name) => INTERVALS.find((i) => i.name === name)?.semitones)
+          if (new Set(semis).size !== semis.length) {
+            problems.push(`${where}: two options sound the same — ${q.options.join(' | ')}`)
+          }
+        }
         // The level's own vocabulary: Basics must never reach for a key or a
         // chord it has not introduced.
-        if (level.id === 'basics' && q.key.mode !== 'major') problems.push(`${where}: minor key in Basics`)
+        if (level.id === 'basics' && q.key?.mode !== 'major') problems.push(`${where}: minor key in Basics`)
 
         // The answer must be what the engine says, re-derived here rather than
         // trusted from the generator — otherwise this only checks that the
         // generator agrees with itself.
-        if (q.type === 'numeral' && romanNumeral(q.chords[0], q.key) !== q.answer) {
+        if (q.type === 'numeral' && q.key && romanNumeral(q.chords[0], q.key) !== q.answer) {
           problems.push(`${where}: numeral disagrees with romanNumeral()`)
         }
         if (q.type === 'fn') {
@@ -664,6 +717,14 @@ console.log('\n--- exercises ---')
         }
         if (q.type === 'cadence' && cadenceAt(q.chords, 1, q.key)?.label !== q.answer) {
           problems.push(`${where}: cadence disagrees with cadenceAt()`)
+        }
+        if (q.type === 'interval') {
+          // Re-derive from the two notes named in the prompt rather than trusting
+          // the catalogue entry the generator happened to draw.
+          const [, a, b] = q.prompt.match(/from (\S+) up to (\S+)\?/) ?? []
+          const named = a && b ? intervalBetween(parseNote(a.replace('♯', '#').replace('♭', 'b')), parseNote(b.replace('♯', '#').replace('♭', 'b')), { octave: q.answer === 'octave' }) : null
+          if (!named) problems.push(`${where}: could not re-read "${q.prompt}"`)
+          else if (named.name !== q.answer) problems.push(`${where}: says ${q.answer}, intervalBetween says ${named.name}`)
         }
         if (q.type === 'outsider') {
           const strangers = q.chords.filter((c) => !isDiatonic(c, q.key)).map(chordSymbol)
@@ -677,7 +738,7 @@ console.log('\n--- exercises ---')
   eq('  every level builds a question every time', problems.length, 0)
   if (problems.length) console.log('   ' + problems.slice(0, 8).join('\n   '))
   eq('  questions generated', built, EX_LEVELS.length * 120 * 12)
-  eq('  every question type appears', typesSeen.size, 6)
+  eq('  every question type appears', typesSeen.size, 12)
   console.log('     mix — ' + [...typesSeen].map(([t, n]) => `${t} ${n}`).join(', '))
 
   // Same seed, same question. Without this the check above proves nothing about

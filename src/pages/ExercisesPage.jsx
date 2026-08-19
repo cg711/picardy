@@ -1,10 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { LEVELS, TYPE_LABELS, levelById, makeQuestion } from '../theory/exercises.js'
+import {
+  LEVELS, TYPE_LABELS, levelById, makeQuestion, checkNote,
+  GUITAR_TUNING, GUITAR_MAX_FRET, PIANO_LOW, PIANO_HIGH,
+} from '../theory/exercises.js'
 import { chordSymbol, voiceChord } from '../theory/chords.js'
 import { keyName } from '../theory/keys.js'
 import { playChord, playProgression, stopPlayback } from '../audio/synth.js'
 import { encodeState } from '../lib/share.js'
 import { pageFor } from '../lib/routes.js'
+import Piano from '../components/Piano.jsx'
+import Fretboard from '../components/Fretboard.jsx'
 
 const STORE_KEY = 'picardy.exercises.v1'
 
@@ -33,11 +38,16 @@ export default function ExercisesPage() {
   const [levelId, setLevelId] = useState(() => readProgress().level ?? LEVELS[0].id)
   const [question, setQuestion] = useState(() => makeQuestion(levelId))
   const [chosen, setChosen] = useState(null)
+  // Instrument questions are answered by clicking a note rather than an option,
+  // so what was "picked" is a MIDI number and there is no index to compare.
+  const [picked, setPicked] = useState(null)
   const [progress, setProgress] = useState(readProgress)
 
   const level = levelById(levelId)
   const stats = progress[levelId] ?? blankLevel()
-  const answered = chosen !== null
+  const onInstrument = question?.input === 'instrument'
+  const answered = onInstrument ? picked !== null : chosen !== null
+  const gotItRight = onInstrument ? checkNote(question, picked) : chosen === question?.answerIndex
 
   useEffect(() => {
     document.title = pageFor('exercises').title
@@ -51,6 +61,7 @@ export default function ExercisesPage() {
   const nextQuestion = useCallback((id = levelId) => {
     stopPlayback()
     setChosen(null)
+    setPicked(null)
     setQuestion(makeQuestion(id))
   }, [levelId])
 
@@ -60,11 +71,9 @@ export default function ExercisesPage() {
     nextQuestion(id)
   }
 
-  const answer = useCallback((index) => {
-    if (chosen !== null || !question) return
-    setChosen(index)
-    const right = index === question.answerIndex
-
+  // Scoring is the same whichever way the answer arrived, so both entry points
+  // funnel through here rather than each keeping their own copy of the tally.
+  const record = useCallback((right) => {
     setProgress((prev) => {
       const before = prev[question.level] ?? blankLevel()
       const type = before.byType[question.type] ?? { asked: 0, right: 0 }
@@ -84,20 +93,54 @@ export default function ExercisesPage() {
         },
       })
     })
-  }, [chosen, question])
+  }, [question])
+
+  const answer = useCallback((index) => {
+    if (answered || !question) return
+    setChosen(index)
+    record(index === question.answerIndex)
+  }, [answered, question, record])
+
+  const answerNote = useCallback((midi) => {
+    if (answered || !question) return
+    setPicked(midi)
+    record(checkNote(question, midi))
+  }, [answered, question, record])
+
+  /**
+   * What this question sounds like: explicit MIDI if it has any, else its chords.
+   *
+   * Some questions hold back part of the sound until they are over — a
+   * find-the-note drill that plays the note you are looking for has answered
+   * itself.
+   */
+  const voices = useMemo(() => {
+    if (!question) return []
+    if (answered && question.playAnswer) return question.playAnswer
+    if (question.play) return question.play
+    return (question.chords ?? []).map((c) => voiceChord(c, { bottom: 52 }))
+  }, [question, answered])
 
   const hear = useCallback(() => {
-    if (!question) return
+    if (!voices.length) return
     stopPlayback()
-    if (question.chords.length === 1) {
-      playChord(voiceChord(question.chords[0], { bottom: 52 }), { duration: 1.8 })
+    if (voices.length === 1) {
+      playChord(voices[0], { duration: 1.8 })
       return
     }
     playProgression(
-      question.chords.map((c) => ({ midis: voiceChord(c, { bottom: 52 }), beats: 2 })),
+      voices.map((midis) => ({ midis, beats: 2 })),
       { bpm: 92, timbre: 'piano', pattern: 'block', strum: 0.008 },
     )
-  }, [question])
+  }, [voices])
+
+  // Ear questions play themselves on arrival — the whole question is the sound,
+  // and pressing play every single time is friction with no purpose. Before the
+  // first click the audio context is still suspended and this is a silent no-op,
+  // which is why the play button stays.
+  useEffect(() => {
+    if (question?.autoPlay) hear()
+  }, [question, hear])
 
   // Number keys answer, Enter moves on. Drilling with a mouse is slow enough
   // that people stop after five questions instead of fifty.
@@ -107,9 +150,9 @@ export default function ExercisesPage() {
       const target = event.target
       if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
 
-      if (!answered && /^[1-9]$/.test(event.key)) {
+      if (!answered && !onInstrument && /^[1-9]$/.test(event.key)) {
         const index = Number(event.key) - 1
-        if (index < (question?.options.length ?? 0)) {
+        if (index < (question?.options?.length ?? 0)) {
           event.preventDefault()
           answer(index)
         }
@@ -123,12 +166,38 @@ export default function ExercisesPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [answered, question, answer, nextQuestion, hear])
+  }, [answered, onInstrument, question, answer, nextQuestion, hear])
 
+  // Only offered when the question is made of chords in a key. An interval or a
+  // single note has nothing for the progression editor to open.
   const openInTool = useMemo(() => {
-    if (!question) return '/'
+    if (!question?.chords?.length || !question.key) return null
     return `/#${encodeState({ key: question.key, progression: question.chords })}`
   }, [question])
+
+  /**
+   * Reference note, the pick, and — once it is over — every note that would have
+   * been accepted.
+   *
+   * "Find any B♭" has a dozen right answers, so showing one of them and calling
+   * it the answer would teach the wrong lesson. All of them light up.
+   */
+  const marks = useMemo(() => {
+    const m = new Map()
+    if (!question) return m
+    if (question.reference != null) m.set(question.reference, 'ref')
+    if (answered) {
+      if (question.answerMidi != null) m.set(question.answerMidi, 'right')
+      for (const pc of question.answerPcs ?? []) {
+        const { low, high } = question.instrument === 'piano'
+          ? { low: PIANO_LOW, high: PIANO_HIGH }
+          : { low: GUITAR_TUNING[0], high: GUITAR_TUNING[GUITAR_TUNING.length - 1] + GUITAR_MAX_FRET }
+        for (let n = low; n <= high; n++) if (((n % 12) + 12) % 12 === pc) m.set(n, 'right')
+      }
+      if (picked != null) m.set(picked, checkNote(question, picked) ? 'right' : 'wrong')
+    }
+    return m
+  }, [question, answered, picked])
 
   if (!question) {
     return (
@@ -150,11 +219,12 @@ export default function ExercisesPage() {
           Every question is generated from the same engine the tool runs on, so the
           answers here and the analysis there can never disagree — and there is no
           end to them. Answer with the number keys, <kbd>P</kbd> to hear it,{' '}
-          <kbd>Enter</kbd> for the next one.
+          <kbd>Enter</kbd> for the next one — or answer on the instrument, where
+          there is one.
         </p>
       </header>
 
-      <div className="ex-levels" role="tablist" aria-label="Difficulty">
+      <div className="ex-levels" role="tablist" aria-label="Topic">
         {LEVELS.map((l) => (
           <button
             key={l.id}
@@ -172,7 +242,7 @@ export default function ExercisesPage() {
       <div className="panel ex-card">
         <div className="panel-head">
           <h2>{question.typeLabel}</h2>
-          <span className="muted">{keyName(question.key)}</span>
+          {question.key && <span className="muted">{keyName(question.key)}</span>}
           <span className="ex-score">
             <b>{stats.streak}</b> streak
             {stats.asked > 0 && <> · {pct(stats.right, stats.asked)}% of {stats.asked}</>}
@@ -182,10 +252,53 @@ export default function ExercisesPage() {
         <div className="ex-body">
           <p className="ex-prompt">{question.prompt}</p>
 
-          <button className="btn ghost ex-hear" onClick={hear}>
-            ▶ Hear {question.chords.length > 1 ? 'them' : 'it'}
-            <span className="ex-hear-chords">{question.chords.map(chordSymbol).join(' – ')}</span>
-          </button>
+          {question.hint && <p className="ex-hint">{question.hint}</p>}
+
+          {voices.length > 0 && (
+            <button className={`btn ghost ex-hear${question.secret ? ' loud' : ''}`} onClick={hear}>
+              ▶ {question.secret ? 'Play again' : `Hear ${voices.length > 1 ? 'them' : 'it'}`}
+              {/* Naming the chords next to the button would answer a listening
+                  question before it was asked. */}
+              {!question.secret && question.chords?.length > 0 && (
+                <span className="ex-hear-chords">{question.chords.map(chordSymbol).join(' – ')}</span>
+              )}
+            </button>
+          )}
+
+          {question.instrument === 'piano' && (
+            <div className="ex-instrument">
+              <Piano
+                chord={null}
+                low={PIANO_LOW}
+                high={PIANO_HIGH}
+                marks={marks}
+                showLabels={false}
+                readout={false}
+                onToggleNote={onInstrument ? answerNote : undefined}
+              />
+            </div>
+          )}
+
+          {question.instrument === 'guitar' && (
+            <div className="ex-instrument">
+              <Fretboard
+                chord={null}
+                tuning={GUITAR_TUNING}
+                maxFret={GUITAR_MAX_FRET}
+                marks={marks}
+                onToggleNote={onInstrument ? answerNote : undefined}
+              />
+            </div>
+          )}
+
+          {onInstrument && (
+            <ul className="ex-legend">
+              {question.reference != null && <li className="mark-ref">the note in the question</li>}
+              {answered && <li className={gotItRight ? 'mark-right' : 'mark-wrong'}>what you picked</li>}
+              {answered && !gotItRight && <li className="mark-right">where it was</li>}
+              {!answered && <li className="plain">click a {question.instrument === 'guitar' ? 'fret' : 'key'} to answer</li>}
+            </ul>
+          )}
 
           <ol className="ex-options">
             {question.options.map((option, i) => {
@@ -217,8 +330,8 @@ export default function ExercisesPage() {
           </ol>
 
           {answered && (
-            <div className={`ex-explain${chosen === question.answerIndex ? ' right' : ' wrong'}`} role="status">
-              <strong>{chosen === question.answerIndex ? 'Correct.' : 'Not quite.'}</strong>{' '}
+            <div className={`ex-explain${gotItRight ? ' right' : ' wrong'}`} role="status">
+              <strong>{gotItRight ? 'Correct.' : 'Not quite.'}</strong>{' '}
               {question.explain}
             </div>
           )}
@@ -230,9 +343,11 @@ export default function ExercisesPage() {
               </button>
               {/* A real navigation rather than an in-app link: the app reads its
                   state from the hash once, on load, so this has to be a load. */}
-              <a className="btn ghost" href={openInTool}>
-                Open these chords in the tool
-              </a>
+              {openInTool && (
+                <a className="btn ghost" href={openInTool}>
+                  Open these chords in the tool
+                </a>
+              )}
             </div>
           )}
         </div>
