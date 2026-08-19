@@ -1,12 +1,9 @@
 import React from 'react'
 import { KEY_CHOICES, makeKey, keySignatureAccidentals, keyName } from '../theory/keys.js'
 import { noteName, prettyName, parseNote } from '../theory/notes.js'
-import { capoSuggestions, isOpenFriendly } from '../theory/transpose.js'
 
 export default function KeyPicker({ musicKey, onChange, onDetect, canDetect, onTranspose, canTranspose }) {
   const sig = keySignatureAccidentals(musicKey)
-  const capos = capoSuggestions(musicKey)
-  const openFriendly = isOpenFriendly(musicKey)
 
   return (
     <div className="key-picker">
@@ -48,12 +45,6 @@ export default function KeyPicker({ musicKey, onChange, onDetect, canDetect, onT
       <button className="btn ghost tiny" onClick={onDetect} disabled={!canDetect} title="Infer the key from the chords entered">
         Detect from progression
       </button>
-
-      {!openFriendly && capos.length > 0 && (
-        <span className="capo muted" title="Play easier shapes and let the capo do the transposing">
-          capo {capos[0].fret} → play in {keyName(capos[0].shapeKey).replace(' major', '').replace(' minor', 'm')}
-        </span>
-      )}
     </div>
   )
 }

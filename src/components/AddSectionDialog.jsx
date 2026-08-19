@@ -9,7 +9,7 @@ import { describeLength } from '../theory/rhythm.js'
  * different scales, so they should not look like different mechanisms. Sharing
  * the .add-sidebar class is the point rather than an accident.
  */
-export default function AddSectionDialog({ open, onClose, segments, onAdd }) {
+export default function AddSectionDialog({ open, onClose, segments, onAdd, insertAt, songLength = 0 }) {
   useEffect(() => {
     if (!open) return
     const onKey = (event) => {
@@ -24,7 +24,11 @@ export default function AddSectionDialog({ open, onClose, segments, onAdd }) {
       <div className="add-dialog-head">
         <h2>Add a section</h2>
         <span className="muted small">
-          {segments.length ? 'appends to the end of the song' : 'nothing saved yet'}
+          {!segments.length
+            ? 'nothing saved yet'
+            : insertAt == null || insertAt >= songLength
+              ? 'adds to the end of the song'
+              : `inserts at position ${insertAt + 1}`}
         </span>
         <button className="btn ghost tiny add-dialog-x" onClick={onClose} aria-label="Close">×</button>
       </div>

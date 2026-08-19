@@ -6,7 +6,16 @@ import { categoryStyle } from '../lib/colors.js'
 
 const TIER_ORDER = ['vcommon', 'common', 'occasional', 'uncommon', 'rare']
 
-export default function Suggestions({ suggestions, onAdd, onPreview, limit = 40 }) {
+export default function Suggestions({
+  suggestions,
+  onAdd,
+  onPreview,
+  // Plays the move rather than the chord: what you are judging is the
+  // transition, and a chord on its own does not tell you whether it lands.
+  onPlayTransition,
+  transitionHint = 'Hear the move into this chord',
+  limit = 40,
+}) {
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(null)
@@ -93,13 +102,25 @@ export default function Suggestions({ suggestions, onAdd, onPreview, limit = 40 
                         <span style={{ width: `${Math.max(4, s.score)}%` }} />
                       </div>
                       <div className="sug-buttons">
+                        {onPlayTransition && (
+                          <button
+                            className="btn tiny"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onPlayTransition(s.chord)
+                            }}
+                            title={transitionHint}
+                          >
+                            ⇢
+                          </button>
+                        )}
                         <button
                           className="btn tiny"
                           onClick={(e) => {
                             e.stopPropagation()
                             onPreview(s.chord)
                           }}
-                          title="Hear it and show it on the instruments"
+                          title="Hear it on its own and show it on the instruments"
                         >
                           ▶
                         </button>

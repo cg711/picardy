@@ -1,4 +1,4 @@
-// Transposition, and the capo arithmetic guitarists actually want.
+// Transposition that moves the music, not just the label.
 
 import { mod, pcOf, spellFrom, normAcc, LETTER_PC } from './notes.js'
 import { makeChord, chordNotes } from './chords.js'
@@ -113,54 +113,6 @@ export function keyPrefersFlats(key) {
 export function intervalBetween(fromKey, toKey) {
   const raw = mod(pcOf(toKey.tonic) - pcOf(fromKey.tonic), 12)
   return raw > 6 ? raw - 12 : raw
-}
-
-// --- capo --------------------------------------------------------------------
-
-// Keys a guitarist can play with open-position shapes, roughly in order of how
-// comfortable they are. These are the shapes a capo lets you reuse.
-const FRIENDLY_SHAPES = [
-  { name: 'G', pc: 7, score: 10 },
-  { name: 'C', pc: 0, score: 10 },
-  { name: 'D', pc: 2, score: 9 },
-  { name: 'A', pc: 9, score: 9 },
-  { name: 'E', pc: 4, score: 8 },
-  { name: 'Am', pc: 9, minor: true, score: 10 },
-  { name: 'Em', pc: 4, minor: true, score: 10 },
-  { name: 'Dm', pc: 2, minor: true, score: 8 },
-]
-
-/**
- * Capo positions that let you play the sounding key using open shapes.
- *
- * @returns array of { fret, shapeKey, shapeName, comfort } sorted best first
- */
-export function capoSuggestions(soundingKey, { maxFret = 7 } = {}) {
-  const minor = soundingKey.mode === 'minor'
-  const soundingPc = pcOf(soundingKey.tonic)
-  const out = []
-
-  for (const shape of FRIENDLY_SHAPES) {
-    if (!!shape.minor !== minor) continue
-    // Capo raises pitch: shape + fret = sounding.
-    const fret = mod(soundingPc - shape.pc, 12)
-    if (fret === 0 || fret > maxFret) continue
-    out.push({
-      fret,
-      shapeName: shape.name,
-      shapeKey: bestKeyFor(shape.pc, soundingKey.mode),
-      // Lower frets and friendlier shapes first.
-      comfort: shape.score - fret * 0.6,
-    })
-  }
-
-  return out.sort((a, b) => b.comfort - a.comfort)
-}
-
-/** Is this key already playable in open position without a capo? */
-export function isOpenFriendly(key) {
-  const pc = pcOf(key.tonic)
-  return FRIENDLY_SHAPES.some((s) => s.pc === pc && !!s.minor === (key.mode === 'minor'))
 }
 
 export { parseNote, noteName, spellFrom }

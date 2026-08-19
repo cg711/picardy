@@ -61,6 +61,8 @@ export default function App() {
   const [shapes, setShapes] = useState(initial?.shapes ?? [])
   // Which lyric line each chord sits over, and the lines of plain text.
   const [lines, setLines] = useState(initial?.lines ?? [])
+  // Lyric-lane width per chord, independent of its beat length.
+  const [spans, setSpans] = useState(initial?.spans ?? [])
   const [lyricLines, setLyricLines] = useState(initial?.lyricLines ?? [''])
   const [editorView, setEditorView] = useState('chips')
   const [timeSignature, setTimeSignature] = useState(initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE)
@@ -78,9 +80,16 @@ export default function App() {
   // Name of the section just saved, shown briefly as confirmation.
   const [savedNote, setSavedNote] = useState(null)
   const savedTimer = useRef(null)
-  useEffect(() => () => clearTimeout(savedTimer.current), [])
+  // A separate, shorter flag: the confirmation text reads for a couple of
+  // seconds, but the tab should only pulse once — about a second — or it turns
+  // into a distraction sitting next to the tab you are working in.
+  const [justSaved, setJustSaved] = useState(false)
+  const glowTimer = useRef(null)
+  useEffect(() => () => { clearTimeout(savedTimer.current); clearTimeout(glowTimer.current) }, [])
   // Whether the "add a section to the song" sidebar is open.
-  const [addSectionOpen, setAddSectionOpen] = useState(false)
+  // Where in the song a picked section will land, or null when the sidebar is
+  // shut. Mirrors how the chord sidebar targets a gap in the strip.
+  const [addSectionAt, setAddSectionAt] = useState(null)
 
   const [tuningId, setTuningId] = useState('standard')
   const [lefty, setLefty] = useState(() => !!loadPrefs().lefty)
@@ -113,7 +122,7 @@ export default function App() {
   const [loop, setLoop] = useState(false)
   const [showScale, setShowScale] = useState(false)
   const [scaleId, setScaleId] = useState(null)
-  const [detailTab, setDetailTab] = useState('voicing')
+  const [detailTab, setDetailTab] = useState('scale')
   const prevLen = useRef(progression.length)
   const activeIndexRef = useRef(activeIndex)
   useEffect(() => {
@@ -134,10 +143,11 @@ export default function App() {
     durations,
     shapes,
     lines,
+    spans,
     lyricLines,
     key: `${noteName(musicKey.tonic)}${musicKey.mode === 'minor' ? 'm' : ''}`,
     timeSignature,
-  }), [progression, inversions, durations, shapes, lines, lyricLines, musicKey, timeSignature])
+  }), [progression, inversions, durations, shapes, lines, spans, lyricLines, musicKey, timeSignature])
 
   const applySnapshot = useCallback((snap) => {
     const minor = /m$/.test(snap.key)
@@ -149,6 +159,7 @@ export default function App() {
     setDurations(snap.durations)
     setShapes(snap.shapes)
     setLines(snap.lines ?? [])
+    setSpans(snap.spans ?? [])
     setLyricLines(snap.lyricLines ?? [''])
     setTimeSignature(snap.timeSignature)
     setActiveIndex(Math.min(activeIndexRef.current, chords.length - 1))
@@ -264,8 +275,8 @@ export default function App() {
   // fragment from state that was never lost.
   useEffect(() => {
     if (route !== 'app') return
-    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines })
-  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines])
+    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines, spans })
+  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, lyricLines, lines, spans])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -335,6 +346,8 @@ export default function App() {
       setShapes((sh) => [...sh.slice(0, insertAt), null, ...sh.slice(insertAt)])
       // A chord inserted mid-progression joins the line its neighbour is on.
       setLines((ln) => [...ln.slice(0, insertAt), ln[insertAt - 1] ?? ln[insertAt] ?? 0, ...ln.slice(insertAt)])
+      // A new chord takes an even share of its lyric line.
+      setSpans((w) => [...w.slice(0, insertAt), 1, ...w.slice(insertAt)])
       setPreview(null)
       setSelection(new Set())
       setGenerated(null)
@@ -352,12 +365,45 @@ export default function App() {
     [timbre],
   )
 
+  /**
+   * Play the candidate in context: the chord before it, the candidate, and the
+   * chord after it when inserting into the middle.
+   *
+   * Hearing a suggestion alone tells you what it *is*; hearing the move tells
+   * you whether it lands, which is the only question the list is really asking.
+   * The candidate is shown on the instruments as it sounds.
+   */
+  const playTransition = useCallback(
+    (chord) => {
+      const at = activeIndexRef.current + 1
+      const before = progression[at - 1]
+      const after = progression[at]
+      const run = [before, chord, after].filter(Boolean)
+      if (!run.length) return
+      setPreview(chord)
+      setDisplayInversion(0)
+      resumeAudio()
+      playProgression(
+        run.map((c) => ({ midis: voiceChord(c, { bottom: 48 }), beats: 2 })),
+        {
+          bpm,
+          timbre,
+          pattern: 'block',
+          beatsPerBar: timeSignatureOf(timeSignature).beatsPerBar,
+          strum: timbre === 'guitar' ? 0.02 : 0.008,
+        },
+      )
+    },
+    [progression, bpm, timbre, timeSignature],
+  )
+
   const removeChord = (i) => {
     setProgression((p) => p.filter((_, j) => j !== i))
     setInversions((iv) => iv.filter((_, j) => j !== i))
     setDurations((d) => d.filter((_, j) => j !== i))
     setShapes((sh) => sh.filter((_, j) => j !== i))
     setLines((ln) => ln.filter((_, j) => j !== i))
+    setSpans((w) => w.filter((_, j) => j !== i))
     setActiveIndex((a) => Math.max(0, Math.min(a, progression.length - 2)))
     setPreview(null)
     setGenerated(null)
@@ -385,6 +431,11 @@ export default function App() {
     setShapes((sh) => {
       const padded = [...sh]
       while (padded.length < progression.length) padded.push(null)
+      return swap(padded)
+    })
+    setSpans((w) => {
+      const padded = [...w]
+      while (padded.length < progression.length) padded.push(1)
       return swap(padded)
     })
     setLines((ln) => {
@@ -428,20 +479,20 @@ export default function App() {
   }
 
   /**
-   * Ripple drag: moving chord `i` later lengthens the chord before it and
-   * carries everything after along unchanged, so only one duration changes.
-   * That is what makes it behave like sliding a divider.
+   * Move the lyric-lane boundary between two neighbouring chords.
+   *
+   * Only their two widths change and their sum is preserved, so the line stays
+   * exactly full and nothing after it shifts. Durations are deliberately
+   * untouched: aligning a chord to a syllable is a typographic decision, and it
+   * used to silently rewrite the rhythm.
    */
-  const dragChord = (i, deltaBeats) => {
-    if (i <= 0 || !Number.isFinite(deltaBeats)) return
-    setDurations((d) => {
-      const next = [...d]
-      while (next.length < progression.length) next.push(DEFAULT_DURATION)
-      const previous = toBeats(next[i - 1])
-      // The previous chord absorbs the move, and can never vanish entirely.
-      const grown = Math.max(MIN_BEATS, previous + deltaBeats)
-      if (Math.abs(grown - previous) < 1e-9) return d
-      next[i - 1] = grown
+  const resizeSpans = (leftIndex, leftSpan, rightIndex, rightSpan) => {
+    if (!Number.isFinite(leftSpan) || !Number.isFinite(rightSpan)) return
+    setSpans((list) => {
+      const next = [...list]
+      while (next.length < progression.length) next.push(1)
+      next[leftIndex] = leftSpan
+      next[rightIndex] = rightSpan
       return next
     })
   }
@@ -515,6 +566,7 @@ export default function App() {
     setDurations(durs)
     setShapes(result.progression.map(() => null))
     setLines(result.progression.map(() => 0))
+    setSpans(result.progression.map(() => 1))
     setLyricLines([''])
     setActiveIndex(result.progression.length - 1)
     setPreview(null)
@@ -582,6 +634,7 @@ export default function App() {
     setDurations(parsed.durations)
     setShapes(parsed.chords.map(() => null))
     setLines(parsed.chords.map(() => 0))
+    setSpans(parsed.chords.map(() => 1))
     setLyricLines([''])
     setActiveIndex(parsed.chords.length - 1)
     setPreview(null)
@@ -602,6 +655,7 @@ export default function App() {
       timeSignature,
       shapes,
       lines,
+      spans,
       lyricLines,
     })
     setSegments((list) => [...list, segment])
@@ -610,6 +664,9 @@ export default function App() {
     setSavedNote(name)
     clearTimeout(savedTimer.current)
     savedTimer.current = setTimeout(() => setSavedNote(null), 2600)
+    setJustSaved(true)
+    clearTimeout(glowTimer.current)
+    glowTimer.current = setTimeout(() => setJustSaved(false), 1000)
   }
 
   const setSegmentHue = (id, hue) => {
@@ -628,6 +685,7 @@ export default function App() {
     setDurations(live.durations)
     setShapes(live.shapes)
     setLines(live.lines)
+    setSpans(live.spans ?? live.progression.map(() => 1))
     setLyricLines(live.lyricLines.length ? live.lyricLines : [''])
     setTimeSignature(live.timeSignature)
     setActiveIndex(live.progression.length - 1)
@@ -645,6 +703,14 @@ export default function App() {
   }
 
   const addToSong = (segmentId) => setSong((list) => [...list, { segmentId, repeats: 1 }])
+
+  /** Same shape as inserting a chord: the index is a gap, not a position. */
+  const insertIntoSong = (at, segmentId) => {
+    setSong((list) => {
+      const where = Math.max(0, Math.min(at ?? list.length, list.length))
+      return [...list.slice(0, where), { segmentId, repeats: 1 }, ...list.slice(where)]
+    })
+  }
 
   const setRepeats = (i, repeats) =>
     setSong((list) => list.map((e, j) => (j === i ? { ...e, repeats } : e)))
@@ -766,31 +832,18 @@ export default function App() {
         <section className="col col-left">
           <div className="panel p-progression">
             <div className="panel-head">
-              <h2>Progression</h2>
-              <div className="head-right">
-                <select
-                  className="flavour"
-                  value={flavour}
-                  onChange={(e) => setFlavour(e.target.value)}
-                  aria-label="Generator style"
-                  title="Which harmonic vocabulary the generator draws on"
-                >
-                  <option value="any">Any style</option>
-                  {Object.entries(FLAVOURS).map(([id, f]) => (
-                    <option key={id} value={id}>{f.label}</option>
-                  ))}
-                </select>
-                <button className="btn surprise" onClick={surprise} title="Generate a progression that ends on a cadence">
-                  🎲 Surprise me
-                </button>
-              </div>
+              <h2>Progression tool</h2>
             </div>
 
             {/* Both of these read or rewrite the progression below: which key the
                 numerals are measured against, and moving the music to a new one.
                 The muted key name that used to sit in the head is gone — the
-                picker is the key name now. */}
-            <div className="setup-bar">
+                picker is the key name now.
+
+                Hidden on the song tab: nothing here acts on a song, and leaving
+                a key picker above an arrangement invites you to change the wrong
+                thing. */}
+            <div className="setup-bar" hidden={editorView === 'sections'}>
               <KeyPicker
                 musicKey={musicKey}
                 onChange={(k) => k && setMusicKey(k)}
@@ -815,7 +868,11 @@ export default function App() {
                 ['lyrics', 'Lyrics & timing'],
                 ['sections', 'Song structure'],
               ].map(([id, label]) => (
-                <button key={id} className={editorView === id ? 'on' : ''} onClick={() => setEditorView(id)}>
+                <button
+                  key={id}
+                  className={`${editorView === id ? 'on' : ''}${id === 'sections' && justSaved ? ' just-saved' : ''}`}
+                  onClick={() => setEditorView(id)}
+                >
                   {label}
                 </button>
               ))}
@@ -840,16 +897,15 @@ export default function App() {
             {editorView === 'lyrics' && progression.length > 0 && (
               <LyricTimeline
                 progression={progression}
-                durations={durations}
                 lines={lines}
+                spans={spans}
                 lyricLines={lyricLines}
                 musicKey={musicKey}
-                timeSignature={timeSignature}
                 activeIndex={activeIndex}
                 playingIndex={playingIndex}
                 onSelect={selectChord}
                 onLyricLines={setLyricLines}
-                onDragChord={dragChord}
+                onResize={resizeSpans}
                 onMoveChordToLine={moveChordToLine}
                 onRemove={removeChord}
               />
@@ -866,7 +922,7 @@ export default function App() {
                 onLoad={loadSegment}
                 onRename={renameSegment}
                 onDeleteSegment={deleteSegment}
-                onOpenAddSection={() => setAddSectionOpen(true)}
+                onOpenAddSection={(at) => setAddSectionAt(at)}
                 onSetHue={setSegmentHue}
                 onAddToSong={addToSong}
                 onSetRepeats={setRepeats}
@@ -894,6 +950,9 @@ export default function App() {
               onDuration={setDurationAt}
               onMove={moveChord}
               onSurprise={surprise}
+              onFlavour={setFlavour}
+              flavour={flavour}
+              flavours={Object.entries(FLAVOURS)}
               onSmooth={smoothVoicing}
               onUndo={undo}
               onRedo={redo}
@@ -910,6 +969,7 @@ export default function App() {
                 setDurations([])
                 setShapes([])
                 setLines([])
+                setSpans([])
                 setLyricLines([''])
                 setActiveIndex(-1)
                 setPreview(null)
@@ -918,6 +978,7 @@ export default function App() {
               }}
             />
 
+            {editorView !== 'sections' && (
             <Transport
               playing={playing}
               onPlay={play}
@@ -939,14 +1000,18 @@ export default function App() {
               loop={loop}
               onLoop={setLoop}
               disabled={!progression.length}
+              hideChordDefaults={editorView === 'lyrics'}
             />
+            )}
 
             {/* Down with the transport rather than floating between the strip and
                 it, where it had none of the panel's padding and read as loose.
                 Still outside the Sections tab on purpose: it acts on the
                 progression, not on the library, so it should not hide behind the
                 tab that lists what you have already saved. */}
-            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} savedNote={savedNote} />
+            {editorView !== 'sections' && (
+              <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} savedNote={savedNote} />
+            )}
           </div>
 
           {/* Its own panel directly under the progression, rather than inside the
@@ -972,6 +1037,7 @@ export default function App() {
                         setDurations(s.progression.map(() => DEFAULT_DURATION))
                         setShapes(s.progression.map(() => null))
                         setLines(s.progression.map(() => 0))
+                        setSpans(s.progression.map(() => 1))
                         setLyricLines([''])
                         setActiveIndex(s.progression.length - 1)
                         setPreview(null)
@@ -1175,8 +1241,7 @@ export default function App() {
               <>
                 <div className="detail-tabs">
                   {[
-                    ['voicing', 'Voicing'],
-                    ['scale', 'What to play'],
+                    ['scale', 'Scale applications'],
                     ['reharm', 'Reharmonise'],
                   ].map(([id, label]) => (
                     <button
@@ -1232,6 +1297,7 @@ export default function App() {
         onAdd={addChordAndClose}
         suggestions={suggestions}
         onPreview={previewChord}
+        onPlayTransition={playTransition}
         timeSignature={timeSignature}
         onLoadChart={(parsed) => {
           loadChart(parsed)
@@ -1243,10 +1309,12 @@ export default function App() {
       />
 
       <AddSectionDialog
-        open={addSectionOpen}
-        onClose={() => setAddSectionOpen(false)}
+        open={addSectionAt !== null}
+        insertAt={addSectionAt}
+        songLength={song.length}
+        onClose={() => setAddSectionAt(null)}
         segments={segments}
-        onAdd={addToSong}
+        onAdd={(id) => insertIntoSong(addSectionAt ?? song.length, id)}
       />
 
       {exporting && (

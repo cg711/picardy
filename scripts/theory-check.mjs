@@ -14,7 +14,7 @@ const { identifyChord } = await import(B + 'theory/identify.js')
 const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
 const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete } = await import(B + 'theory/rhythm.js')
 const { flattenSong, songBeats, readSegment, makeSegment } = await import(B + 'lib/song.js')
-const { transposeChord, transposeKey, keyPrefersFlats, capoSuggestions } = await import(B + 'theory/transpose.js')
+const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theory/transpose.js')
 const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
@@ -378,9 +378,6 @@ console.log('\n--- transpose ---')
   }
   eq('  no ordinary chord transposes to a double accidental', ugly.join(','), '')
 
-  const capo = capoSuggestions(makeKey('Bb', 'major'))
-  eq('  B♭ major suggests a capo', capo.length > 0, true)
-  eq('  and the best one is playable in open position', capo[0].fret <= 3, true)
 }
 
 console.log('\n--- voice leading ---')

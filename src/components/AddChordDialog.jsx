@@ -46,6 +46,7 @@ export default function AddChordDialog({
   onAdd,
   suggestions,
   onPreview,
+  onPlayTransition,
   timeSignature,
   onLoadChart,
   selection,
@@ -99,7 +100,7 @@ export default function AddChordDialog({
 
       <div className="add-dialog-body">
         {inputMode === 'suggest' && (
-          <Suggestions suggestions={suggestions} onAdd={onAdd} onPreview={onPreview} />
+          <Suggestions suggestions={suggestions} onAdd={onAdd} onPreview={onPreview} onPlayTransition={onPlayTransition} />
         )}
         {inputMode === 'text' && <ChordInput onAdd={onAdd} musicKey={musicKey} />}
         {inputMode === 'roman' && <RomanPicker musicKey={musicKey} onAdd={onAdd} />}

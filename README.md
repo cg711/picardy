@@ -82,13 +82,12 @@ approach diminished chords.
 movement, using dynamic programming over every inversion of every chord. Typically cuts movement
 by 75–80%. Slash chords keep the bass you gave them.
 
-**Transpose and capo.** Move the music, not just the label. Spelling carries the *generic
+**Transpose.** Move the music, not just the label. Spelling carries the *generic
 interval* across from the source key rather than being re-derived from the pitch, so B♭ in C
 becomes C in D — the lowered 7th in both — instead of B♯, and repeated transposition doesn't drift
 into double accidentals. Where the functional spelling would be unreadable (♭6 of D♭ is B𝄫), the
 cleanest enharmonic wins instead; that trades the roman numeral for legibility, which is the
-choice a real chart makes. For guitar it suggests capo positions that let you play open shapes:
-"capo 1 → play in C" for a song in D♭.
+choice a real chart makes.
 
 **Import and analysis.** Paste a chart like `| Cmaj7 | Am7 | Dm7 G7 |` and it parses into a
 section, splitting shared bars. Then it reads the progression back: names the cadence, finds
@@ -278,7 +277,7 @@ src/
     rhythm.js     note durations, time signatures, grouping chords into bars with ties
     scales.js     chord-scales derived from function, guide tones, common tones
     reharm.js     in-place substitutions and approach chords
-    transpose.js  transposition with sane spelling, plus capo suggestions
+    transpose.js  transposition with sane spelling
     voicelead.js  inversion search that minimises voice movement
     analyze.js    cadence detection and prose analysis of a progression
     guitar.js     fretboard voicing search and playability filtering

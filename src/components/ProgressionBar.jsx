@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { chordSymbol, chordNotes, inversionLabel } from '../theory/chords.js'
+import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
 import { DURATIONS, durationOf, toBeats, describeLength, barsAreComplete, timeSignatureOf, presetFor } from '../theory/rhythm.js'
@@ -21,6 +22,9 @@ export default function ProgressionBar({
   onSurprise,
   onSmooth,
   onAddAt,
+  flavour = 'any',
+  onFlavour,
+  flavours = [],
   shapes = [],
   tuningId = 'standard',
   onUndo,
@@ -56,16 +60,37 @@ export default function ProgressionBar({
   // a second, contradictory one.
   if (!progression.length && hideWhenEmpty) return null
 
+  // Empty: two dotted placeholders standing where real chips will be, rather
+  // than prose plus a row of buttons. The strip already teaches the shape of a
+  // chord card, so an outline of one is the clearest possible "put one here".
   if (!progression.length) {
     return (
-      <div className="progression empty">
-        <p className="muted">
-          Nothing yet. Add a chord and the suggestion list will start reading the context — or let
-          the generator write you a whole progression.
-        </p>
-        <div className="empty-actions">
-          <button className="btn primary" onClick={() => onAddAt(0)}>+ Add a chord</button>
-          <button className="btn" onClick={onSurprise}>🎲 Surprise me — generate one</button>
+      <div className="progression">
+        <div className="prog-strip">
+          <button className="add-card empty-chord" onClick={() => onAddAt(0)} title="Add the first chord">
+            <span className="add-card-plus" aria-hidden="true">+</span>
+            <span className="add-card-label">Add chord</span>
+          </button>
+
+          <div className="add-card die-card">
+            <button className="die-face" onClick={onSurprise} title="Generate a progression that ends on a cadence">
+              <span className="die-glyph" aria-hidden="true">🎲</span>
+              <span className="add-card-label">Surprise me</span>
+            </button>
+            <select
+              className="die-style"
+              value={flavour}
+              onChange={(e) => onFlavour(e.target.value)}
+              aria-label="Generator style"
+              title="Which harmonic vocabulary the generator draws on"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="any">Any style</option>
+              {flavours.map(([id, f]) => (
+                <option key={id} value={id}>{f.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     )
@@ -149,15 +174,34 @@ export default function ProgressionBar({
               </label>
 
 
+              {/* Inversion picks straight from a list rather than cycling a
+                  button: cycling hid both how many there are and which one you
+                  are on, so an inversion set on a chip was invisible from the
+                  chip. The bass note is what you actually hear change, so it is
+                  what the row shows. */}
+              <label className="chip-inversion" onClick={(e) => e.stopPropagation()}>
+                <span className="lbl">Inv</span>
+                <select
+                  value={inv}
+                  onChange={(e) => onInvert(i, Number(e.target.value))}
+                  title={inversionLabel(chord, inv)}
+                  aria-label="Inversion"
+                >
+                  {Array.from({ length: nTones }, (_, n) => (
+                    <option key={n} value={n}>
+                      {n === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][n - 1] ?? `${n}th`}
+                      {' · '}
+                      {prettyName(chordNotes(chord)[n % nTones].note)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="chip-controls" onClick={(e) => e.stopPropagation()}>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>
-                <button
-                  className="inv-btn"
-                  title={inversionLabel(chord, inv)}
-                  onClick={() => onInvert(i, (inv + 1) % nTones)}
-                >
-                  {inv === 0 ? 'root' : `inv ${inv}`}
-                </button>
+                <span className={`chip-inv-badge${inv > 0 ? ' on' : ''}`} title={inversionLabel(chord, inv)}>
+                  {inv === 0 ? 'root pos.' : `${['1st', '2nd', '3rd', '4th', '5th'][inv - 1] ?? `${inv}th`} inv`}
+                </span>
                 <button title="Move right" onClick={() => onMove(i, 1)} disabled={i === progression.length - 1}>›</button>
               </div>
             </div>

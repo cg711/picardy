@@ -55,7 +55,7 @@ export function chordFlow(segment, max = 4) {
 const uid = () => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 /** Snapshot the editor into a storable segment. Chords are stored as symbols. */
-export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lines, lyricLines }) {
+export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lines, lyricLines, spans }) {
   return {
     id: uid(),
     name: name || 'Untitled',
@@ -67,6 +67,9 @@ export function makeSegment({ name, key, progression, inversions, durations, tim
     shapes: progression.map((_, i) => shapes?.[i] ?? null),
     // Which lyric line each chord sits over, plus the lines themselves.
     lines: progression.map((_, i) => lines?.[i] ?? 0),
+    // How wide each chord sits over its lyric line. Independent of durations:
+    // alignment to syllables is not the same question as how long a chord lasts.
+    spans: progression.map((_, i) => spans?.[i] ?? 1),
     lyricLines: [...(lyricLines ?? [])],
     at: Date.now(),
   }
@@ -84,6 +87,7 @@ export function readSegment(segment) {
     durations: progression.map((_, i) => toBeats(segment.durations?.[i])),
     shapes: progression.map((_, i) => segment.shapes?.[i] ?? null),
     lines: progression.map((_, i) => segment.lines?.[i] ?? 0),
+    spans: progression.map((_, i) => segment.spans?.[i] ?? 1),
     lyricLines: [...(segment.lyricLines ?? [])],
     timeSignature: segment.timeSignature || DEFAULT_TIME_SIGNATURE,
   }

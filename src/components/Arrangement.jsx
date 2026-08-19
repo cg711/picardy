@@ -140,14 +140,24 @@ export default function Arrangement({
         )}
       </div>
 
-      <div className="song-strip">
+      <div className="song-strip prog-strip">
         {song.map((entry, i) => {
           const s = byId.get(entry.segmentId)
           if (!s) return null
           const hue = segmentHue(s)
           return (
+            <React.Fragment key={`${entry.segmentId}-${i}`}>
+            {/* Same insert slot as the chord strip: a section can go between two
+                others rather than only on the end. */}
+            <button
+              className="insert-slot"
+              onClick={() => onOpenAddSection(i)}
+              title={`Insert a section before ${s.name}`}
+              aria-label={`Insert a section before ${s.name}`}
+            >
+              <span aria-hidden="true">+</span>
+            </button>
             <div
-              key={`${entry.segmentId}-${i}`}
               className={`song-chip${i === playingSongIndex ? ' playing' : ''}`}
               style={chip(hue)}
             >
@@ -177,10 +187,11 @@ export default function Arrangement({
                 <button title="Move later" onClick={() => onMoveEntry(i, 1)} disabled={i === song.length - 1}>›</button>
               </div>
             </div>
+            </React.Fragment>
           )
         })}
 
-        <button className="add-card" onClick={onOpenAddSection} title="Add a section to the song">
+        <button className="add-card" onClick={() => onOpenAddSection(song.length)} title="Add a section to the end of the song">
           <span className="add-card-plus" aria-hidden="true">+</span>
           <span className="add-card-label">Add section</span>
         </button>

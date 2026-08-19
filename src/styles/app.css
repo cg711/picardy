@@ -46,6 +46,12 @@
 
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute is only `display: none` in the UA stylesheet, so any
+   author rule that sets display — and this file sets it on almost everything —
+   silently outranks it. Without this, hiding something with `hidden` does
+   nothing at all. */
+[hidden] { display: none !important; }
+
 html, body, #root { height: 100%; }
 
 body {
@@ -790,7 +796,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .obs-tonicisation { border-left-color: #fbbf24; }
 .obs-motion { border-left-color: var(--accent-2); }
 
-/* ---------- transpose & capo ---------- */
+/* ---------- transpose ---------- */
 
 .transpose { display: flex; align-items: center; gap: 4px; }
 .transpose button {
@@ -799,7 +805,6 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 }
 .transpose button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .transpose button:disabled { opacity: 0.35; cursor: not-allowed; }
-.capo { font-size: 11px; padding: 2px 8px; border: 1px dashed var(--border); border-radius: 999px; }
 
 /* ---------- lyrics & pinned shapes ---------- */
 
@@ -837,40 +842,51 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 }
 
 .tl-line { display: flex; gap: 8px; align-items: stretch; }
-.tl-lane-wrap { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 2px; }
+.tl-lane-wrap { flex: 1; min-width: 0; padding-bottom: 2px; }
+/* The lane is a flex row now, not an absolute-positioned beat canvas: the chords
+   divide the full width between them, so it is proportion that matters and the
+   pixel scale does not. No horizontal scroll — a line always fits. */
 .tl-lane {
-  position: relative; height: 46px; margin-bottom: 2px;
+  display: flex; align-items: stretch; height: 46px; margin-bottom: 2px;
   border-bottom: 1px solid var(--border-soft);
 }
-
-.tl-grid {
-  position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-soft);
-}
-.tl-grid.bar { background: #574a39; }
-.tl-grid em {
-  position: absolute; top: -2px; left: 3px; font-style: normal; font-size: 9px;
-  color: var(--text-dim);
-}
+.tl-empty { align-self: center; font-size: 11px; color: var(--text-dim); padding-left: 2px; }
 
 .tl-chord {
-  position: absolute; top: 12px; height: 32px;
-  display: flex; flex-direction: column; justify-content: center; gap: 0;
-  padding: 2px 6px; border-radius: 6px; cursor: grab; overflow: hidden;
+  position: relative;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 2px 6px; margin: 6px 0; border-radius: 6px; overflow: hidden;
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
-  font: inherit; text-align: left; white-space: nowrap;
+  white-space: nowrap;
 }
 .tl-chord:hover { border-color: #574a39; }
 .tl-chord.active { border-color: var(--accent); background: #2a2113; }
 .tl-chord.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
-.tl-chord.anchored { cursor: default; border-style: dashed; }
-.tl-chord.grabbing { cursor: grabbing; border-color: var(--accent); z-index: 3; }
-.tl-symbol { font-size: 13px; font-weight: 600; line-height: 1.1; }
+.tl-chord-face {
+  display: flex; flex-direction: column; justify-content: center; gap: 0;
+  font: inherit; text-align: left; background: none; border: 0; color: inherit;
+  padding: 0; cursor: pointer; min-width: 0; overflow: hidden;
+}
+.tl-symbol { font-size: 13px; font-weight: 600; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
 .tl-roman { font-size: 9px; color: var(--accent); line-height: 1.1; }
 .tl-remove {
   position: absolute; top: 1px; right: 3px; font-size: 11px; color: var(--text-dim);
   cursor: pointer; line-height: 1;
 }
 .tl-remove:hover { color: var(--danger); }
+
+/* The draggable boundary between two chords. Sits on the chord's trailing edge
+   and overhangs both sides, so there is a real grab area without a visible gap. */
+.tl-divider {
+  position: absolute; top: 0; bottom: 0; right: -5px; width: 10px; z-index: 2;
+  cursor: col-resize; touch-action: none;
+}
+.tl-divider::after {
+  content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: 2px;
+  border-radius: 2px; background: var(--border); transition: background 120ms;
+}
+.tl-divider:hover::after, .tl-divider.grabbing::after { background: var(--accent); }
+.lyric-timeline.dragging { cursor: col-resize; user-select: none; }
 
 .tl-lyric {
   display: block; font: inherit; font-size: 14px; line-height: 1.4;
@@ -1097,14 +1113,17 @@ a.brand { text-decoration: none; color: inherit; }
   display: flex; align-items: stretch; gap: 8px;
   overflow-x: auto; padding: 11px 14px 8px;
 }
+/* Deliberately the same box as .prog-chip — same width, padding, radius and
+   border — so arranging sections and arranging chords are visibly one gesture. */
 .song-chip {
   position: relative;
   flex: 0 0 auto;
-  width: 158px;
-  display: flex; flex-direction: column; gap: 5px;
+  width: 124px;
+  display: flex; flex-direction: column; gap: 4px;
   padding: 8px;
   border: 1px solid;
   border-radius: 9px;
+  transition: border-color 120ms, background 120ms;
 }
 .song-chip.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
 .song-pos {
@@ -1113,7 +1132,7 @@ a.brand { text-decoration: none; color: inherit; }
   background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--text-dim);
 }
 .song-chip-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; }
-.song-name { font-size: 14px; font-weight: 600; }
+.song-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 /* The chords themselves, so a chip says what it is without being opened. */
 .song-flow {
   font-size: 12px; color: var(--text); opacity: 0.82;
@@ -1192,3 +1211,90 @@ a.brand { text-decoration: none; color: inherit; }
 .section-chip .song-name:hover { text-decoration: underline; }
 .section-chip .song-chip-top { margin-top: 0; }
 .section-chip .add-to-song { margin-left: auto; }
+
+/* ---------- navbar ---------- */
+
+/* Never wraps. The bar is identity plus navigation only, so it always fits on
+   one line — and a wrapping navbar changes the page's whole vertical rhythm at
+   exactly the widths where space is tightest. */
+.topbar {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.topbar .brand { align-items: center; min-width: 0; }
+.topbar .brand h1 { display: flex; align-items: center; }
+.topbar-right { align-items: center; flex: none; }
+/* The tagline is the only thing here that can be sacrificed for width. */
+@media (max-width: 620px) {
+  .topbar .tagline { display: none; }
+  .topbar { gap: 8px; padding: 10px 12px; }
+}
+
+/* ---------- square icon buttons ---------- */
+
+/* Hamburger and every close button: a real square with the glyph centred, rather
+   than text padding that happens to look square at one font size. */
+.menu-btn, .add-dialog-x, .chip-x, .icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; flex: none; line-height: 1;
+}
+.add-dialog-x, .chip-x { font-size: 16px; }
+.chip-x { width: 20px; height: 20px; font-size: 15px; border-radius: 5px; }
+.menu-btn .hamburger { margin: 0; }
+
+/* ---------- add-a-chord tab bar ---------- */
+
+/* Sized by its tabs, not stretched to the panel. inline-flex means the strip is
+   exactly as wide as the five labels need. */
+.add-dialog-tabs { display: inline-flex; align-self: flex-start; max-width: calc(100% - 28px); }
+.add-dialog-tabs button { flex: 0 0 auto; }
+.detail-tabs button { flex: 1 1 auto; }
+
+/* ---------- empty progression ---------- */
+
+/* Placeholders shaped like the cards they will become. */
+.empty-chord { border-style: dashed; }
+.die-card {
+  display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  gap: 6px; width: 150px; padding: 8px;
+  border: 1.5px dashed var(--border); border-radius: 9px; background: transparent;
+}
+.die-face {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font: inherit; color: var(--text-dim); background: none; border: 0; cursor: pointer;
+}
+.die-card:hover { border-color: var(--accent); }
+.die-card:hover .die-face { color: var(--accent); }
+.die-glyph { font-size: 22px; line-height: 1; }
+.die-style { width: 100%; font-size: 11px; padding: 3px 6px; }
+
+/* ---------- inversion on a chip ---------- */
+
+.chip-inversion { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
+.chip-inversion select { flex: 1; min-width: 0; font-size: 11px; padding: 3px 5px; }
+.chip-inv-badge {
+  flex: 1; text-align: center; font-size: 10px; padding: 2px 4px; border-radius: 5px;
+  color: var(--text-dim); background: #00000030; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.chip-inv-badge.on { color: var(--accent); background: #2a2113; }
+
+/* ---------- saved-section glow ---------- */
+
+/* One pulse on the tab the section just landed in, so a save that happens on a
+   tab you are not looking at still points at where it went. */
+.view-tabs button.just-saved {
+  animation: saved-glow 1s ease-out;
+}
+@keyframes saved-glow {
+  0%   { box-shadow: 0 0 0 0 #7ee2a800; border-color: transparent; }
+  25%  { box-shadow: 0 0 0 3px #7ee2a866; }
+  100% { box-shadow: 0 0 0 0 #7ee2a800; }
+}
+@media (prefers-reduced-motion: reduce) { .view-tabs button.just-saved { animation: none; } }
+
+/* Blank-state copy reads at the same size wherever it appears. */
+.arrangement > .pad-sm { font-size: 12.5px; line-height: 1.55; padding: 4px 14px 8px; }
+.tl-hint { font-size: 12.5px; line-height: 1.55; }
