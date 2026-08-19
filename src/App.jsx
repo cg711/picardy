@@ -857,10 +857,10 @@ export default function App() {
                 The muted key name that used to sit in the head is gone — the
                 picker is the key name now.
 
-                Hidden on the song tab: nothing here acts on a song, and leaving
-                a key picker above an arrangement invites you to change the wrong
-                thing. */}
-            <div className="setup-bar" hidden={editorView === 'sections'}>
+                Only on the Chords tab, because that is the only place these act
+                on what is in front of you. Above an arrangement or a page of
+                lyrics they are an invitation to change the wrong thing. */}
+            <div className="setup-bar" hidden={editorView !== 'chips'}>
               <KeyPicker
                 musicKey={musicKey}
                 onChange={(k) => k && setMusicKey(k)}
