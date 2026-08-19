@@ -6,7 +6,7 @@
 
 const B = '../src/'
 const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort } = await import(B + 'theory/chords.js')
-const { makeKey, romanNumeral, detectKey, scaleNotes } = await import(B + 'theory/keys.js')
+const { makeKey, romanNumeral, detectKey, scaleNotes, harmonicFunction, isDiatonic } = await import(B + 'theory/keys.js')
 const { prettyName, noteName } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
@@ -18,7 +18,8 @@ const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theo
 const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
-const { analyseProgression } = await import(B + 'theory/analyze.js')
+const { analyseProgression, cadenceAt } = await import(B + 'theory/analyze.js')
+const { makeQuestion, makeRng, LEVELS: EX_LEVELS } = await import(B + 'theory/exercises.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
@@ -620,6 +621,72 @@ console.log('\n--- analysis ---')
   }
 }
 
+console.log('\n--- exercises ---')
+{
+  // Sweeping seeds rather than checking one question: the failures that matter
+  // here are rare draws — a distractor that happens to equal the answer, a key
+  // where a builder cannot find four options — and they only show up in bulk.
+  const problems = []
+  const typesSeen = new Map()
+  let built = 0
+
+  for (const level of EX_LEVELS) {
+    for (let seed = 1; seed <= 120; seed++) {
+      const rng = makeRng(seed * 97)
+      for (let n = 0; n < 12; n++) {
+        const q = makeQuestion(level.id, rng)
+        if (!q) { problems.push(`${level.id}: makeQuestion gave up at seed ${seed}`); continue }
+        built++
+        typesSeen.set(q.type, (typesSeen.get(q.type) ?? 0) + 1)
+
+        const where = `${level.id}/${q.type} seed ${seed}`
+        if (new Set(q.options).size !== q.options.length) problems.push(`${where}: duplicate options — ${q.options.join(' | ')}`)
+        if (q.options.length < 3) problems.push(`${where}: only ${q.options.length} options`)
+        if (q.options[q.answerIndex] !== q.answer) problems.push(`${where}: answerIndex points at the wrong option`)
+        if (!q.prompt || !q.explain) problems.push(`${where}: missing prompt or explanation`)
+        if (!q.chords?.length) problems.push(`${where}: no chords to play`)
+        if (/undefined|NaN|\[object/.test(q.prompt + q.explain + q.options.join(''))) {
+          problems.push(`${where}: placeholder leaked into the text`)
+        }
+        // The level's own vocabulary: Basics must never reach for a key or a
+        // chord it has not introduced.
+        if (level.id === 'basics' && q.key.mode !== 'major') problems.push(`${where}: minor key in Basics`)
+
+        // The answer must be what the engine says, re-derived here rather than
+        // trusted from the generator — otherwise this only checks that the
+        // generator agrees with itself.
+        if (q.type === 'numeral' && romanNumeral(q.chords[0], q.key) !== q.answer) {
+          problems.push(`${where}: numeral disagrees with romanNumeral()`)
+        }
+        if (q.type === 'fn') {
+          const want = { T: 'Tonic', PD: 'Predominant', D: 'Dominant' }[harmonicFunction(q.chords[0], q.key)]
+          if (want !== q.answer) problems.push(`${where}: function disagrees with harmonicFunction()`)
+        }
+        if (q.type === 'cadence' && cadenceAt(q.chords, 1, q.key)?.label !== q.answer) {
+          problems.push(`${where}: cadence disagrees with cadenceAt()`)
+        }
+        if (q.type === 'outsider') {
+          const strangers = q.chords.filter((c) => !isDiatonic(c, q.key)).map(chordSymbol)
+          if (strangers.length !== 1) problems.push(`${where}: ${strangers.length} chords outside the key, want exactly 1`)
+          else if (strangers[0] !== q.answer) problems.push(`${where}: names the wrong chord as the outsider`)
+        }
+      }
+    }
+  }
+
+  eq('  every level builds a question every time', problems.length, 0)
+  if (problems.length) console.log('   ' + problems.slice(0, 8).join('\n   '))
+  eq('  questions generated', built, EX_LEVELS.length * 120 * 12)
+  eq('  every question type appears', typesSeen.size, 6)
+  console.log('     mix — ' + [...typesSeen].map(([t, n]) => `${t} ${n}`).join(', '))
+
+  // Same seed, same question. Without this the check above proves nothing about
+  // a specific failure, because there is no way to get back to it.
+  const a = makeQuestion('chromatic', makeRng(4242))
+  const b = makeQuestion('chromatic', makeRng(4242))
+  eq('  a seed reproduces its question', a.prompt === b.prompt && a.answerIndex === b.answerIndex, true)
+}
+
 console.log('\n--- chart import ---')
 {
   const r = parseChart('| Cmaj7 | Am7 | Dm7 G7 |')
@@ -773,6 +840,7 @@ console.log('\n--- routes ---')
   eq('  /privacy', routeFor('/privacy'), 'privacy')
   eq('  /terms', routeFor('/terms'), 'terms')
   // A trailing slash is the same page — hosts and hand-typed URLs disagree about it.
+  eq('  /exercises', routeFor('/exercises'), 'exercises')
   eq('  /privacy/ is the same page', routeFor('/privacy/'), 'privacy')
   eq('  unknown paths fall back to the app', routeFor('/nope'), 'app')
   eq('  every page round-trips', PAGES.every((p) => pageFor(p.route).path === p.path), true)

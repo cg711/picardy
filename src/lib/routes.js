@@ -11,6 +11,7 @@
 
 export const PAGES = [
   { path: '/', route: 'app', label: 'Picardy', title: 'Picardy — chord progressions, explained' },
+  { path: '/exercises', route: 'exercises', label: 'Exercises', title: 'Exercises — Picardy' },
   { path: '/privacy', route: 'privacy', label: 'Privacy', title: 'Privacy — Picardy' },
   { path: '/terms', route: 'terms', label: 'Terms', title: 'Terms — Picardy' },
 ]

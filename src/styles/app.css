@@ -1011,6 +1011,91 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 a.brand { text-decoration: none; color: inherit; }
 
+/* ---------- exercises ---------- */
+
+.exercises {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 26px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+.ex-intro h1 { font-size: 26px; letter-spacing: -0.02em; margin-bottom: 10px; }
+.ex-intro p { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-dim); max-width: 62ch; }
+.exercises kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em;
+  background: #ffffff0d; border: 1px solid var(--border); border-bottom-width: 2px;
+  padding: 0 4px; border-radius: 4px; color: var(--text);
+}
+
+.ex-levels { display: flex; gap: 6px; flex-wrap: wrap; }
+.ex-levels button {
+  padding: 7px 14px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-dim);
+}
+.ex-levels button:hover { background: #ffffff0a; color: var(--text); }
+.ex-levels button.on { background: #4a3512; border-color: #6b4d1a; color: var(--accent); }
+.ex-blurb { margin: -6px 0 0; font-size: 12.5px; color: var(--text-dim); }
+
+.ex-card .panel-head .ex-score { margin-left: auto; font-size: 12px; color: var(--text-dim); }
+.ex-card .panel-head .ex-score b { color: var(--accent); font-size: 14px; }
+.ex-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
+.ex-prompt { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 600; }
+
+.ex-hear { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; }
+.ex-hear-chords { font-size: 12px; color: var(--text-dim); }
+
+.ex-options { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ex-option {
+  width: 100%; display: flex; align-items: center; gap: 11px; text-align: left;
+  padding: 11px 13px; border-radius: 9px; cursor: pointer; font-size: 14.5px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  transition: background 120ms, border-color 120ms;
+}
+.ex-option:hover:not(:disabled) { background: #322a20; border-color: #4d4335; }
+/* Disabled is the normal state after answering, so it must not read as
+   unavailable — only the unpicked wrong answers dim. */
+.ex-option:disabled { cursor: default; opacity: 1; }
+.ex-key {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px;
+  display: grid; place-items: center; font-size: 11px;
+  background: #ffffff0d; color: var(--text-dim);
+}
+.ex-label { flex: 1 1 auto; min-width: 0; }
+.ex-mark { flex: 0 0 auto; font-size: 15px; font-weight: 700; }
+.ex-option.right { background: #4ade8018; border-color: #4ade8066; }
+.ex-option.right .ex-mark { color: #4ade80; }
+.ex-option.wrong { background: #f8717118; border-color: #f8717166; }
+.ex-option.wrong .ex-mark { color: #f87171; }
+.ex-option.dim { opacity: 0.45; }
+
+.ex-explain {
+  font-size: 13.5px; line-height: 1.6; color: #d8d0c4;
+  padding: 11px 13px; border-radius: 8px; border-left: 3px solid var(--border);
+  background: #ffffff05;
+}
+.ex-explain.right { border-left-color: #4ade80; }
+.ex-explain.wrong { border-left-color: #f87171; }
+.ex-explain strong { color: var(--text); }
+
+.ex-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.ex-bars { list-style: none; margin: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ex-bars li { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.ex-bar-label { flex: 0 0 auto; width: 118px; color: var(--text-dim); }
+.ex-bar { flex: 1 1 auto; height: 6px; border-radius: 3px; background: #ffffff0d; overflow: hidden; }
+.ex-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.ex-bar-num { flex: 0 0 auto; width: 34px; text-align: right; color: var(--text); }
+
+@media (max-width: 560px) {
+  .ex-prompt { font-size: 17px; }
+  .ex-bar-label { width: 96px; }
+  .ex-actions .btn { flex: 1 1 auto; text-align: center; }
+}
+
 .legal {
   /* ~70 characters at this size — past that the eye loses the line return. */
   max-width: 62ch;

@@ -61,6 +61,9 @@ const CADENCES = [
   },
 ]
 
+/** Every cadence this engine can name — the pool the exercises draw wrong answers from. */
+export const CADENCE_LABELS = CADENCES.map((c) => c.label)
+
 const degreeOf = (chord, key) => mod(pcOf(chord.root) - pcOf(key.tonic), 12)
 const isDominant = (chord) => QUALITIES[chord.qualityId]?.family === 'dom'
 const isMinorish = (chord) => ['minor', 'dim'].includes(QUALITIES[chord.qualityId]?.family)

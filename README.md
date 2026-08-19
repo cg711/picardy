@@ -243,8 +243,33 @@ These are real paths rather than hash routes, because the hash is already the ap
 and a legal URL needs to be something you can hand to an app store or a payment provider. A direct
 load of `/privacy` works because the host serves `index.html` for unknown paths — that is what
 `not_found_handling` is doing in `wrangler.jsonc`, and the check suite asserts it stays set. The
-router is thirty lines in `src/lib/router.js`; three pages, none of them with parameters, do not
+router is thirty lines in `src/lib/router.js`; four pages, none of them with parameters, do not
 justify a dependency.
+
+## Exercises
+
+`/exercises` is a drill page: multiple-choice questions on roman numerals, harmonic function, chord
+spelling, cadences, resolution, and spotting the chord that left the key.
+
+Nothing is authored. `src/theory/exercises.js` builds each question from the engine and takes the
+right answer from whatever the engine says — `romanNumeral()` names the numeral, `cadenceAt()` names
+the cadence, `harmonicFunction()` names the function. A hand-written question bank would go stale
+the first time the engine was corrected and then contradict the app in front of someone trying to
+learn; this cannot. When the minor-plagal shadowing bug was fixed in `analyze.js`, the drill started
+asking about minor plagal cadences the same day, with no content change.
+
+Three levels gate the vocabulary — keys, seventh chords, chromatic harmony, and which cadence names
+are even offered as wrong answers. Distractors have to come from the same world as the answer: a
+Phrygian half cadence against a plain V–I in Basics is eliminable without knowing any theory.
+
+The generator takes a seeded RNG, which is what makes it testable. `npm run check` builds 4,320
+questions across every level and asserts each has exactly one correct answer, no duplicate options,
+no placeholder text, and — re-deriving from the engine rather than trusting the generator — that the
+marked answer is the right one. A generator that produces a broken question one draw in five hundred
+is exactly the failure that needs a seed to pin down.
+
+Progress is per level in `localStorage` (`picardy.exercises.v1`): streak, accuracy, and per-type
+accuracy so the weakest topics surface. No accounts, so nothing to sync and nothing to store.
 
 The App component stays mounted across the switch and only swaps its body, so reading the terms
 halfway through writing a progression doesn't cost you the progression. The state fragment is
@@ -294,6 +319,7 @@ src/
     analyze.js    cadence detection and prose analysis of a progression
     guitar.js     fretboard voicing search and playability filtering
     identify.js   reverse lookup — notes to chord symbol
+    exercises.js  question generator — every answer comes from the engine
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
   audio/synth.js  Web Audio polysynth
   brand/
@@ -304,6 +330,7 @@ src/
     site.js       the operator/contact/jurisdiction the legal pages need
     Privacy.jsx   privacy policy — draft, describes the app's actual behaviour
     Terms.jsx     terms of service — draft
+    ExercisesPage.jsx  the drill page at /exercises
   lib/            URL/share encoding, colour tokens, segment + song model,
                   PDF export, MIDI writer, chart text import
 ```

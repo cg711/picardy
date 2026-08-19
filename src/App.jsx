@@ -47,6 +47,7 @@ import { useRoute, linkProps } from './lib/router.js'
 import Menu from './components/Menu.jsx'
 import SiteFooter from './components/SiteFooter.jsx'
 import LegalPage from './pages/LegalPage.jsx'
+import ExercisesPage from './pages/ExercisesPage.jsx'
 
 const initial = decodeState(window.location.hash)
 
@@ -822,7 +823,7 @@ export default function App() {
             <Menu route={route} />
           </div>
         </header>
-        <LegalPage route={route} />
+        {route === 'exercises' ? <ExercisesPage /> : <LegalPage route={route} />}
         <SiteFooter route={route} />
       </div>
     )
