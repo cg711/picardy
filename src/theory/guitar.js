@@ -7,12 +7,72 @@
 import { mod, pcOf, midiToPc } from './notes.js'
 import { QUALITIES, chordNotes } from './chords.js'
 
+/**
+ * Tunings, low string first, as MIDI numbers.
+ *
+ * Grouped so the picker can show them under headings — the list is long enough
+ * now that a flat one is hard to scan. Nothing here assumes six strings: the
+ * voicing search, the neck and the chord boxes all read `tuning.length`.
+ */
 export const TUNINGS = {
-  standard: { name: 'Standard (EADGBE)', strings: [40, 45, 50, 55, 59, 64] },
-  dropD: { name: 'Drop D (DADGBE)', strings: [38, 45, 50, 55, 59, 64] },
-  openG: { name: 'Open G (DGDGBD)', strings: [38, 43, 50, 55, 59, 62] },
-  dadgad: { name: 'DADGAD', strings: [38, 45, 50, 55, 57, 62] },
-  halfStepDown: { name: 'E♭ standard', strings: [39, 44, 49, 54, 58, 63] },
+  standard: { name: 'Standard (EADGBE)', group: 'Standard', strings: [40, 45, 50, 55, 59, 64] },
+  halfStepDown: { name: 'E♭ standard (E♭A♭D♭G♭B♭E♭)', group: 'Standard', strings: [39, 44, 49, 54, 58, 63] },
+  wholeStepDown: { name: 'D standard (DGCFAD)', group: 'Standard', strings: [38, 43, 48, 53, 57, 62] },
+  cStandard: { name: 'C standard (CFB♭E♭GC)', group: 'Standard', strings: [36, 41, 46, 51, 55, 60] },
+
+  dropD: { name: 'Drop D (DADGBE)', group: 'Dropped', strings: [38, 45, 50, 55, 59, 64] },
+  doubleDropD: { name: 'Double drop D (DADGBD)', group: 'Dropped', strings: [38, 45, 50, 55, 59, 62] },
+  dropCsharp: { name: 'Drop C♯ (C♯G♯C♯F♯A♯D♯)', group: 'Dropped', strings: [37, 44, 49, 54, 58, 63] },
+  dropC: { name: 'Drop C (CGCFAD)', group: 'Dropped', strings: [36, 43, 48, 53, 57, 62] },
+  dropB: { name: 'Drop B (BF♯BEG♯C♯)', group: 'Dropped', strings: [35, 42, 47, 52, 56, 61] },
+
+  openG: { name: 'Open G (DGDGBD)', group: 'Open', strings: [38, 43, 50, 55, 59, 62] },
+  openD: { name: 'Open D (DADF♯AD)', group: 'Open', strings: [38, 45, 50, 54, 57, 62] },
+  openE: { name: 'Open E (EBEG♯BE)', group: 'Open', strings: [40, 47, 52, 56, 59, 64] },
+  openC: { name: 'Open C (CGCGCE)', group: 'Open', strings: [36, 43, 48, 55, 60, 64] },
+  openA: { name: 'Open A (EAEAC♯E)', group: 'Open', strings: [40, 45, 52, 57, 61, 64] },
+  openDminor: { name: 'Open Dm (DADFAD)', group: 'Open', strings: [38, 45, 50, 53, 57, 62] },
+
+  dadgad: { name: 'DADGAD', group: 'Modal', strings: [38, 45, 50, 55, 57, 62] },
+  cgdgcd: { name: 'Orkney (CGDGCD)', group: 'Modal', strings: [36, 43, 50, 55, 60, 62] },
+
+  sevenString: { name: '7-string (BEADGBE)', group: 'Extended range', strings: [35, 40, 45, 50, 55, 59, 64] },
+  sevenDropA: { name: '7-string drop A (AEADGBE)', group: 'Extended range', strings: [33, 40, 45, 50, 55, 59, 64] },
+  eightString: { name: '8-string (F♯BEADGBE)', group: 'Extended range', strings: [30, 35, 40, 45, 50, 55, 59, 64] },
+  baritone: { name: 'Baritone B (BEADF♯B)', group: 'Extended range', strings: [35, 40, 45, 50, 54, 59] },
+  bassFour: { name: 'Bass, 4-string (EADG)', group: 'Extended range', strings: [28, 33, 38, 43] },
+}
+
+/** The id used to stamp a pinned shape. */
+export const CUSTOM_TUNING = 'custom'
+export const MIN_STRINGS = 4
+export const MAX_STRINGS = 8
+/** Playable range for a string: low B on an 8-string up to a high A. */
+export const MIN_STRING_MIDI = 24
+export const MAX_STRING_MIDI = 76
+
+/**
+ * A stable identity for whatever tuning is in force.
+ *
+ * A pinned shape is only meaningful against the exact strings it was found on,
+ * so a custom tuning's key has to be its notes — otherwise editing one string
+ * would silently keep every shape pinned under the old one. Underscores, not
+ * colons: encodeShape separates the tuning from the frets with a colon.
+ */
+export function tuningKey(tuningId, strings) {
+  if (tuningId !== CUSTOM_TUNING) return tuningId
+  return `${CUSTOM_TUNING}_${(strings ?? []).join('_')}`
+}
+
+/** Clamp a proposed custom tuning into something playable. */
+export function normaliseTuning(strings) {
+  const out = (Array.isArray(strings) ? strings : [])
+    .map((m) => Math.round(Number(m)))
+    .filter((m) => Number.isFinite(m))
+    .map((m) => Math.min(MAX_STRING_MIDI, Math.max(MIN_STRING_MIDI, m)))
+    .slice(0, MAX_STRINGS)
+  while (out.length < MIN_STRINGS) out.push(out.length ? out[out.length - 1] + 5 : 40)
+  return out
 }
 
 export const FRET_COUNT = 15
@@ -227,7 +287,10 @@ function evaluate(fretsIn, tuning, need, bassPc, chord) {
   score -= interiorMutes * 14
   score -= Math.max(0, fingerCount - 3) * 5
   if (barre) score -= 3
-  if (sounding.length === 6) score += 4
+  // A grip that sounds every string, whatever the instrument has — this used to
+  // be hardcoded to six, so on a 7- or 8-string the bonus could never be earned
+  // and on a bass it was unreachable too.
+  if (sounding.length === frets.length) score += 4
 
   return { frets, midis, sounding, bassPc: lowestPc, score, span, position, fingers: fingerCount, barre, coverage }
 }

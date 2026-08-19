@@ -1335,3 +1335,37 @@ a.brand { text-decoration: none; color: inherit; }
 /* Inside a fixed card the swatches have to fit the width they are given. */
 .song-chip .hue-picker { margin-top: auto; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; }
 .song-chip .hue-dot { border-width: 2px; }
+
+/* ---------- tuning picker ---------- */
+
+.tuning-picker { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tuning-select { max-width: 210px; }
+
+.tuning-editor {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px;
+  background: #00000030;
+}
+/* Wraps rather than scrolls: eight strings still fit two tidy rows on a phone. */
+.tuning-strings { display: flex; flex-wrap: wrap; gap: 5px; }
+.tuning-string {
+  display: flex; align-items: center; gap: 3px;
+  padding: 2px 4px; border: 1px solid var(--border-soft); border-radius: 6px;
+  background: #14110c;
+}
+.tuning-num { font-size: 9px; color: var(--text-dim); width: 8px; text-align: center; }
+.tuning-string button {
+  font: inherit; font-size: 12px; line-height: 1; width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; cursor: pointer; border-radius: 4px;
+  border: 1px solid var(--border-soft); background: var(--surface-2); color: var(--text);
+}
+.tuning-string button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.tuning-string button:disabled { opacity: 0.3; cursor: not-allowed; }
+/* Fixed width so the row does not jog as names change between "E2" and "A♯3". */
+.tuning-note {
+  font-size: 11px; font-weight: 600; min-width: 28px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.tuning-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tuning-readout { font-variant-numeric: tabular-nums; }

@@ -115,6 +115,15 @@ preset ids are read back correctly.
 The PDF follows suit — sections with lyrics print as a real chord-over-lyric chart, with each
 chord placed at the point in the line where it falls, rather than as a bar grid.
 
+**Tunings.** Twenty-two presets — standard and flattened, the dropped family, six open
+tunings, DADGAD and Orkney, plus 7- and 8-string, baritone and bass — or build your own, string by
+string, from four to eight strings anywhere in a playable range. Nothing in the voicing search, the
+neck or the chord boxes assumes six strings; they all read the tuning's length.
+
+A custom tuning is identified by its *notes* rather than by the word custom, which is what makes
+pinned shapes safe: retune one string and every shape found on the old tuning is quietly dropped
+rather than drawn against strings that now sound something else.
+
 **Pinned voicings.** The guitar shape you choose is remembered against that chord, survives
 leaving and returning to it, rides along in the share link, and is the shape drawn in the PDF.
 A shape is only valid in the tuning it was chosen in, so it is ignored rather than drawn wrong

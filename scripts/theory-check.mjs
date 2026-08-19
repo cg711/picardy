@@ -9,7 +9,7 @@ const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bas
 const { makeKey, romanNumeral, detectKey, scaleNotes } = await import(B + 'theory/keys.js')
 const { prettyName, noteName } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
-const { findVoicings, TUNINGS, voicingLabel } = await import(B + 'theory/guitar.js')
+const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
 const { identifyChord } = await import(B + 'theory/identify.js')
 const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
 const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete } = await import(B + 'theory/rhythm.js')
@@ -140,6 +140,44 @@ console.log('\n--- bass and inversion labels ---')
   eq('  plain C root position', inversionLabel(plain, 0), 'root position — C in the bass')
   eq('  plain C 1st inversion', inversionLabel(plain, 1), '1st inversion — E in the bass')
   eq('  plain C 2nd inversion', inversionShort(plain, 2), '2nd inv')
+}
+
+console.log('\n--- tunings ---')
+{
+  const ids = Object.keys(TUNINGS)
+  eq('  every tuning has a name and strings', ids.every((id) => TUNINGS[id].name && TUNINGS[id].strings.length >= 4), true)
+  eq('  and strings run low to high', ids.every((id) => TUNINGS[id].strings.every((m, i, a) => i === 0 || m >= a[i - 1])), true)
+  console.log(`     ${ids.length} presets, string counts: ${[...new Set(ids.map((id) => TUNINGS[id].strings.length))].sort().join(', ')}`)
+
+  // Every preset has to be able to voice a plain major triad, or it is not a
+  // usable tuning in this app whatever it is called.
+  const dead = ids.filter((id) => !findVoicings(parseChord('C'), { tuning: TUNINGS[id].strings, limit: 1 }).length)
+  eq('  every preset can voice a C major triad', dead.join(','), '')
+  // And something harder, on the extended-range ones especially.
+  const deadJazz = ids.filter((id) => !findVoicings(parseChord('Cmaj7'), { tuning: TUNINGS[id].strings, limit: 1 }).length)
+  eq('  and a Cmaj7', deadJazz.join(','), '')
+
+  // A seven-string grip really uses seven strings.
+  const seven = findVoicings(parseChord('C'), { tuning: TUNINGS.sevenString.strings, limit: 1 })[0]
+  eq('  a 7-string shape has 7 slots', seven.frets.length, 7)
+
+  // Custom tunings: normalisation, and the identity that guards pinned shapes.
+  eq('  a custom tuning is clamped to playable strings', normaliseTuning([0, 999, 45]).every((m) => m >= 24 && m <= 76), true)
+  eq('  and padded to at least four', normaliseTuning([40]).length >= 4, true)
+  eq('  and capped at eight', normaliseTuning(new Array(20).fill(40)).length, 8)
+
+  const keyA = tuningKey('custom', [40, 45, 50, 55, 59, 64])
+  const keyB = tuningKey('custom', [38, 45, 50, 55, 59, 64])
+  eq('  a preset keeps its own id', tuningKey('dropD', [1, 2]), 'dropD')
+  eq('  two different custom tunings get different keys', keyA === keyB, false)
+  eq('  and the key carries no colon', keyA.includes(':'), false)
+
+  // The point of that: retuning one string must not keep shapes found on the old
+  // tuning, since the same frets now sound different notes.
+  const shape = findVoicings(parseChord('C'), { tuning: [40, 45, 50, 55, 59, 64], limit: 1 })[0]
+  const stamped = encodeShape(shape, keyA)
+  eq('  a shape pinned under one custom tuning decodes there', decodeShape(stamped, keyA) !== null, true)
+  eq('  and is rejected after retuning a string', decodeShape(stamped, keyB), null)
 }
 
 console.log('\n--- inversions on guitar ---')

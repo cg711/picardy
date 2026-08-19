@@ -6,11 +6,14 @@ import { pcOf, prettyName, noteName } from './theory/notes.js'
 import { suggestNext, analyzeChord } from './theory/suggest.js'
 import { generateProgression, FLAVOURS } from './theory/generate.js'
 import { DURATIONS, DEFAULT_DURATION, DEFAULT_TIME_SIGNATURE, TIME_SIGNATURES, toBeats, timeSignatureOf, snapBeat, MIN_BEATS } from './theory/rhythm.js'
-import { transposeChord, transposeKey } from './theory/transpose.js'
+import { transposeChord, transposeKey, keyPrefersFlats } from './theory/transpose.js'
 import { optimiseInversions, progressionMovement } from './theory/voicelead.js'
 import { scalesForChord, guideTones, commonTones } from './theory/scales.js'
 import { reharmonise } from './theory/reharm.js'
-import { findVoicings, TUNINGS, voicingLabel, encodeShape, decodeShape, shapeFromFrets } from './theory/guitar.js'
+import {
+  findVoicings, TUNINGS, voicingLabel, encodeShape, decodeShape, shapeFromFrets,
+  CUSTOM_TUNING, tuningKey, normaliseTuning,
+} from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
 import { playChord, playProgression, stopPlayback, setVolume, resumeAudio, PATTERNS } from './audio/synth.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
@@ -26,6 +29,7 @@ import {
 
 import { Lockup } from './brand/Mark.jsx'
 import KeyPicker from './components/KeyPicker.jsx'
+import TuningPicker from './components/TuningPicker.jsx'
 import ProgressionBar from './components/ProgressionBar.jsx'
 import Piano from './components/Piano.jsx'
 import Fretboard, { ChordBox } from './components/Fretboard.jsx'
@@ -91,7 +95,10 @@ export default function App() {
   // shut. Mirrors how the chord sidebar targets a gap in the strip.
   const [addSectionAt, setAddSectionAt] = useState(null)
 
-  const [tuningId, setTuningId] = useState('standard')
+  const [tuningId, setTuningId] = useState(() => loadPrefs().tuningId ?? 'standard')
+  // The notes behind 'custom'. Kept separately from tuningId so switching to a
+  // preset and back does not lose what you built.
+  const [customStrings, setCustomStrings] = useState(() => normaliseTuning(loadPrefs().customStrings ?? TUNINGS.standard.strings))
   const [lefty, setLefty] = useState(() => !!loadPrefs().lefty)
   const [showAllTones, setShowAllTones] = useState(true)
   const [voicingPick, setVoicingPick] = useState(null)
@@ -129,7 +136,10 @@ export default function App() {
     activeIndexRef.current = activeIndex
   }, [activeIndex])
 
-  const tuning = TUNINGS[tuningId].strings
+  const tuning = tuningId === CUSTOM_TUNING ? customStrings : (TUNINGS[tuningId]?.strings ?? TUNINGS.standard.strings)
+  // What a pinned shape is stamped with. For a custom tuning this is its notes,
+  // so retuning one string correctly invalidates shapes found on the old one.
+  const shapeTuningKey = tuningKey(tuningId, customStrings)
 
   // --- undo / redo -----------------------------------------------------------
   //
@@ -234,9 +244,9 @@ export default function App() {
   // in the tuning it was chosen in.
   const storedShape = useMemo(() => {
     if (preview || focusIndex < 0) return null
-    const frets = decodeShape(shapes[focusIndex], tuningId)
+    const frets = decodeShape(shapes[focusIndex], shapeTuningKey)
     return frets ? shapeFromFrets(frets, tuning) : null
-  }, [shapes, focusIndex, tuningId, tuning, preview])
+  }, [shapes, focusIndex, shapeTuningKey, tuning, preview])
 
   const shape = voicingPick ?? storedShape ?? shownShapes[0] ?? null
   const displayKey = playbackKey ?? musicKey
@@ -964,7 +974,7 @@ export default function App() {
               canRedo={canRedo}
               hideWhenEmpty={editorView !== 'chips'}
               shapes={shapes}
-              tuningId={tuningId}
+              tuningId={shapeTuningKey}
               durations={durations}
               timeSignature={timeSignature}
               onClear={() => {
@@ -1090,11 +1100,25 @@ export default function App() {
             <>
             <div className="sub-head">
               <div className="fb-controls">
-                <select value={tuningId} onChange={(e) => setTuningId(e.target.value)}>
-                  {Object.entries(TUNINGS).map(([id, t]) => (
-                    <option key={id} value={id}>{t.name}</option>
-                  ))}
-                </select>
+                <TuningPicker
+                  tuningId={tuningId}
+                  strings={tuning}
+                  customStrings={customStrings}
+                  preferFlats={keyPrefersFlats(musicKey)}
+                  onSelect={(id) => {
+                    setTuningId(id)
+                    savePref('tuningId', id)
+                  }}
+                  onCustom={(next) => {
+                    const clean = normaliseTuning(next)
+                    setCustomStrings(clean)
+                    savePref('customStrings', clean)
+                    if (tuningId !== CUSTOM_TUNING) {
+                      setTuningId(CUSTOM_TUNING)
+                      savePref('tuningId', CUSTOM_TUNING)
+                    }
+                  }}
+                />
                 <div className="hand-toggle" role="group" aria-label="Handedness">
                   {[[false, 'Right'], [true, 'Left']].map(([value, text]) => (
                     <button
@@ -1172,7 +1196,7 @@ export default function App() {
                           setShapes((sh) => {
                             const next = [...sh]
                             while (next.length < progression.length) next.push(null)
-                            next[focusIndex] = encodeShape(s, tuningId)
+                            next[focusIndex] = encodeShape(s, shapeTuningKey)
                             return next
                           })
                         }
@@ -1328,7 +1352,7 @@ export default function App() {
           onCancel={() => setExporting(false)}
           onExport={({ title, instrument }) => {
             setSongTitle(title)
-            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId, lefty })
+            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId: shapeTuningKey, lefty })
             setExporting(false)
           }}
         />
