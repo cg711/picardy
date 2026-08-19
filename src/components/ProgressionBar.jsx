@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { chordSymbol, chordNotes, inversionLabel, inversionShort, bassOf } from '../theory/chords.js'
 import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
@@ -36,10 +36,25 @@ export default function ProgressionBar({
   // These have to sit above the empty-state return: hooks must run in the same
   // order on every render, and clearing the progression would otherwise change
   // how many are called.
-  // No scroll-into-view any more: the strip wraps, so every chip is already on
-  // screen. Scrolling the *page* to the focused chip instead would yank the view
-  // on every chord change during playback, which is worse than not scrolling.
   const stripRef = useRef(null)
+  const focused = playingIndex >= 0 ? playingIndex : activeIndex
+  useEffect(() => {
+    // Keep the chord being played (or edited) in view — on a long progression
+    // the strip would otherwise leave it scrolled off the end.
+    //
+    // Query by class rather than indexing children: the strip interleaves insert
+    // slots between the chips, so child index and chord index are not the same
+    // number any more.
+    const strip = stripRef.current
+    const chip = strip?.querySelectorAll('.prog-chip')?.[focused]
+    if (!strip || !chip) return
+    const left = chip.offsetLeft - strip.offsetLeft
+    const right = left + chip.offsetWidth
+    if (left < strip.scrollLeft) strip.scrollTo({ left: left - 12, behavior: 'smooth' })
+    else if (right > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollTo({ left: right - strip.clientWidth + 12, behavior: 'smooth' })
+    }
+  }, [focused])
 
   // In the lyric view the chips are hidden, so the empty-state prompt would be
   // a second, contradictory one.
