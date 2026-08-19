@@ -422,18 +422,33 @@ select { cursor: pointer; }
 .sug:hover { border-color: var(--border); }
 .sug.open { border-color: #4d4335; background: #241e17; }
 
+/* One layout, because there is only one place this list appears: the add-a-chord
+   sidebar, which is about 412px wide whatever the window is doing. It used to
+   carry a wide four-column layout with a viewport media query to undo it, and
+   that query stopped describing the component the moment it moved into a panel —
+   on a wide screen the row kept the wide layout and squeezed the category column
+   from the 123px "Secondary leading-tone" needs down to 95px. */
 .sug-main {
   display: grid;
-  grid-template-columns: minmax(120px, 1.3fr) minmax(90px, auto) 72px auto;
-  gap: 10px; align-items: center; padding: 7px 10px; cursor: pointer;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'ident buttons' 'cat cat' 'score score';
+  gap: 6px 10px; align-items: center; padding: 7px 10px; cursor: pointer;
 }
+.sug-ident { grid-area: ident; }
+.sug-cat { grid-area: cat; justify-self: start; }
+.sug-score { grid-area: score; }
+.sug-buttons { grid-area: buttons; }
 .sug-ident { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 .sug-roman { color: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .sug-symbol { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sug-cat {
   font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 1px solid transparent;
   white-space: nowrap; text-align: center;
+  /* Last resort if a label still cannot fit: shorten it visibly rather than let
+     it spill past the pill's own border. */
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
+
 .sug-score { height: 5px; border-radius: 3px; background: #14110c; overflow: hidden; }
 .sug-score span { display: block; height: 100%; background: linear-gradient(90deg, #8a5a12, var(--accent)); }
 .sug-buttons { display: flex; gap: 4px; }
@@ -449,13 +464,7 @@ select { cursor: pointer; }
   background: #14110c; border: 1px solid var(--border);
 }
 
-@media (max-width: 620px) {
-  .sug-main { grid-template-columns: 1fr auto; grid-template-areas: 'ident buttons' 'cat cat' 'score score'; }
-  .sug-ident { grid-area: ident; }
-  .sug-cat { grid-area: cat; justify-self: start; }
-  .sug-score { grid-area: score; }
-  .sug-buttons { grid-area: buttons; }
-}
+
 
 /* ---------- chord detail ---------- */
 
