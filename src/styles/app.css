@@ -823,8 +823,11 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 /* ---------- analysis panel ---------- */
 
-.p-analysis { display: flex; flex-direction: column; gap: 10px; }
-.p-analysis .empty-note {
+/* .panel carries no padding of its own — each body supplies it, and 12px 14px
+   is what the others use (see .chord-detail). The map, the legend and the
+   observations all line up on that same edge as a result. */
+.analysis-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.analysis-body .empty-note {
   margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
   padding: 14px; border: 1px dashed var(--border); border-radius: 8px; text-align: center;
 }

@@ -69,10 +69,12 @@ export default function AnalysisPanel({
         <div className="panel-head">
           <h2>Analysis</h2>
         </div>
-        <p className="empty-note">
-          Add a couple of chords and Picardy will read them back to you — the key
-          they imply, what each chord is doing, and how the phrase closes.
-        </p>
+        <div className="analysis-body">
+          <p className="empty-note">
+            Add a couple of chords and Picardy will read them back to you — the key
+            they imply, what each chord is doing, and how the phrase closes.
+          </p>
+        </div>
       </div>
     )
   }
@@ -90,65 +92,67 @@ export default function AnalysisPanel({
         </span>
       </div>
 
-      {/* The set key drives the numerals, so when the chords point somewhere
-          else that has to be said out loud — otherwise every numeral below is
-          quietly measured from the wrong tonic. */}
-      {mismatch && (
-        <div className="key-mismatch">
-          <span>
-            These chords read more like <strong>{keyName(detected)}</strong>.
-          </span>
-          {onUseKey && (
-            <button className="btn tiny" onClick={() => onUseKey(detected)}>
-              Read in {keyName(detected)}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* The function map. Colour carries the harmonic function, so the shape of
-          the phrase — tension gathering and releasing — is visible before you
-          read a word of it. */}
-      <div className="fn-map" role="list">
-        {analysis.chords.map((c, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && (
-              <span className="fn-motion" aria-hidden="true">
-                {motions[i]}
-              </span>
+      <div className="analysis-body">
+        {/* The set key drives the numerals, so when the chords point somewhere
+            else that has to be said out loud — otherwise every numeral below is
+            quietly measured from the wrong tonic. */}
+        {mismatch && (
+          <div className="key-mismatch">
+            <span>
+              These chords read more like <strong>{keyName(detected)}</strong>.
+            </span>
+            {onUseKey && (
+              <button className="btn tiny" onClick={() => onUseKey(detected)}>
+                Read in {keyName(detected)}
+              </button>
             )}
-            <button
-              role="listitem"
-              className={`fn-cell fn-${c.fn}${i === focused ? ' on' : ''}${c.diatonic ? '' : ' chromatic'}`}
-              onClick={() => onSelect(i)}
-              title={`${c.symbol} — ${FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
-            >
-              <span className="fn-roman">{c.roman}</span>
-              <span className="fn-sym">{c.symbol}</span>
-              {cadences[i] && (
-                <span className="fn-cadence" title={cadences[i].label}>
-                  {cadences[i].label.replace(/ cadence$/, '')}
+          </div>
+        )}
+
+        {/* The function map. Colour carries the harmonic function, so the shape
+            of the phrase — tension gathering and releasing — is visible before
+            you read a word of it. */}
+        <div className="fn-map" role="list">
+          {analysis.chords.map((c, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && (
+                <span className="fn-motion" aria-hidden="true">
+                  {motions[i]}
                 </span>
               )}
-            </button>
-          </React.Fragment>
-        ))}
-      </div>
-
-      <div className="fn-legend">
-        {['T', 'PD', 'D'].map((f) => (
-          <span key={f} className={`fn-key fn-${f}`}>{FN_LABEL[f]}</span>
-        ))}
-        <span className="fn-key chromatic">chromatic</span>
-      </div>
-
-      {analysis.observations.length > 0 && (
-        <ul className="observations">
-          {analysis.observations.map((o, i) => (
-            <li key={i} className={`obs obs-${o.kind}`}>{o.text}</li>
+              <button
+                role="listitem"
+                className={`fn-cell fn-${c.fn}${i === focused ? ' on' : ''}${c.diatonic ? '' : ' chromatic'}`}
+                onClick={() => onSelect(i)}
+                title={`${c.symbol} — ${FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
+              >
+                <span className="fn-roman">{c.roman}</span>
+                <span className="fn-sym">{c.symbol}</span>
+                {cadences[i] && (
+                  <span className="fn-cadence" title={cadences[i].label}>
+                    {cadences[i].label.replace(/ cadence$/, '')}
+                  </span>
+                )}
+              </button>
+            </React.Fragment>
           ))}
-        </ul>
-      )}
+        </div>
+
+        <div className="fn-legend">
+          {['T', 'PD', 'D'].map((f) => (
+            <span key={f} className={`fn-key fn-${f}`}>{FN_LABEL[f]}</span>
+          ))}
+          <span className="fn-key chromatic">chromatic</span>
+        </div>
+
+        {analysis.observations.length > 0 && (
+          <ul className="observations">
+            {analysis.observations.map((o, i) => (
+              <li key={i} className={`obs obs-${o.kind}`}>{o.text}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
