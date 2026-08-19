@@ -14,14 +14,42 @@ const SONG_KEY = 'picardy.song.v1'
 
 export const SEGMENT_NAMES = ['Intro', 'Verse', 'Pre-chorus', 'Chorus', 'Bridge', 'Solo', 'Outro']
 
-/** Colour per section type, so the arrangement is readable at a glance. */
-export function segmentHue(name) {
+/**
+ * Colour per section, so the arrangement is readable at a glance.
+ *
+ * A stored `hue` wins: the derived colour is only a starting point, and once
+ * somebody has deliberately picked one it should survive a rename.
+ */
+export function segmentHue(segment) {
+  if (segment && typeof segment === 'object') {
+    if (Number.isFinite(segment.hue)) return segment.hue
+    return hueFromName(segment.name ?? '')
+  }
+  return hueFromName(String(segment ?? ''))
+}
+
+function hueFromName(name) {
   const known = SEGMENT_NAMES.indexOf(name.replace(/\s*\d+$/, ''))
   if (known >= 0) return [200, 152, 42, 320, 268, 60, 12][known] ?? 200
   // Stable hue for a custom name.
   let h = 0
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360
   return h
+}
+
+/** The palette offered in the chip's colour picker. */
+export const SEGMENT_HUES = [200, 152, 42, 320, 268, 60, 12, 96, 240, 176]
+
+/**
+ * A short "C – Am – F" for a chip, so a section is recognisable without opening
+ * it. Long sections are elided in the middle: the first chords and the last one
+ * are what identify a part, and the middle is what makes it too long to read.
+ */
+export function chordFlow(segment, max = 4) {
+  const chords = segment?.chords ?? []
+  if (!chords.length) return ''
+  if (chords.length <= max) return chords.join(' – ')
+  return `${chords.slice(0, max - 1).join(' – ')} … ${chords[chords.length - 1]}`
 }
 
 const uid = () => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`

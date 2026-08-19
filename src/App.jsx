@@ -32,6 +32,7 @@ import Fretboard, { ChordBox } from './components/Fretboard.jsx'
 import Transport from './components/Transport.jsx'
 import Arrangement, { SaveSectionRow } from './components/Arrangement.jsx'
 import AddChordDialog from './components/AddChordDialog.jsx'
+import AddSectionDialog from './components/AddSectionDialog.jsx'
 import ExportDialog from './components/ExportDialog.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
@@ -74,6 +75,12 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false)
   // Instruments show one at a time now, so this is which one.
   const [instrument, setInstrument] = useState('piano')
+  // Name of the section just saved, shown briefly as confirmation.
+  const [savedNote, setSavedNote] = useState(null)
+  const savedTimer = useRef(null)
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
+  // Whether the "add a section to the song" sidebar is open.
+  const [addSectionOpen, setAddSectionOpen] = useState(false)
 
   const [tuningId, setTuningId] = useState('standard')
   const [lefty, setLefty] = useState(() => !!loadPrefs().lefty)
@@ -585,8 +592,9 @@ export default function App() {
 
   const saveSegment = (baseName) => {
     if (!progression.length) return
+    const name = uniqueName((baseName || '').trim() || 'Section', segments)
     const segment = makeSegment({
-      name: uniqueName(baseName, segments),
+      name,
       key: musicKey,
       progression,
       inversions,
@@ -597,6 +605,15 @@ export default function App() {
       lyricLines,
     })
     setSegments((list) => [...list, segment])
+    // Saving is otherwise silent — the section lands in a tab you may not be
+    // looking at, so without this there is nothing at all to tell you it worked.
+    setSavedNote(name)
+    clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => setSavedNote(null), 2600)
+  }
+
+  const setSegmentHue = (id, hue) => {
+    setSegments((list) => list.map((s) => (s.id === id ? { ...s, hue } : s)))
   }
 
   const loadSegment = (id) => {
@@ -796,7 +813,7 @@ export default function App() {
               {[
                 ['chips', 'Chords'],
                 ['lyrics', 'Lyrics & timing'],
-                ['sections', 'Sections & song'],
+                ['sections', 'Song structure'],
               ].map(([id, label]) => (
                 <button key={id} className={editorView === id ? 'on' : ''} onClick={() => setEditorView(id)}>
                   {label}
@@ -849,7 +866,8 @@ export default function App() {
                 onLoad={loadSegment}
                 onRename={renameSegment}
                 onDeleteSegment={deleteSegment}
-                onAddToSong={addToSong}
+                onOpenAddSection={() => setAddSectionOpen(true)}
+                onSetHue={setSegmentHue}
                 onSetRepeats={setRepeats}
                 onMoveEntry={moveEntry}
                 onRemoveEntry={removeEntry}
@@ -927,7 +945,7 @@ export default function App() {
                 Still outside the Sections tab on purpose: it acts on the
                 progression, not on the library, so it should not hide behind the
                 tab that lists what you have already saved. */}
-            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} />
+            <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} savedNote={savedNote} />
           </div>
 
           {/* Its own panel directly under the progression, rather than inside the
@@ -1221,6 +1239,13 @@ export default function App() {
         selection={selection}
         onClearNotes={() => setSelection(new Set())}
         identified={identified}
+      />
+
+      <AddSectionDialog
+        open={addSectionOpen}
+        onClose={() => setAddSectionOpen(false)}
+        segments={segments}
+        onAdd={addToSong}
       />
 
       {exporting && (

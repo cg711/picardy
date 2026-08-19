@@ -1100,3 +1100,95 @@ a.brand { text-decoration: none; color: inherit; }
    pointer events, so the fill has to exist and be transparent. */
 .fret-hits circle { fill: #ffffff00; cursor: pointer; }
 .picked-note > circle:first-child { fill: var(--tone-ext); opacity: 0.85; }
+
+/* ---------- song chips ---------- */
+
+/* Same shape and behaviour as the chord strip: arranging sections is the same
+   act as arranging chords, one level up, so it should not look like a different
+   mechanism. */
+.song-strip {
+  display: flex; align-items: stretch; gap: 8px;
+  overflow-x: auto; padding: 11px 14px 8px;
+}
+.song-chip {
+  position: relative;
+  flex: 0 0 auto;
+  width: 158px;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 8px;
+  border: 1px solid;
+  border-radius: 9px;
+}
+.song-chip.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
+.song-pos {
+  position: absolute; top: -9px; left: 8px;
+  font-size: 10px; padding: 1px 6px; border-radius: 5px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--text-dim);
+}
+.song-chip-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; }
+.song-name { font-size: 14px; font-weight: 600; }
+/* The chords themselves, so a chip says what it is without being opened. */
+.song-flow {
+  font-size: 12px; color: var(--text); opacity: 0.82;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.song-chip-meta { font-size: 10.5px; color: var(--text-dim); }
+.song-chip-controls { display: flex; align-items: center; gap: 4px; }
+.song-chip-controls button {
+  font: inherit; font-size: 12px; line-height: 1; padding: 3px 7px; cursor: pointer;
+  border: 1px solid var(--border-soft); border-radius: 5px;
+  background: #00000030; color: inherit;
+}
+.song-chip-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+.song-repeats { display: flex; align-items: center; gap: 2px; font-size: 11px; margin-left: auto; }
+.song-repeats input {
+  width: 38px; font: inherit; font-size: 11px; padding: 2px 4px;
+  background: #00000030; border: 1px solid var(--border-soft); border-radius: 5px; color: inherit;
+}
+.song-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px; }
+.song-actions .btn { white-space: nowrap; }
+
+/* ---------- section colours ---------- */
+
+.hue-wrap { position: relative; display: inline-flex; }
+.hue-swatch {
+  width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid #00000060; cursor: pointer;
+}
+.hue-picker {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;
+  padding: 7px; border-radius: 9px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  box-shadow: 0 14px 34px #00000090;
+}
+.hue-dot {
+  width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+}
+.hue-dot.on { border-color: var(--ink); }
+
+/* ---------- saving a section ---------- */
+
+.section-name { width: 150px; }
+.saved-note {
+  font-size: 12px; color: #7ee2a8; font-weight: 600;
+  animation: saved-in 160ms ease-out;
+}
+@keyframes saved-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .saved-note { animation: none; } }
+
+/* ---------- pick-a-section list ---------- */
+
+.pick-list { list-style: none; margin: 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 7px; }
+.pick-list button {
+  width: 100%; text-align: left; font: inherit; cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 4px 9px; align-items: baseline;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--text);
+}
+.pick-list button:hover { background: #322a20; }
+.pick-dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; }
+.pick-name { font-weight: 600; }
+.pick-meta { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.pick-flow { grid-column: 2 / -1; font-size: 12px; color: var(--text-dim); }
