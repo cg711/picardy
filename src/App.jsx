@@ -16,9 +16,10 @@ import {
 } from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
 import { playChord, playProgression, stopPlayback, setVolume, resumeAudio } from './audio/synth.js'
+import { isBand } from './audio/styles.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
 import {
-  decodeState, writeHash, shareUrl, loadHistory, saveToHistory, clearHistory, historyToState,
+  decodeState, encodeState, writeHash, shareUrl, loadHistory, saveToHistory, clearHistory, historyToState,
   loadPrefs, savePref,
 } from './lib/share.js'
 import { toneColor } from './lib/colors.js'
@@ -44,12 +45,13 @@ import ReharmPanel from './components/ReharmPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, linkProps } from './lib/router.js'
-import { legacyToolPath, pageFor } from './lib/routes.js'
+import { legacyToolPath, pageFor, BACKING_PATH } from './lib/routes.js'
 import Menu from './components/Menu.jsx'
 import SiteFooter from './components/SiteFooter.jsx'
 import LegalPage from './pages/LegalPage.jsx'
 import ExercisesPage from './pages/ExercisesPage.jsx'
 import HomePage from './pages/HomePage.jsx'
+import BackingPage from './pages/BackingPage.jsx'
 
 // Before anything reads the URL: a shared progression that arrives at '/' is
 // forwarded to the tool, carrying its fragment. Every link ever generated points
@@ -860,8 +862,9 @@ export default function App() {
           </div>
         </header>
         {route === 'home' ? <HomePage />
-          : route === 'exercises' ? <ExercisesPage />
-            : <LegalPage route={route} />}
+          : route === 'backing' ? <BackingPage />
+            : route === 'exercises' ? <ExercisesPage />
+              : <LegalPage route={route} />}
         <SiteFooter route={route} />
       </div>
     )
@@ -879,6 +882,20 @@ export default function App() {
             on. Share stays: it copies a link to the whole app state, not to one
             panel, so a bar that lyrics the app is where it belongs. */}
         <div className="topbar-right">
+          {/* A real load, not an in-app link: the player reads the whole track
+              from the hash once, on mount. */}
+          <a
+            className={`btn ghost${progression.length ? '' : ' disabled'}`}
+            href={progression.length
+              // A backing track with no band is not a backing track, so a
+              // chord-only style does not travel — the player opens on a band.
+              ? `${BACKING_PATH}#${encodeState({ key: musicKey, progression, inversions, durations, timeSignature, bpm, style: isBand(pattern) ? pattern : 'pop' })}`
+              : BACKING_PATH}
+            aria-disabled={progression.length ? undefined : 'true'}
+            title="Open this progression as a backing track to play over"
+          >
+            Backing track
+          </a>
           <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
           </button>
@@ -890,7 +907,7 @@ export default function App() {
         <section className="col col-left">
           <div className="panel p-progression">
             <div className="panel-head">
-              <h2>Progression tool</h2>
+              <h2>Studio</h2>
             </div>
 
             {/* Both of these read or rewrite the progression below: which key the

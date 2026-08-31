@@ -115,6 +115,20 @@ harmony by beat rather than by index. The bass reads `bassOf`, so a slash chord 
 note down there rather than the root. Fills land in the bar before each section change and before
 the loop comes round, with a crash on the downbeat after.
 
+The player lives at `/backing`, decoupled from the studio on purpose: it exists to be followed while
+your hands are busy, so the chart is large, the current bar is unmissable, and nothing is editable.
+The whole track arrives in the URL — `encodeState` carries tempo and style alongside the chords —
+which means the link is also the save button. `Backing track` in the studio's top bar opens the
+current progression there, forcing a band style if the studio was on a chord-only one.
+
+Looping is sample-accurate. A loop that re-arms *at* the end never is: the timer fires late and the
+next pass starts relative to whenever that happened. `runPass` instead schedules the following pass
+a quarter-second early against the exact AudioContext time the current one ends, so the join is
+placed before it is needed. Measured at 120bpm over a 16-beat loop, events land at 7.75s, exactly
+8.0000s, then 8.25s — the same spacing across the boundary as everywhere else. Tempo and style are
+read once per pass through a `settings` callback rather than captured at play time, so nudging
+either lands next time round instead of restarting and losing your place.
+
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
@@ -243,8 +257,9 @@ a minimum ΔE from the accent and from every other tone. Retune those by the num
 
 ## Pages
 
-`/` is the landing page — what Picardy is, the tools, and links into them. `/tool` is the
-progression tool, `/exercises` the drills, `/privacy` and `/terms` the legal text. The menu in the
+`/` is the landing page — what Picardy is, the tools, and links into them. `/tool` is the studio,
+`/backing` the backing-track player, `/exercises` the drills, `/privacy` and `/terms` the legal
+text. The menu in the
 top bar and the footer are both generated from `PAGES` in `src/lib/routes.js`, so a new page appears
 in both by adding one entry.
 
@@ -380,6 +395,7 @@ src/
     Mark.jsx      the mark and the lockup
   pages/
     HomePage.jsx  the landing page at /
+    BackingPage.jsx    the backing-track player at /backing
     site.js       the operator/contact/jurisdiction the legal pages need
     Privacy.jsx   privacy policy — draft, describes the app's actual behaviour
     Terms.jsx     terms of service — draft

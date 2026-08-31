@@ -1012,6 +1012,97 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 a.brand { text-decoration: none; color: inherit; }
 
+/* ---------- backing tracks ---------- */
+
+.backing {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 18px 16px 28px;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.backing-empty { padding: 40px 0; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.backing-empty h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0; }
+.backing-empty p { margin: 0; max-width: 56ch; font-size: 14px; line-height: 1.65; color: var(--text-dim); }
+
+.backing-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bk-meta { display: flex; gap: 14px; font-size: 12px; color: var(--text-dim); }
+.bk-key { color: var(--accent); font-weight: 600; }
+.bk-links { margin-left: auto; display: flex; gap: 8px; }
+.bk-links .btn { text-decoration: none; }
+
+/* The readout. Sized to be legible from wherever the instrument is, which is
+   the whole reason this page is not just the studio with the panels hidden. */
+.bk-now {
+  display: flex; align-items: baseline; gap: 28px; flex-wrap: wrap;
+  padding: 22px 24px; border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  transition: border-color 160ms;
+}
+.bk-now.live { border-color: var(--accent); }
+.bk-current { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+.bk-current strong { font-size: clamp(40px, 9vw, 68px); line-height: 1; letter-spacing: -0.03em; }
+.bk-next { display: flex; align-items: baseline; gap: 10px; margin-left: auto; opacity: 0.65; }
+.bk-next strong { font-size: clamp(20px, 4vw, 30px); line-height: 1; letter-spacing: -0.02em; }
+.bk-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); }
+.bk-roman { font-size: 15px; color: var(--accent); }
+
+/* The chart. auto-fill rather than a fixed count so a long track keeps four
+   bars to a line on a laptop and two on a phone, like a real lead sheet. */
+.bk-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.bk-bar {
+  position: relative;
+  min-height: 66px;
+  padding: 20px 10px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: #ffffff05;
+  transition: background 120ms, border-color 120ms;
+}
+.bk-bar.on { border-color: var(--accent); background: #4a351226; }
+.bk-barnum {
+  position: absolute; top: 6px; left: 9px;
+  font-size: 10px; color: var(--text-dim);
+}
+.bk-barchords { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.bk-cell { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: #d8d0c4; }
+.bk-cell.on { color: var(--accent); }
+.bk-cell.tied { opacity: 0.4; font-weight: 400; }
+
+.bk-transport {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border-soft); background: #ffffff05;
+}
+.bk-play { min-width: 104px; font-size: 14.5px; padding: 9px 16px; }
+.bk-tempo { flex: 1 1 200px; }
+.bk-tempo input { flex: 1 1 auto; }
+.bk-tempo output { min-width: 30px; font-size: 12px; color: var(--text-dim); text-align: right; }
+.bk-hint { margin: 0; font-size: 12px; color: var(--text-dim); }
+.backing kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em;
+  background: #ffffff0d; border: 1px solid var(--border); border-bottom-width: 2px;
+  padding: 0 4px; border-radius: 4px; color: var(--text);
+}
+
+/* An anchor styled as a button still needs to look unavailable when it is. */
+.btn.disabled { opacity: 0.4; pointer-events: none; }
+
+@media (max-width: 560px) {
+  .bk-now { gap: 14px; padding: 16px; }
+  .bk-next { margin-left: 0; }
+  .bk-chart { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .bk-play { flex: 1 1 100%; }
+}
+
 /* ---------- landing ---------- */
 
 .home {

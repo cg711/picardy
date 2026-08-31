@@ -45,7 +45,7 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, bpm, style }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
@@ -61,6 +61,11 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
   if (leadIns?.some((l) => l && l.trim())) params.set('w', leadIns.map((l) => l ?? '').join('~'))
   if (lyrics?.some((l) => l && l.trim())) params.set('y', lyrics.map((l) => l ?? '').join('~'))
   if (lines?.some((n) => n)) params.set('n', lines.join(','))
+  // Playback settings, so a backing-track link arrives at the right tempo and
+  // feel. Only written when set, so an ordinary chord link stays as short as it
+  // was and every link ever shared still decodes.
+  if (bpm) params.set('b', String(Math.round(bpm)))
+  if (style) params.set('s', style)
 
   return params.toString()
 }
@@ -110,6 +115,8 @@ export function decodeState(hash) {
     shapes: progression.map((_, i) => shapes[i] || null),
     leadIns,
     lyrics: progression.map((_, i) => lyrics[i] ?? ''),
+    bpm: params.get('b') ? Math.min(300, Math.max(30, parseInt(params.get('b'), 10) || 0)) || null : null,
+    style: params.get('s') || null,
   }
 }
 

@@ -344,24 +344,31 @@ function scheduleChords(items, o) {
   return cursor
 }
 
-export function playProgression(items, {
-  bpm = 84,
-  timbre = 'piano',
-  strum = 0.012,
-  pattern = 'block',
-  countIn = 0,
-  beatsPerBar = 4,
-  timeSignature = null,
-  loop = false,
-  onStep,
-  onDone,
-  sectionStartBeats = [],
-} = {}) {
-  ensureContext()
-  resumeAudio()
-  stopPlayback()
+/**
+ * How far ahead of the end the next pass is scheduled, in seconds.
+ *
+ * A loop that re-arms *at* the end is never seamless: the timer fires late, and
+ * the new pass then starts relative to whenever that happened. Scheduling early
+ * against an explicit start time means the next downbeat is placed in
+ * AudioContext time before the current pass has finished sounding, so the join
+ * is sample-accurate rather than merely quick.
+ */
+const LOOP_LOOKAHEAD = 0.25
+
+function runPass(items, opts, startAt) {
+  // `settings` is consulted once per pass rather than captured at play time, so
+  // a tempo nudge or a style change lands on the next time round instead of
+  // being ignored until playback is restarted. Restarting would be the worse
+  // instrument: you would lose your place every time you touched the tempo.
+  const live = typeof opts.settings === 'function' ? (opts.settings() ?? {}) : {}
+  const {
+    timbre, strum, countIn, beatsPerBar,
+    timeSignature, loop, onStep, onDone, sectionStartBeats,
+  } = opts
+  const bpm = live.bpm ?? opts.bpm
+  const pattern = live.pattern ?? opts.pattern
   const secondsPerBeat = 60 / bpm
-  let start = ctx.currentTime + 0.08
+  let start = startAt
 
   if (countIn > 0) {
     for (let i = 0; i < countIn; i++) {
@@ -372,23 +379,41 @@ export function playProgression(items, {
 
   const ts = timeSignature ?? { beatsPerBar, top: beatsPerBar, bottom: 4 }
   const style = styleOf(pattern)
-  const cursor = style.band
+  const end = style.band
     ? scheduleBand(items, { start, secondsPerBeat, timbre, styleId: pattern, ts, onStep, sectionStartBeats })
     : scheduleChords(items, { start, secondsPerBeat, timbre, pattern, strum, onStep })
 
-  const endsIn = Math.max(0, (cursor - ctx.currentTime) * 1000)
-  playbackTimer = setTimeout(() => {
-    if (loop) {
-      // Re-arm rather than scheduling the whole loop up front, so tempo and
-      // style changes take effect on the next pass and Stop always works.
-      playProgression(items, {
-        bpm, timbre, strum, pattern, countIn: 0, beatsPerBar, timeSignature,
-        loop, onStep, onDone, sectionStartBeats,
-      })
-    } else {
-      onDone && onDone()
-    }
-  }, endsIn)
+  if (loop) {
+    // Re-arm one pass at a time rather than scheduling the whole loop up front,
+    // so tempo and style changes take effect on the next pass and Stop always
+    // works — but arm it early, and hand it the exact time this pass ends.
+    const fireIn = Math.max(0, (end - LOOP_LOOKAHEAD - ctx.currentTime) * 1000)
+    playbackTimer = setTimeout(() => runPass(items, { ...opts, countIn: 0 }, end), fireIn)
+  } else {
+    playbackTimer = setTimeout(() => onDone && onDone(), Math.max(0, (end - ctx.currentTime) * 1000))
+  }
+  return end
+}
+
+export function playProgression(items, opts = {}) {
+  ensureContext()
+  resumeAudio()
+  stopPlayback()
+  runPass(items, {
+    bpm: 84,
+    timbre: 'piano',
+    strum: 0.012,
+    pattern: 'block',
+    countIn: 0,
+    beatsPerBar: 4,
+    timeSignature: null,
+    loop: false,
+    onStep: undefined,
+    onDone: undefined,
+    sectionStartBeats: [],
+    settings: null,
+    ...opts,
+  }, ctx.currentTime + 0.08)
 }
 
 export function isAudioReady() {

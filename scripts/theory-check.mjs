@@ -987,6 +987,7 @@ console.log('\n--- routes ---')
   eq('  /terms', routeFor('/terms'), 'terms')
   // A trailing slash is the same page — hosts and hand-typed URLs disagree about it.
   eq('  /exercises', routeFor('/exercises'), 'exercises')
+  eq('  /backing', routeFor('/backing'), 'backing')
   eq('  /privacy/ is the same page', routeFor('/privacy/'), 'privacy')
   eq('  unknown paths fall back to the front page', routeFor('/nope'), 'home')
 

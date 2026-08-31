@@ -11,7 +11,8 @@
 
 export const PAGES = [
   { path: '/', route: 'home', label: 'Home', title: 'Picardy — chord progressions, explained' },
-  { path: '/tool', route: 'app', label: 'Progression tool', title: 'Progression tool — Picardy' },
+  { path: '/tool', route: 'app', label: 'Studio', title: 'Studio — Picardy' },
+  { path: '/backing', route: 'backing', label: 'Backing tracks', title: 'Backing tracks — Picardy' },
   { path: '/exercises', route: 'exercises', label: 'Exercises', title: 'Exercises — Picardy' },
   { path: '/privacy', route: 'privacy', label: 'Privacy', title: 'Privacy — Picardy' },
   { path: '/terms', route: 'terms', label: 'Terms', title: 'Terms — Picardy' },
@@ -19,6 +20,7 @@ export const PAGES = [
 
 /** Where the tool lives. Referenced by name so moving it is one edit, not twelve. */
 export const TOOL_PATH = '/tool'
+export const BACKING_PATH = '/backing'
 
 /** Anything unrecognised lands on the front page rather than a blank tool. */
 export function routeFor(pathname) {

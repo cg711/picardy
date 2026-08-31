@@ -256,13 +256,6 @@ export default function ProgressionBar({
           <button className="btn ghost" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)">↶</button>
           <button className="btn ghost" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)">↷</button>
         </div>
-        {/* The dotted card is the primary way in, but it sits at the end of a
-            strip that scrolls — past four or five chords it is off the right edge
-            and unreachable without scrolling sideways first. This is the same
-            action, always in view, and it costs nothing when the card is visible. */}
-        <button className="btn ghost" onClick={() => onAddAt(progression.length)} title="Add a chord to the end">
-          + Add chord
-        </button>
         <button className="btn ghost" onClick={onClear}>Clear</button>
         <button
           className="btn ghost"

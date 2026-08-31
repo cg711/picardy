@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { linkProps } from '../lib/router.js'
-import { TOOL_PATH } from '../lib/routes.js'
+import { TOOL_PATH, BACKING_PATH } from '../lib/routes.js'
 import { LEVELS } from '../theory/exercises.js'
 
 /**
@@ -10,7 +10,7 @@ import { LEVELS } from '../theory/exercises.js'
 const TOOLS = [
   {
     path: TOOL_PATH,
-    name: 'Progression tool',
+    name: 'Studio',
     tagline: 'Write a progression. Find out what it is doing.',
     points: [
       'Ranked suggestions for the next chord, each with a roman numeral and a reason',
@@ -18,7 +18,19 @@ const TOOLS = [
       'Guitar shapes and piano voicings for every chord, in twenty-two tunings',
       'Lyrics under their chords, a PDF lead sheet, and MIDI out',
     ],
-    cta: 'Open the tool',
+    cta: 'Open the studio',
+  },
+  {
+    path: BACKING_PATH,
+    name: 'Backing tracks',
+    tagline: 'A band behind your progression, to play over.',
+    points: [
+      'Drums, bass and comping in pop/rock, jazz swing, ballad or bossa nova',
+      'A big chart that follows along, readable from where the instrument is',
+      'Seamless looping, with fills where the sections change',
+      'The whole track lives in the link, so sharing it is saving it',
+    ],
+    cta: 'Open a backing track',
   },
   {
     path: '/exercises',
@@ -77,7 +89,7 @@ export default function HomePage() {
           numeral, a reason, and a live view on both instruments.
         </p>
         <div className="hero-actions">
-          <a className="btn primary hero-cta" {...linkProps(TOOL_PATH)}>Open the progression tool</a>
+          <a className="btn primary hero-cta" {...linkProps(TOOL_PATH)}>Open the studio</a>
           <a className="btn ghost hero-cta" {...linkProps('/exercises')}>Try the exercises</a>
         </div>
         <p className="hero-note">
