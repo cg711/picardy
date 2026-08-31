@@ -1,10 +1,16 @@
 // A small Web Audio polysynth. No samples, no dependencies.
 
 import { midiToFreq } from '../theory/notes.js'
+import { playDrum } from './drums.js'
+import { barFor, styleOf } from './styles.js'
+export { STYLES, isBand } from './styles.js'
 
 let ctx = null
 let master = null
 let reverb = null
+// Drums get their own bus with far less reverb — a kit soaked in the same plate
+// as the pad turns the backbeat to mush.
+let drumBus = null
 
 function ensureContext() {
   if (ctx) return ctx
@@ -25,6 +31,14 @@ function ensureContext() {
   wet.gain.value = 0.22
   reverb.connect(wet)
   wet.connect(comp)
+
+  drumBus = ctx.createGain()
+  drumBus.gain.value = 0.9
+  drumBus.connect(master)
+  const drumSend = ctx.createGain()
+  drumSend.gain.value = 0.06
+  drumBus.connect(drumSend)
+  drumSend.connect(reverb)
   return ctx
 }
 
@@ -55,6 +69,10 @@ const TIMBRES = {
   piano: { osc: ['triangle', 'sine'], detune: 4, attack: 0.006, decay: 0.9, sustain: 0.28, release: 0.5, cutoff: 3200 },
   guitar: { osc: ['sawtooth', 'triangle'], detune: 7, attack: 0.004, decay: 1.4, sustain: 0.16, release: 0.7, cutoff: 2400 },
   pad: { osc: ['sawtooth', 'sawtooth'], detune: 11, attack: 0.12, decay: 0.6, sustain: 0.6, release: 1.2, cutoff: 1800 },
+  // Almost no detune and a low cutoff: a bass that beats against itself muddies
+  // everything above it, and the harmonics that survive are the ones that let
+  // you hear the root on a laptop speaker.
+  bass: { osc: ['triangle', 'sine'], detune: 1, attack: 0.008, decay: 0.5, sustain: 0.45, release: 0.25, cutoff: 900 },
 }
 
 // Every sounding voice, so playback can actually be cut short. Oscillators are
@@ -150,12 +168,8 @@ export function stopPlayback() {
  * @param items array of { midis, beats } — beats are quarter-note beats, so a
  *              whole note in 4/4 is 4. onStep(i) fires as item i sounds.
  */
-export const PATTERNS = {
-  block: { label: 'Block chords' },
-  strum: { label: 'Strum' },
-  arpeggio: { label: 'Arpeggio' },
-  bassComp: { label: 'Bass + comp' },
-}
+// The four chord-only patterns now live in styles.js alongside the band styles,
+// so the picker has one list and cannot offer a style the scheduler cannot play.
 
 /** A click, for the count-in. */
 function playClick(when, accent) {
@@ -212,6 +226,124 @@ function renderPattern(midis, seconds, pattern, strum) {
   return midis.map((m, i) => ({ midi: m, at: i * strum, duration: sustain }))
 }
 
+/** Where a bass note sits: the lowest octave that still speaks, E1 upward. */
+const BASS_FLOOR = 28
+const bassMidiFor = (pc) => BASS_FLOOR + ((((pc | 0) - BASS_FLOOR) % 12) + 12) % 12
+
+/**
+ * Chord spans in beats, so anything on the bar-level timeline can ask what
+ * harmony is sounding underneath it.
+ *
+ * The groove repeats per bar while chords change on their own schedule, and the
+ * two do not line up: a chord can straddle a bar line, and a bar can hold three
+ * chords. Resolving by beat rather than by index is what keeps the bass on the
+ * right root in both cases.
+ */
+function spansOf(items) {
+  const spans = []
+  let at = 0
+  for (const item of items) {
+    const beats = Math.max(0.05, item.beats ?? 4)
+    spans.push({ start: at, end: at + beats, item })
+    at += beats
+  }
+  return { spans, total: at }
+}
+
+const spanAt = (spans, beat) =>
+  spans.find((s) => beat >= s.start - 1e-6 && beat < s.end - 1e-6) ?? spans[spans.length - 1]
+
+/** The bass pitch class for an item — stated if the caller knows it, else the lowest voiced note. */
+const bassPcOf = (item) =>
+  item?.bassPc != null ? item.bassPc : (item?.midis?.length ? Math.min(...item.midis) % 12 : 0)
+
+function scheduleBand(items, o) {
+  const { start, secondsPerBeat, timbre, styleId, ts, onStep, sectionStartBeats } = o
+  const bar = barFor(styleId, ts)
+  const { spans, total } = spansOf(items)
+  const perBar = ts.beatsPerBar
+  const barCount = Math.max(1, Math.ceil(total / perBar - 1e-6))
+
+  // A fill goes in the bar before something changes: a new section, or the loop
+  // coming round again. Without them a groove stops being a performance and
+  // starts being wallpaper.
+  const fills = new Set([barCount - 1])
+  for (const b of sectionStartBeats) {
+    if (b > 0) fills.add(Math.max(0, Math.ceil(b / perBar) - 1))
+  }
+
+  const emit = (beat, fn) => {
+    if (beat < -1e-6 || beat > total + 1e-6) return
+    fn(start + beat * secondsPerBeat)
+  }
+
+  for (let b = 0; b < barCount; b++) {
+    const barStart = b * perBar
+    const barLen = Math.min(perBar, total - barStart)
+    const isFill = fills.has(b)
+
+    // barFor has already swung these and trimmed them to the bar; the only
+    // thing left to check is a final bar that is shorter than a full one.
+    for (const hit of isFill ? bar.fill : bar.drums) {
+      const at = hit.at
+      if (at >= barLen - 1e-6) continue
+      emit(barStart + at, (when) => {
+        const v = playDrum(ctx, drumBus, hit.voice, when, hit.gain ?? 1)
+        if (v) voices.push(v)
+      })
+    }
+    // A crash on the downbeat after a fill, which is what the fill was for.
+    if (b > 0 && fills.has(b - 1)) {
+      emit(barStart, (when) => {
+        const v = playDrum(ctx, drumBus, 'crash', when, 0.7)
+        if (v) voices.push(v)
+      })
+    }
+
+    for (const hit of bar.comp) {
+      const at = hit.at
+      if (at >= barLen - 1e-6) continue
+      const span = spanAt(spans, barStart + at)
+      const dur = Math.min(hit.dur, barLen - at) * secondsPerBeat
+      emit(barStart + at, (when) => {
+        for (const m of span.item.midis ?? []) playNote(m, when, dur, timbre, 0.13 * (hit.gain ?? 1))
+      })
+    }
+
+    for (const hit of bar.bass) {
+      const at = hit.at
+      if (at >= barLen - 1e-6) continue
+      const span = spanAt(spans, barStart + at)
+      const midi = bassMidiFor(bassPcOf(span.item)) + (hit.degree ?? 0)
+      const dur = Math.min(hit.dur, barLen - at) * secondsPerBeat
+      emit(barStart + at, (when) => playNote(midi, when, dur, 'bass', 0.3 * (hit.gain ?? 1)))
+    }
+  }
+
+  // The playhead still moves chord by chord, whatever the band is doing.
+  spans.forEach((span, i) => {
+    const when = start + span.start * secondsPerBeat
+    scheduled.push(setTimeout(() => onStep && onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
+  })
+
+  return start + total * secondsPerBeat
+}
+
+function scheduleChords(items, o) {
+  const { start, secondsPerBeat, timbre, pattern, strum, onStep } = o
+  let cursor = start
+  items.forEach((item, i) => {
+    const seconds = Math.max(0.05, (item.beats ?? 4) * secondsPerBeat)
+    const when = cursor
+    for (const note of renderPattern(item.midis, seconds, pattern, strum)) {
+      playNote(note.midi, when + note.at, note.duration, timbre)
+    }
+    scheduled.push(setTimeout(() => onStep && onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
+    cursor += seconds
+  })
+  return cursor
+}
+
 export function playProgression(items, {
   bpm = 84,
   timbre = 'piano',
@@ -219,9 +351,11 @@ export function playProgression(items, {
   pattern = 'block',
   countIn = 0,
   beatsPerBar = 4,
+  timeSignature = null,
   loop = false,
   onStep,
   onDone,
+  sectionStartBeats = [],
 } = {}) {
   ensureContext()
   resumeAudio()
@@ -236,23 +370,21 @@ export function playProgression(items, {
     start += countIn * secondsPerBeat
   }
 
-  let cursor = start
-  items.forEach((item, i) => {
-    const seconds = Math.max(0.05, (item.beats ?? 4) * secondsPerBeat)
-    const when = cursor
-    for (const note of renderPattern(item.midis, seconds, pattern, strum)) {
-      playNote(note.midi, when + note.at, note.duration, timbre)
-    }
-    scheduled.push(setTimeout(() => onStep && onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
-    cursor += seconds
-  })
+  const ts = timeSignature ?? { beatsPerBar, top: beatsPerBar, bottom: 4 }
+  const style = styleOf(pattern)
+  const cursor = style.band
+    ? scheduleBand(items, { start, secondsPerBeat, timbre, styleId: pattern, ts, onStep, sectionStartBeats })
+    : scheduleChords(items, { start, secondsPerBeat, timbre, pattern, strum, onStep })
 
   const endsIn = Math.max(0, (cursor - ctx.currentTime) * 1000)
   playbackTimer = setTimeout(() => {
     if (loop) {
       // Re-arm rather than scheduling the whole loop up front, so tempo and
-      // pattern changes take effect on the next pass and Stop always works.
-      playProgression(items, { bpm, timbre, strum, pattern, countIn: 0, beatsPerBar, loop, onStep, onDone })
+      // style changes take effect on the next pass and Stop always works.
+      playProgression(items, {
+        bpm, timbre, strum, pattern, countIn: 0, beatsPerBar, timeSignature,
+        loop, onStep, onDone, sectionStartBeats,
+      })
     } else {
       onDone && onDone()
     }

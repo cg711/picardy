@@ -12,7 +12,7 @@ const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
 const { identifyChord } = await import(B + 'theory/identify.js')
 const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
-const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete } = await import(B + 'theory/rhythm.js')
+const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete, TIME_SIGNATURES } = await import(B + 'theory/rhythm.js')
 const { flattenSong, songBeats, readSegment, makeSegment } = await import(B + 'lib/song.js')
 const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theory/transpose.js')
 const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
@@ -27,6 +27,8 @@ const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/gu
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
 const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
 const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
+const { STYLES, barFor, swingBeat, isCompound, pulseOf } = await import(B + 'audio/styles.js')
+const { DRUM_VOICES } = await import(B + 'audio/drums.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
 const { readFile } = await import('node:fs/promises')
 
@@ -894,6 +896,57 @@ console.log('\n--- brand palette ---')
   eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
   eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
   console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
+}
+
+console.log('\n--- playback styles ---')
+{
+  const bandStyles = Object.entries(STYLES).filter(([, s]) => s.band)
+  eq('  band styles present', bandStyles.length, 4)
+  eq('  the chord-only patterns survive',
+    ['block', 'strum', 'arpeggio', 'bassComp'].every((id) => STYLES[id] && !STYLES[id].band), true)
+
+  const problems = []
+  // Every metre the app offers, not just 4/4 — a groove written for a backbeat
+  // must not put a snare on a beat that 3/4 does not have.
+  for (const ts of TIME_SIGNATURES) {
+    for (const [id, style] of bandStyles) {
+      const bar = barFor(id, ts)
+      const where = `${id} in ${ts.id}`
+      if (!bar) { problems.push(`${where}: no bar built`); continue }
+
+      for (const part of ['drums', 'fill', 'comp', 'bass']) {
+        if (!Array.isArray(bar[part]) || !bar[part].length) problems.push(`${where}: ${part} is empty`)
+        for (const e of bar[part] ?? []) {
+          const at = e.at
+          if (!(at >= 0)) problems.push(`${where}: ${part} event at ${e.at} is negative or NaN`)
+          if (at >= ts.beatsPerBar) problems.push(`${where}: ${part} event at ${at} is past the ${ts.beatsPerBar}-beat bar`)
+          if (e.gain != null && (e.gain <= 0 || e.gain > 1.2)) problems.push(`${where}: ${part} gain ${e.gain} out of range`)
+        }
+      }
+      for (const hit of [...bar.drums, ...bar.fill]) {
+        if (!DRUM_VOICES.includes(hit.voice)) problems.push(`${where}: no such drum voice "${hit.voice}"`)
+      }
+      // A bar with no downbeat reads as a mistake however good the rest is.
+      if (!bar.drums.some((h) => h.at === 0)) problems.push(`${where}: nothing on the downbeat`)
+      // The fill has to differ from the groove, or it is not a fill.
+      const sig = (list) => list.map((h) => `${h.voice}@${h.at}`).join(',')
+      if (sig(bar.drums) === sig(bar.fill)) problems.push(`${where}: the fill is identical to the groove`)
+    }
+  }
+  eq('  every style fits every metre', problems.length, 0)
+  if (problems.length) console.log('   ' + problems.slice(0, 8).join('\n   '))
+
+  // Swing moves offbeats and leaves everything else alone.
+  eq('  a downbeat never swings', swingBeat(2, 1), 2)
+  eq('  a straight offbeat is untouched at swing 0', swingBeat(2.5, 0), 2.5)
+  eq('  full swing puts the offbeat on the triplet', +swingBeat(2.5, 1).toFixed(4), +(2 + 2 / 3).toFixed(4))
+  eq('  a sixteenth is left alone', swingBeat(2.25, 1), 2.25)
+
+  // 6/8 is compound: three quarter-beats to the bar, a dotted-quarter pulse.
+  const sixEight = TIME_SIGNATURES.find((t) => t.id === '6/8')
+  eq('  6/8 is compound', isCompound(sixEight), true)
+  eq('  and its pulse is a dotted quarter', pulseOf(sixEight), 1.5)
+  eq('  4/4 is not compound', isCompound(TIME_SIGNATURES.find((t) => t.id === '4/4')), false)
 }
 
 console.log('\n--- keeping the strip in view ---')

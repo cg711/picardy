@@ -97,6 +97,24 @@ complete ii–V–Is, flags applied chords and borrowed colour, and describes th
 marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
 dependency.
 
+**Backing tracks.** Four band styles — pop/rock, jazz swing, ballad and bossa nova — put drums,
+bass and comping behind the progression, so you can play over it rather than only read it. The kit
+is synthesised (`src/audio/drums.js`): a few oscillators and filtered noise, because shipping
+megabytes of samples would undo the thing the app is fastest at.
+
+Grooves live in `src/audio/styles.js` as data, free of Web Audio, so `npm run check` can hold them
+to the bar in every metre the app offers — nothing past the bar line, nothing on a beat 3/4 does not
+have, a downbeat in every bar, and a fill that differs from the groove it interrupts. That check
+found a ride cymbal swinging off the end of a 7/8 bar. Swing is applied inside `barFor` rather than
+by the scheduler, because it *moves* events, and an event moved past the bar line is a note in the
+wrong bar; doing it in one place makes the returned bar in-bounds by construction.
+
+The groove runs on a bar-level timeline beside the chord timeline, and the two do not line up — a
+chord can straddle a bar line and a bar can hold three chords — so the bass and comp resolve their
+harmony by beat rather than by index. The bass reads `bassOf`, so a slash chord puts its own bass
+note down there rather than the root. Fills land in the bar before each section change and before
+the loop comes round, with a crash on the downbeat after.
+
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
@@ -352,7 +370,10 @@ src/
     exercises.js  question generator — every answer comes from the engine
     intervals.js  naming the distance between two notes
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
-  audio/synth.js  Web Audio polysynth
+  audio/
+    synth.js      Web Audio polysynth and the playback scheduler
+    drums.js      synthesised kit — oscillators and filtered noise, no samples
+    styles.js     what the band plays for one bar, as checkable data
   brand/
     theme.js      the palette recipe — one hue in, every colour out; plus the
                   contrast and perceptual-distance maths the check suite asserts

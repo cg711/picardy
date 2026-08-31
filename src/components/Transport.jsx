@@ -1,6 +1,6 @@
 import React from 'react'
 import { DURATIONS, TIME_SIGNATURES } from '../theory/rhythm.js'
-import { PATTERNS } from '../audio/synth.js'
+import { STYLES } from '../audio/styles.js'
 
 export default function Transport({
   playing,
@@ -63,10 +63,14 @@ export default function Transport({
         </select>
       </label>
       <label className="ctl">
-        <span className="lbl">Feel</span>
-        <select value={pattern} onChange={(e) => onPattern(e.target.value)}>
-          {Object.entries(PATTERNS).map(([id, p]) => (
-            <option key={id} value={id}>{p.label}</option>
+        <span className="lbl">Style</span>
+        <select
+          value={pattern}
+          onChange={(e) => onPattern(e.target.value)}
+          title="How the progression is played back — the chords alone, or with a band behind them"
+        >
+          {Object.entries(STYLES).map(([id, s]) => (
+            <option key={id} value={id}>{s.label}</option>
           ))}
         </select>
       </label>

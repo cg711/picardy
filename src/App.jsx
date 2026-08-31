@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { makeKey, keyName, detectKey, romanNumeral } from './theory/keys.js'
-import { chordSymbol, chordName, chordNotes, voiceChord, inversionLabel, chordId, parseChord } from './theory/chords.js'
+import { chordSymbol, chordName, chordNotes, voiceChord, inversionLabel, chordId, parseChord, bassOf } from './theory/chords.js'
 import { pcOf, prettyName, noteName } from './theory/notes.js'
 import { suggestNext, analyzeChord } from './theory/suggest.js'
 import { generateProgression, FLAVOURS } from './theory/generate.js'
@@ -15,7 +15,7 @@ import {
   CUSTOM_TUNING, tuningKey, normaliseTuning,
 } from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
-import { playChord, playProgression, stopPlayback, setVolume, resumeAudio, PATTERNS } from './audio/synth.js'
+import { playChord, playProgression, stopPlayback, setVolume, resumeAudio } from './audio/synth.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
 import {
   decodeState, writeHash, shareUrl, loadHistory, saveToHistory, clearHistory, historyToState,
@@ -567,6 +567,9 @@ export default function App() {
     const voiced = chords.map((c, i) => ({
       midis: voiceChord(c, { inversion: invs[i] ?? 0, bottom: 48 }),
       beats: toBeats(durs[i]),
+      // What the bass player plays. bassOf honours a slash chord's own symbol,
+      // so D/F♯ puts F♯ down there rather than the root.
+      bassPc: pcOf(bassOf(c, invs[i] ?? 0).note),
     }))
     setPlaying(true)
     playProgression(voiced, {
@@ -576,6 +579,7 @@ export default function App() {
       loop,
       countIn: countIn ? timeSignatureOf(timeSignature).beatsPerBar : 0,
       beatsPerBar: timeSignatureOf(timeSignature).beatsPerBar,
+      timeSignature: timeSignatureOf(timeSignature),
       strum: timbre === 'guitar' ? 0.02 : 0.008,
       onStep: (i) => setPlayingIndex(i),
       onDone: () => {
@@ -767,10 +771,24 @@ export default function App() {
     if (!items.length) return
     stopEverything()
     setPlayingSong(true)
+    // Where each section begins, in beats — the band puts a fill in the bar
+    // before each one, so an arrangement announces its own changes.
+    const sectionStartBeats = []
+    let beatCursor = 0
+    let lastEntry = null
+    for (const item of items) {
+      if (item.entryIndex !== lastEntry) {
+        sectionStartBeats.push(beatCursor)
+        lastEntry = item.entryIndex
+      }
+      beatCursor += toBeats(item.durationId)
+    }
+
     playProgression(
       items.map((item) => ({
         midis: voiceChord(item.chord, { inversion: item.inversion, bottom: 48 }),
         beats: toBeats(item.durationId),
+        bassPc: pcOf(bassOf(item.chord, item.inversion).note),
       })),
       {
         bpm,
@@ -779,6 +797,8 @@ export default function App() {
         loop,
         countIn: countIn ? timeSignatureOf(timeSignature).beatsPerBar : 0,
         beatsPerBar: timeSignatureOf(timeSignature).beatsPerBar,
+        timeSignature: timeSignatureOf(timeSignature),
+        sectionStartBeats,
         strum: timbre === 'guitar' ? 0.02 : 0.008,
         onStep: (i) => {
           const item = items[i]
