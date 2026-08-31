@@ -154,6 +154,23 @@ placed before it is needed. Measured at 120bpm over a 16-beat loop, events land 
 read once per pass through a `settings` callback rather than captured at play time, so nudging
 either lands next time round instead of restarting and losing your place.
 
+**Melody, explained.** A piano roll on its own Melody tab, drawn as one SVG rather than a grid of
+elements — sixteen bars at eighth resolution is a couple of thousand cells, and the browser should
+not lay out two thousand divs so someone can click four of them.
+
+The roll is worth having because the app already knows what chord is sounding at every beat, so
+`src/theory/melody.js` can say what each note is *doing*: a chord tone (named, with why the third
+matters more than the fifth), a tension the chord invites (9, ♯11, ♭13…), a note from outside the
+key, or the one note that will fight — a natural 11th sitting a half step above a major third. That
+last rule asks whether the chord actually has that third rather than assuming, which is why **F over
+Cmaj7 is an avoid note and G over Dm7 is just the eleventh**: same interval, different chord, and
+only one of them clashes.
+
+Colour carries the role, using the same green/amber/purple the analysis panel uses, so "chromatic"
+means one thing across the whole app. Hovering reads the note back in a sentence. The line travels
+in the URL as `beat:length:midi` triples and plays back on a brighter lead voice over whatever the
+band is doing.
+
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
@@ -407,6 +424,7 @@ src/
     analyze.js    cadence detection and prose analysis of a progression
     guitar.js     fretboard voicing search and playability filtering
     identify.js   reverse lookup — notes to chord symbol
+    melody.js     what a melody note is doing against the chord underneath
     exercises.js  question generator — every answer comes from the engine
     intervals.js  naming the distance between two notes
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)

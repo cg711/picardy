@@ -73,6 +73,9 @@ const TIMBRES = {
   // everything above it, and the harmonics that survive are the ones that let
   // you hear the root on a laptop speaker.
   bass: { osc: ['triangle', 'sine'], detune: 1, attack: 0.008, decay: 0.5, sustain: 0.45, release: 0.25, cutoff: 900 },
+  // A melody has to sit on top of a whole band, so this is brighter and more
+  // present than the comping voices rather than louder.
+  lead: { osc: ['square', 'triangle'], detune: 3, attack: 0.01, decay: 0.35, sustain: 0.55, release: 0.3, cutoff: 4200 },
 }
 
 // Every sounding voice, so playback can actually be cut short. Oscillators are
@@ -383,6 +386,19 @@ function runPass(items, opts, startAt) {
     ? scheduleBand(items, { start, secondsPerBeat, timbre, styleId: pattern, ts, onStep, sectionStartBeats })
     : scheduleChords(items, { start, secondsPerBeat, timbre, pattern, strum, onStep })
 
+  // The melody rides on the same timeline as everything else, so it does not
+  // care whether a band is playing underneath or just block chords.
+  for (const note of opts.melody ?? []) {
+    if (!(note.beats > 0)) continue
+    playNote(
+      note.midi,
+      start + note.at * secondsPerBeat,
+      note.beats * secondsPerBeat * 0.95,
+      'lead',
+      0.2,
+    )
+  }
+
   if (loop) {
     // Re-arm one pass at a time rather than scheduling the whole loop up front,
     // so tempo and style changes take effect on the next pass and Stop always
@@ -412,6 +428,7 @@ export function playProgression(items, opts = {}) {
     onDone: undefined,
     sectionStartBeats: [],
     settings: null,
+    melody: [],
     ...opts,
   }, ctx.currentTime + 0.08)
 }

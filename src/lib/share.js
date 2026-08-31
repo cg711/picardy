@@ -45,7 +45,7 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, bpm, style, sections }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, bpm, style, sections, melody }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
@@ -78,6 +78,12 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
     params.set('g', sections
       .map((sec) => `${sec.at}:${encodeURIComponent(sec.name ?? '')}${sec.key ? `:${sec.key}` : ''}`)
       .join('~'))
+  }
+
+  // The melody, as beat:length:midi triples. Absent unless there is one, so a
+  // chord-only link is exactly as short as it always was.
+  if (melody?.length) {
+    params.set('m', melody.map((n) => `${+n.at.toFixed(3)}:${+n.beats.toFixed(3)}:${n.midi}`).join('~'))
   }
 
   return params.toString()
@@ -153,6 +159,16 @@ export function decodeState(hash) {
       })
       .filter(Boolean)
       .sort((a, b) => a.at - b.at),
+    melody: (params.get('m') || '')
+      .split('~')
+      .filter(Boolean)
+      .map((part) => {
+        const [at, beats, midi] = part.split(':').map(Number)
+        if (![at, beats, midi].every(Number.isFinite)) return null
+        if (at < 0 || beats <= 0 || midi < 0 || midi > 127) return null
+        return { at, beats, midi }
+      })
+      .filter(Boolean),
   }
 }
 

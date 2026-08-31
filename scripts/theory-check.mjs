@@ -21,6 +21,7 @@ const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression, cadenceAt } = await import(B + 'theory/analyze.js')
 const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
 const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
+const { classifyNote, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
@@ -897,6 +898,42 @@ console.log('\n--- brand palette ---')
   eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
   eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
   console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
+}
+
+console.log('\n--- melody against the chords ---')
+{
+  const role = (midi, sym) => classifyNote(midi, parseChord(sym), C).role
+  const label = (midi, sym) => classifyNote(midi, parseChord(sym), C).label
+
+  eq('  E over Cmaj7 is the third', label(64, 'Cmaj7'), '3')
+  eq('  …and counts as a chord tone', role(64, 'Cmaj7'), 'chord')
+  eq('  B over Cmaj7 is the major seventh', label(71, 'Cmaj7'), '7')
+  eq('  D over Cmaj7 is the ninth', label(62, 'Cmaj7'), '9')
+
+  // The rule worth having: a natural 11th only fights when there is a major
+  // third for it to sit a half step above.
+  eq('  F over Cmaj7 is an avoid note', role(65, 'Cmaj7'), 'avoid')
+  eq('  C over G7 is an avoid note', role(72, 'G7'), 'avoid')
+  eq('  but G over Dm7 is a plain eleventh', role(67, 'Dm7'), 'tension')
+  eq('  …because Dm7 has no major third', label(67, 'Dm7'), '11')
+  eq('  and F over Dm7 is simply its third', label(65, 'Dm7'), '♭3')
+
+  eq('  C♯ over Cmaj7 is outside the key', role(61, 'Cmaj7'), 'outside')
+  eq('  every classification carries a reason',
+    [64, 65, 61, 62].every((m) => (classifyNote(m, parseChord('Cmaj7'), C).why ?? '').length > 10), true)
+
+  // The chord under a beat, with chords of different lengths.
+  const prog = ['Cmaj7', 'G7'].map(parseChord)
+  eq('  beat 0 is under the first chord', chordAtBeat(prog, [4, 2], 0).index, 0)
+  eq('  beat 3.5 is still the first', chordAtBeat(prog, [4, 2], 3.5).index, 0)
+  eq('  beat 4 has moved on', chordAtBeat(prog, [4, 2], 4).index, 1)
+  eq('  past the end there is no chord', chordAtBeat(prog, [4, 2], 99).index, -1)
+
+  // Two clicks on one cell must not stack into a doubled note.
+  const dup = normaliseMelody([{ at: 1, beats: 1, midi: 60 }, { at: 1, beats: 2, midi: 60 }])
+  eq('  a repeated note collapses', dup.length, 1)
+  eq('  and rubbish is dropped',
+    normaliseMelody([{ at: NaN, beats: 1, midi: 60 }, { at: 0, beats: 0, midi: 60 }]).length, 0)
 }
 
 console.log('\n--- ready-made backing tracks ---')

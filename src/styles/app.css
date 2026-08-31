@@ -1012,6 +1012,62 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 a.brand { text-decoration: none; color: inherit; }
 
+/* ---------- melody roll ---------- */
+
+.melody-controls {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px 0;
+}
+.melody-roll { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* The roll is as wide as the progression is long, so it scrolls rather than
+   squashing — a beat has to keep a constant width or the grid stops meaning
+   anything. */
+.roll-scroll { overflow-x: auto; overflow-y: hidden; border: 1px solid var(--border-soft); border-radius: 8px; }
+.roll-svg { display: block; user-select: none; cursor: crosshair; background: var(--surface-1); }
+
+.roll-row { fill: #ffffff04; }
+.roll-row.black { fill: #00000030; }
+.roll-line { stroke: #ffffff0d; stroke-width: 1; }
+.roll-line.pulse { stroke: #ffffff16; }
+.roll-line.bar { stroke: #ffffff2e; stroke-width: 1.4; }
+
+.roll-span { fill: transparent; stroke: #ffffff14; stroke-width: 1; }
+.roll-span.on { fill: #4a351220; }
+.roll-chord { fill: var(--text-dim); font-size: 10px; font-weight: 600; }
+.roll-octave { fill: var(--text-dim); font-size: 9px; text-anchor: end; }
+
+/* Role, not pitch, is what the colour carries — the same green/amber/purple the
+   analysis panel uses, so "chromatic" means one thing across the whole app. */
+.roll-note rect { stroke: #00000060; stroke-width: 0.8; }
+.roll-note text { font-size: 8.5px; fill: #0d0b07; font-weight: 700; }
+.roll-note.chord rect { fill: #4ade80; }
+.roll-note.tension rect { fill: var(--accent); }
+.roll-note.avoid rect { fill: #f87171; }
+.roll-note.outside rect { fill: #c084fc; }
+
+.roll-ghost { fill: #ffffff26; pointer-events: none; }
+
+.roll-readout {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  min-height: 34px; padding: 8px 11px; border-radius: 8px;
+  border-left: 3px solid var(--border); background: #ffffff05;
+  font-size: 12.5px; line-height: 1.5;
+}
+.roll-readout strong { font-size: 15px; }
+.roll-role {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: #ffffff12; color: var(--text);
+}
+.roll-why { color: var(--text-dim); flex: 1 1 240px; min-width: 0; }
+.roll-readout.chord { border-left-color: #4ade80; }
+.roll-readout.chord .roll-role { background: #4ade8026; color: #86efac; }
+.roll-readout.tension { border-left-color: var(--accent); }
+.roll-readout.tension .roll-role { background: #4a3512; color: var(--accent); }
+.roll-readout.avoid { border-left-color: #f87171; }
+.roll-readout.avoid .roll-role { background: #f8717126; color: #fca5a5; }
+.roll-readout.outside { border-left-color: #c084fc; }
+.roll-readout.outside .roll-role { background: #c084fc26; color: #d8b4fe; }
+
 /* ---------- backing tracks ---------- */
 
 .backing {
@@ -1645,10 +1701,19 @@ a.brand { text-decoration: none; color: inherit; }
 .topbar .brand { align-items: center; min-width: 0; }
 .topbar .brand h1 { display: flex; align-items: center; }
 .topbar-right { align-items: center; flex: none; }
-/* The tagline is the only thing here that can be sacrificed for width. */
+/* Things get sacrificed for width in order of how little they carry: the
+   tagline first, then the size of the actions, then the wordmark — the mark
+   alone still says whose site this is. Adding a third action to the bar is what
+   made this necessary; two fitted, three did not, and the buttons were sitting
+   on top of the logo at 375px. */
 @media (max-width: 620px) {
   .topbar .tagline { display: none; }
   .topbar { gap: 8px; padding: 10px 12px; }
+  .topbar-right .btn { padding: 4px 9px; font-size: 12px; }
+  .topbar-right { gap: 6px; }
+}
+@media (max-width: 430px) {
+  .brand-word { display: none; }
 }
 
 /* ---------- square icon buttons ---------- */

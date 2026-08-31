@@ -43,6 +43,7 @@ import AnalysisPanel from './components/AnalysisPanel.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
+import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, linkProps } from './lib/router.js'
 import { legacyToolPath, pageFor, BACKING_PATH } from './lib/routes.js'
@@ -85,6 +86,10 @@ export default function App() {
   // keeps the editor and the printed chart from ever disagreeing.
   const [lyrics, setLyrics] = useState(initial?.lyrics ?? [])
   const [leadIns, setLeadIns] = useState(initial?.leadIns ?? [''])
+  // A melody line over the progression: { at, beats, midi } in quarter-note
+  // beats from the start, independent of which chord happens to be underneath.
+  const [melody, setMelody] = useState(initial?.melody ?? [])
+  const [noteLength, setNoteLength] = useState(1)
   const [editorView, setEditorView] = useState('chips')
   const [timeSignature, setTimeSignature] = useState(initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE)
   const [newChordDuration, setNewChordDuration] = useState(DEFAULT_DURATION)
@@ -302,8 +307,8 @@ export default function App() {
   // fragment from state that was never lost.
   useEffect(() => {
     if (route !== 'app') return
-    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics })
-  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics])
+    writeHash({ key: musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, melody })
+  }, [route, musicKey, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, melody])
 
   // One place sets the tab title, for every route. Per-page effects that each
   // restored "the app's title" on unmount meant a cold load and a navigation
@@ -582,6 +587,7 @@ export default function App() {
       countIn: countIn ? timeSignatureOf(timeSignature).beatsPerBar : 0,
       beatsPerBar: timeSignatureOf(timeSignature).beatsPerBar,
       timeSignature: timeSignatureOf(timeSignature),
+      melody,
       strum: timbre === 'guitar' ? 0.02 : 0.008,
       onStep: (i) => setPlayingIndex(i),
       onDone: () => {
@@ -979,6 +985,7 @@ export default function App() {
             <div className="view-tabs">
               {[
                 ['chips', 'Chords'],
+                ['melody', 'Melody'],
                 ['lyrics', 'Lyrics & timing'],
                 ['sections', 'Song structure'],
               ].map(([id, label]) => (
@@ -991,6 +998,47 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {editorView === 'melody' && progression.length === 0 && (
+              <div className="progression empty">
+                <p className="muted">
+                  A melody is written against chords. Add a couple on the Chords tab
+                  and the roll will have something to explain your notes against.
+                </p>
+              </div>
+            )}
+
+            {editorView === 'melody' && progression.length > 0 && (
+              <>
+                <div className="melody-controls">
+                  <label className="ctl">
+                    <span className="lbl">Note length</span>
+                    <select value={noteLength} onChange={(e) => setNoteLength(Number(e.target.value))}>
+                      <option value={0.5}>1/8</option>
+                      <option value={1}>1/4</option>
+                      <option value={2}>1/2</option>
+                      <option value={4}>1/1</option>
+                    </select>
+                  </label>
+                  <button className="btn ghost" onClick={() => setMelody([])} disabled={!melody.length}>
+                    Clear melody
+                  </button>
+                  <span className="muted small">
+                    {melody.length} note{melody.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <MelodyRoll
+                  progression={progression}
+                  durations={progression.map((_, i) => toBeats(durations[i]))}
+                  timeSignature={timeSignature}
+                  musicKey={displayKey}
+                  melody={melody}
+                  onChange={setMelody}
+                  playingIndex={playingIndex}
+                  noteLength={noteLength}
+                />
+              </>
+            )}
 
             {/* The timeline lays words out against chords, so with no chords it
                 has nothing to lay them against — say so rather than render an
