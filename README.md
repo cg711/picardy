@@ -115,6 +115,24 @@ harmony by beat rather than by index. The bass reads `bassOf`, so a slash chord 
 note down there rather than the root. Fills land in the bar before each section change and before
 the loop comes round, with a crash on the downbeat after.
 
+Landing on `/backing` with nothing in the link shows a shelf of ten standards — blues, minor blues,
+rhythm changes, ii–V–I major and minor, the pop and fifties turnarounds, an Andalusian cadence, a
+bossa and a Dorian vamp. They are stored in `src/lib/backings.js` as scale degrees rather than chord
+symbols, the same `[semitones, generic, quality]` triples the exercise generator uses, so each one
+builds in any of twelve keys with the spelling coming out right and the numerals derived from the
+same engine as everywhere else.
+
+Some keys are theoretical for some shapes: a ii–V–i in D♭ minor wants a B♭♭, and a blues in G♭ needs
+a C♭7 which contains one. Rather than curate a key list per preset — which would go stale the moment
+a preset was added — `buildBacking` retries the same pitch under its other name and offers C♯ minor
+or F♯ major instead. `npm run check` asserts the property directly: every preset, in every key, with
+no double accidentals and whole bars.
+
+The chart prints a roman numeral over every chord, read from that chord's *own* section key. An
+arrangement can change key between sections, and a numeral measured from the wrong tonic is worse
+than no numeral — in the Verse/Chorus/Verse test the E♭ chorus reads `Imaj7 vi7 ii7 V7`, not the
+`♭IIImaj7 i7 iv7 ♭VII7` it would be if read from the verse's C.
+
 A whole arrangement can travel too. `Backing track` in the song actions flattens the song with
 `flattenSong` and encodes it, which is safe across sections in different keys because chord symbols
 are absolute — a section written in E♭ contributes E♭ chords, not degrees. Section boundaries ride
@@ -408,6 +426,7 @@ src/
     Terms.jsx     terms of service — draft
     ExercisesPage.jsx  the drill page at /exercises
   lib/            URL/share encoding, colour tokens, segment + song model,
+                  ready-made backing tracks (backings.js),
                   PDF export, MIDI writer, chart text import
 ```
 

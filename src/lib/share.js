@@ -69,8 +69,15 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
   // Where each section of an arrangement begins, as index:name. Names are
   // encoded individually because a section can be called anything, including
   // something with a colon or a tilde in it.
+  // Where each section of an arrangement begins, as index:name:key. Names are
+  // encoded individually because a section can be called anything, including
+  // something with a colon or a tilde in it. The key travels because sections
+  // can be in different ones, and a numeral read from the wrong tonic is worse
+  // than no numeral at all.
   if (sections?.length) {
-    params.set('g', sections.map((sec) => `${sec.at}:${encodeURIComponent(sec.name ?? '')}`).join('~'))
+    params.set('g', sections
+      .map((sec) => `${sec.at}:${encodeURIComponent(sec.name ?? '')}${sec.key ? `:${sec.key}` : ''}`)
+      .join('~'))
   }
 
   return params.toString()
@@ -127,16 +134,22 @@ export function decodeState(hash) {
       .split('~')
       .filter(Boolean)
       .map((part) => {
-        const cut = part.indexOf(':')
-        const at = parseInt(cut < 0 ? part : part.slice(0, cut), 10)
+        // index:name:key — the key is optional, so links written before sections
+        // carried one still read.
+        const bits = part.split(':')
+        const at = parseInt(bits[0], 10)
         if (!Number.isFinite(at) || at < 0 || at >= progression.length) return null
         let name = ''
         try {
-          name = decodeURIComponent(cut < 0 ? '' : part.slice(cut + 1))
+          name = decodeURIComponent(bits[1] ?? '')
         } catch {
-          name = cut < 0 ? '' : part.slice(cut + 1)
+          name = bits[1] ?? ''
         }
-        return { at, name }
+        const raw = bits[2] ?? ''
+        const minor = /m$/.test(raw)
+        const tonic = minor ? raw.slice(0, -1) : raw
+        const sectionKey = tonic && parseNote(tonic) ? makeKey(tonic, minor ? 'minor' : 'major') : null
+        return { at, name, key: sectionKey }
       })
       .filter(Boolean)
       .sort((a, b) => a.at - b.at),

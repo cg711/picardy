@@ -25,10 +25,10 @@ const TOOLS = [
     name: 'Backing tracks',
     tagline: 'A band behind your progression, to play over.',
     points: [
+      'Ten standards to play over — blues, rhythm changes, ii–V–I — in any key',
       'Drums, bass and comping in pop/rock, jazz swing, ballad or bossa nova',
-      'A big chart that follows along, readable from where the instrument is',
+      'A big chart with roman numerals, readable from where the instrument is',
       'Seamless looping, with fills where the sections change',
-      'The whole track lives in the link, so sharing it is saving it',
     ],
     cta: 'Open a backing track',
   },

@@ -784,7 +784,13 @@ export default function App() {
     let lastEntry = null
     items.forEach((item, i) => {
       if (item.entryIndex !== lastEntry) {
-        sections.push({ at: i, name: item.segmentName })
+        // The section's own key travels with it, so the player can read each
+        // section's numerals from the tonic it was actually written in.
+        sections.push({
+          at: i,
+          name: item.segmentName,
+          key: item.key ? `${noteName(item.key.tonic)}${item.key.mode === 'minor' ? 'm' : ''}` : null,
+        })
         lastEntry = item.entryIndex
       }
     })

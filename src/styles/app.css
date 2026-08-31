@@ -1083,10 +1083,45 @@ a.brand { text-decoration: none; color: inherit; }
   font-style: normal; margin-left: 8px;
   color: var(--accent); letter-spacing: 0.06em;
 }
-.bk-barchords { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
-.bk-cell { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: #d8d0c4; }
-.bk-cell.on { color: var(--accent); }
-.bk-cell.tied { opacity: 0.4; font-weight: 400; }
+.bk-barchords { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+/* Numeral above the symbol: the numeral is what you read to know where you are,
+   the symbol is what you read to know what to play. */
+.bk-cell { display: flex; flex-direction: column; gap: 1px; }
+.bk-cell b { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: #d8d0c4; }
+.bk-cell-roman { font-style: normal; font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.02em; }
+.bk-cell.on b { color: var(--accent); }
+.bk-cell.on .bk-cell-roman { color: var(--accent); opacity: 0.8; }
+.bk-cell.tied { opacity: 0.4; }
+.bk-cell.tied b { font-weight: 400; }
+
+/* ---------- the shelf of ready-made tracks ---------- */
+
+.bk-intro h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 10px; }
+.bk-intro p { margin: 0 0 14px; max-width: 62ch; font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
+.bk-intro a { color: var(--accent); }
+.bk-keypick { display: inline-flex; }
+
+.bk-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.bk-preset {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 16px; border-radius: var(--radius); text-align: left; cursor: pointer;
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  color: inherit;
+  transition: border-color 140ms, transform 140ms;
+}
+.bk-preset:hover { border-color: var(--accent); transform: translateY(-2px); }
+.bk-preset h2 { margin: 0; font-size: 17px; letter-spacing: -0.015em; }
+.bk-preset p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.bk-preset-chords {
+  margin-top: auto; padding-top: 4px;
+  font-size: 14px; font-weight: 600; color: var(--accent);
+}
+.bk-preset-meta { font-size: 11px; color: var(--text-dim); }
 
 .bk-transport {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;

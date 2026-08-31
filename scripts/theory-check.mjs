@@ -12,7 +12,7 @@ const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
 const { identifyChord } = await import(B + 'theory/identify.js')
 const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
-const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete, TIME_SIGNATURES } = await import(B + 'theory/rhythm.js')
+const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete, TIME_SIGNATURES, timeSignatureOf } = await import(B + 'theory/rhythm.js')
 const { flattenSong, songBeats, readSegment, makeSegment } = await import(B + 'lib/song.js')
 const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theory/transpose.js')
 const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
@@ -27,6 +27,7 @@ const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/gu
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
 const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
 const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
+const { BACKINGS, BACKING_KEYS, buildBacking } = await import(B + 'lib/backings.js')
 const { STYLES, barFor, swingBeat, isCompound, pulseOf } = await import(B + 'audio/styles.js')
 const { DRUM_VOICES } = await import(B + 'audio/drums.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
@@ -896,6 +897,52 @@ console.log('\n--- brand palette ---')
   eq(`  no tone crowds the accent (nearest: ${nearestToAccent[1]})`, nearestToAccent[0] >= 30, true)
   eq(`  no two tones collide (closest: ${closestPair[1]})`, closestPair[0] >= 18, true)
   console.log(`     ΔE — nearest to accent ${nearestToAccent[0].toFixed(1)}, closest pair ${closestPair[0].toFixed(1)}`)
+}
+
+console.log('\n--- ready-made backing tracks ---')
+{
+  const problems = []
+  const seen = new Set()
+  for (const preset of BACKINGS) {
+    if (seen.has(preset.id)) problems.push(`duplicate id ${preset.id}`)
+    seen.add(preset.id)
+    if (!STYLES[preset.style]?.band) problems.push(`${preset.id}: style "${preset.style}" is not a band style`)
+
+    // Every preset in every key. Degrees are stored rather than symbols exactly
+    // so this holds: a ii-V-I in D flat has to come out E flat m7, A flat 7,
+    // D flat maj7 — never a sharp, never a double accidental.
+    for (const tonic of BACKING_KEYS) {
+      const built = buildBacking(preset, tonic)
+      const where = `${preset.id} in ${tonic}`
+      if (!built) { problems.push(`${where}: did not build`); continue }
+      if (built.progression.length !== preset.chords.length) problems.push(`${where}: wrong chord count`)
+      for (const chord of built.progression) {
+        for (const e of chordNotes(chord)) {
+          if (Math.abs(e.note.acc) > 1) {
+            problems.push(`${where}: ${chordSymbol(chord)} needs a double accidental (${prettyName(e.note)})`)
+          }
+        }
+        // The numeral is what the chart prints over the chord, so it has to be
+        // something the engine can actually name.
+        const roman = romanNumeral(chord, built.key)
+        if (!roman || /undefined|NaN/.test(roman)) problems.push(`${where}: ${chordSymbol(chord)} has no numeral`)
+      }
+      // Bars have to come out whole, or the chart shows a ragged final bar.
+      const beats = built.durations.reduce((a, b) => a + b, 0)
+      if (beats % timeSignatureOf(built.timeSignature).beatsPerBar !== 0) {
+        problems.push(`${where}: ${beats} beats does not fill whole bars`)
+      }
+    }
+  }
+  eq('  every preset builds in every key', problems.length, 0)
+  if (problems.length) console.log('   ' + problems.slice(0, 8).join('\n   '))
+  eq('  presets offered', BACKINGS.length, 10)
+  eq('  keys offered', BACKING_KEYS.length, 12)
+
+  // The one that matters most, spelled out.
+  const dflat = buildBacking(BACKINGS.find((p) => p.id === 'ii-v-i'), 'Db')
+  eq('  ii–V–I in D♭', dflat.progression.map(chordSymbol).join(' '), 'E♭m7 A♭7 D♭maj7 D♭maj7')
+  eq('  …and its numerals', dflat.progression.map((c) => romanNumeral(c, dflat.key)).join(' '), 'ii7 V7 Imaj7 Imaj7')
 }
 
 console.log('\n--- playback styles ---')
