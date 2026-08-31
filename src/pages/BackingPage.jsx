@@ -43,6 +43,34 @@ export default function BackingPage() {
   const musicKey = initial?.key ?? null
   const timeSignature = initial?.timeSignature ?? DEFAULT_TIME_SIGNATURE
   const ts = timeSignatureOf(timeSignature)
+  const sections = initial?.sections ?? []
+
+  /** Section name for each chord slot, so the chart and the readout agree. */
+  const sectionAt = useMemo(() => {
+    const names = new Array(progression.length).fill(null)
+    if (!sections.length) return names
+    for (let i = 0; i < sections.length; i++) {
+      const end = sections[i + 1]?.at ?? progression.length
+      for (let j = sections[i].at; j < end; j++) names[j] = sections[i].name
+    }
+    return names
+  }, [sections, progression.length])
+
+  /**
+   * Where each section starts, in beats — the band puts a fill in the bar before
+   * each one, so an arrangement announces its own changes.
+   */
+  const sectionStartBeats = useMemo(() => {
+    if (!sections.length) return []
+    const starts = new Set(sections.map((sec) => sec.at))
+    const out = []
+    let beat = 0
+    progression.forEach((_, i) => {
+      if (starts.has(i)) out.push(beat)
+      beat += toBeats(durations[i])
+    })
+    return out
+  }, [sections, progression, durations])
 
   useEffect(() => () => { stopPlayback(); clearTimeout(copyTimer.current) }, [])
 
@@ -79,19 +107,20 @@ export default function BackingPage() {
         countIn: countIn ? ts.beatsPerBar : 0,
         beatsPerBar: ts.beatsPerBar,
         timeSignature: ts,
+        sectionStartBeats,
         settings: () => live.current,
         onStep: setIndex,
         onDone: () => { setPlaying(false); setIndex(-1) },
       },
     )
-  }, [progression, inversions, durations, bpm, style, loop, countIn, ts])
+  }, [progression, inversions, durations, bpm, style, loop, countIn, ts, sectionStartBeats])
 
   const hash = useMemo(() => {
     if (!progression.length || !musicKey) return null
     return encodeState({
-      key: musicKey, progression, inversions, durations, timeSignature, bpm, style,
+      key: musicKey, progression, inversions, durations, timeSignature, bpm, style, sections,
     })
-  }, [progression, inversions, durations, musicKey, timeSignature, bpm, style])
+  }, [progression, inversions, durations, musicKey, timeSignature, bpm, style, sections])
 
   const shareUrl = hash ? `${window.location.origin}${window.location.pathname}#${hash}` : null
 
@@ -151,6 +180,7 @@ export default function BackingPage() {
           {musicKey && <span className="bk-key">{keyName(musicKey)}</span>}
           <span>{timeSignature}</span>
           <span>{bars.length} bar{bars.length === 1 ? '' : 's'}</span>
+          {sections.length > 0 && <span>{sections.length} section{sections.length === 1 ? '' : 's'}</span>}
         </div>
         <div className="bk-links">
           <button className="btn ghost tiny" onClick={copyLink} disabled={!shareUrl}>
@@ -168,7 +198,12 @@ export default function BackingPage() {
           from wherever the instrument is, which is the entire point. */}
       <div className={`bk-now${playing ? ' live' : ''}`}>
         <div className="bk-current">
-          <span className="bk-label">{playing ? 'Now' : 'Starts on'}</span>
+          <span className="bk-label">
+            {playing ? 'Now' : 'Starts on'}
+            {sectionAt[index >= 0 ? index : 0] && (
+              <em className="bk-section">{sectionAt[index >= 0 ? index : 0]}</em>
+            )}
+          </span>
           <strong>{chordSymbol(now ?? progression[0])}</strong>
           {musicKey && (
             <span className="bk-roman">
@@ -183,8 +218,15 @@ export default function BackingPage() {
       </div>
 
       <div className="bk-chart">
-        {bars.map((bar, b) => (
-          <div key={b} className={`bk-bar${bar.some((c) => c.slot === index) ? ' on' : ''}`}>
+        {bars.map((bar, b) => {
+          // A heading wherever a section begins. Matched on the bar's first cell
+          // rather than on any cell in it, so a section that starts mid-bar is
+          // labelled once, at the bar you actually look at.
+          const opens = sections.find((sec) => sec.at === bar[0].slot && !bar[0].tiedFromPrevious)
+          return (
+        <React.Fragment key={b}>
+          {opens && <h2 className="bk-section-head">{opens.name}</h2>}
+          <div className={`bk-bar${bar.some((c) => c.slot === index) ? ' on' : ''}`}>
             <span className="bk-barnum">{b + 1}</span>
             <div className="bk-barchords">
               {bar.map((cell, c) => (
@@ -197,7 +239,9 @@ export default function BackingPage() {
               ))}
             </div>
           </div>
-        ))}
+        </React.Fragment>
+          )
+        })}
       </div>
 
       <div className="bk-transport">

@@ -768,6 +768,39 @@ export default function App() {
 
   const removeEntry = (i) => setSong((list) => list.filter((_, j) => j !== i))
 
+  /**
+   * The whole arrangement as a backing-track link.
+   *
+   * Flattening is safe across sections in different keys because chord symbols
+   * are absolute — a section written in E♭ contributes E♭ chords, not degrees —
+   * so the only thing lost is which key each section was *thought* in, and the
+   * player shows section names instead of roman numerals anyway.
+   */
+  const songBackingHref = useMemo(() => {
+    const items = flattenSong(song, segments)
+    if (!items.length) return null
+
+    const sections = []
+    let lastEntry = null
+    items.forEach((item, i) => {
+      if (item.entryIndex !== lastEntry) {
+        sections.push({ at: i, name: item.segmentName })
+        lastEntry = item.entryIndex
+      }
+    })
+
+    return `${BACKING_PATH}#${encodeState({
+      key: items[0].key,
+      progression: items.map((i) => i.chord),
+      inversions: items.map((i) => i.inversion ?? 0),
+      durations: items.map((i) => i.durationId),
+      timeSignature: items[0].timeSignature ?? timeSignature,
+      bpm,
+      style: isBand(pattern) ? pattern : 'pop',
+      sections,
+    })}`
+  }, [song, segments, bpm, pattern, timeSignature])
+
   const playSong = () => {
     const items = flattenSong(song, segments)
     if (!items.length) return
@@ -1002,6 +1035,7 @@ export default function App() {
                 onRemoveEntry={removeEntry}
                 onClearSong={() => setSong([])}
                 onPlaySong={playSong}
+                backingHref={songBackingHref}
                 onStopSong={stopEverything}
                 onExport={() => setExporting(true)}
                 onExportMidi={exportMidi}

@@ -103,6 +103,7 @@ export default function Arrangement({
   onRemoveEntry,
   onClearSong,
   onPlaySong,
+  backingHref,
   onStopSong,
   onOpenAddSection,
   onSetHue,
@@ -202,6 +203,13 @@ export default function Arrangement({
           <button className="btn primary" onClick={playingSong ? onStopSong : onPlaySong}>
             {playingSong ? '■ Stop song' : '▶ Play song'}
           </button>
+          {/* A real load rather than an in-app link: the player reads the whole
+              arrangement out of the hash once, on mount. */}
+          {backingHref && (
+            <a className="btn" href={backingHref} title="Play the whole arrangement with a band behind it">
+              Backing track
+            </a>
+          )}
           <button className="btn" onClick={onExport}>Export PDF chart</button>
           <button className="btn" onClick={onExportMidi} title="A .mid file you can drop into a DAW">Export MIDI</button>
           <button className="btn ghost" onClick={onClearSong}>Clear song</button>

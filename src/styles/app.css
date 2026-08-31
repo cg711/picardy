@@ -1072,6 +1072,17 @@ a.brand { text-decoration: none; color: inherit; }
   position: absolute; top: 6px; left: 9px;
   font-size: 10px; color: var(--text-dim);
 }
+.bk-section-head {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--accent);
+}
+.bk-section-head:first-child { margin-top: 0; }
+.bk-section {
+  font-style: normal; margin-left: 8px;
+  color: var(--accent); letter-spacing: 0.06em;
+}
 .bk-barchords { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
 .bk-cell { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: #d8d0c4; }
 .bk-cell.on { color: var(--accent); }

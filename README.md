@@ -115,6 +115,13 @@ harmony by beat rather than by index. The bass reads `bassOf`, so a slash chord 
 note down there rather than the root. Fills land in the bar before each section change and before
 the loop comes round, with a crash on the downbeat after.
 
+A whole arrangement can travel too. `Backing track` in the song actions flattens the song with
+`flattenSong` and encodes it, which is safe across sections in different keys because chord symbols
+are absolute — a section written in E♭ contributes E♭ chords, not degrees. Section boundaries ride
+along in a `g` parameter as `index:name` pairs, so the player shows section headings and the band
+puts a fill in the bar before each change. Verified on a Verse/Chorus/Verse arrangement in C and E♭:
+the toms appear in bars 3, 7 and 11 and nowhere else.
+
 The player lives at `/backing`, decoupled from the studio on purpose: it exists to be followed while
 your hands are busy, so the chart is large, the current bar is unmissable, and nothing is editable.
 The whole track arrives in the URL — `encodeState` carries tempo and style alongside the chords —

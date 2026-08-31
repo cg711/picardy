@@ -45,7 +45,7 @@ export function savePref(name, value) {
   return next
 }
 
-export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, bpm, style }) {
+export function encodeState({ key, progression, inversions, durations, timeSignature, shapes, leadIns, lines, lyrics, bpm, style, sections }) {
   const params = new URLSearchParams()
   params.set('k', `${noteName(key.tonic)}${key.mode === 'minor' ? 'm' : ''}`)
   params.set('p', progression.map(chordId).join(','))
@@ -66,6 +66,12 @@ export function encodeState({ key, progression, inversions, durations, timeSigna
   // was and every link ever shared still decodes.
   if (bpm) params.set('b', String(Math.round(bpm)))
   if (style) params.set('s', style)
+  // Where each section of an arrangement begins, as index:name. Names are
+  // encoded individually because a section can be called anything, including
+  // something with a colon or a tilde in it.
+  if (sections?.length) {
+    params.set('g', sections.map((sec) => `${sec.at}:${encodeURIComponent(sec.name ?? '')}`).join('~'))
+  }
 
   return params.toString()
 }
@@ -117,6 +123,23 @@ export function decodeState(hash) {
     lyrics: progression.map((_, i) => lyrics[i] ?? ''),
     bpm: params.get('b') ? Math.min(300, Math.max(30, parseInt(params.get('b'), 10) || 0)) || null : null,
     style: params.get('s') || null,
+    sections: (params.get('g') || '')
+      .split('~')
+      .filter(Boolean)
+      .map((part) => {
+        const cut = part.indexOf(':')
+        const at = parseInt(cut < 0 ? part : part.slice(0, cut), 10)
+        if (!Number.isFinite(at) || at < 0 || at >= progression.length) return null
+        let name = ''
+        try {
+          name = decodeURIComponent(cut < 0 ? '' : part.slice(cut + 1))
+        } catch {
+          name = cut < 0 ? '' : part.slice(cut + 1)
+        }
+        return { at, name }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.at - b.at),
   }
 }
 
