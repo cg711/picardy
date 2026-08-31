@@ -145,11 +145,11 @@ function playNote(midi, when, duration, timbre, gain = 0.16) {
 }
 
 /** Play a chord immediately. `strum` staggers note onsets like a pick stroke. */
-export function playChord(midis, { duration = 1.4, timbre = 'piano', strum = 0 } = {}) {
+export function playChord(midis, { duration = 1.4, timbre = 'piano', strum = 0, gain = 0.16 } = {}) {
   ensureContext()
   resumeAudio()
   const now = ctx.currentTime + 0.02
-  midis.forEach((m, i) => playNote(m, now + i * strum, duration, timbre))
+  midis.forEach((m, i) => playNote(m, now + i * strum, duration, timbre, gain))
 }
 
 let scheduled = []

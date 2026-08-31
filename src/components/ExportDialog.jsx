@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 
-export default function ExportDialog({ defaultTitle, lefty, onCancel, onExport }) {
+export default function ExportDialog({ defaultTitle, lefty, hasMelody, onCancel, onExport }) {
   const [title, setTitle] = useState(defaultTitle)
   const [instrument, setInstrument] = useState('guitar')
+  const [includeMelody, setIncludeMelody] = useState(true)
 
   const submit = (e) => {
     e.preventDefault()
-    onExport({ title: title.trim() || 'Untitled', instrument })
+    onExport({ title: title.trim() || 'Untitled', instrument, includeMelody: hasMelody && includeMelody })
   }
 
   return (
@@ -45,6 +46,19 @@ export default function ExportDialog({ defaultTitle, lefty, onCancel, onExport }
             ))}
           </div>
         </fieldset>
+
+        {/* Only offered when there is one — a switch for something that does not
+            exist is a question the reader has to answer for nothing. */}
+        {hasMelody && (
+          <label className="check field">
+            <input
+              type="checkbox"
+              checked={includeMelody}
+              onChange={(e) => setIncludeMelody(e.target.checked)}
+            />
+            <span>Include the melody, as a contour under each line</span>
+          </label>
+        )}
 
         <div className="modal-actions">
           <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>

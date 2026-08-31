@@ -25,7 +25,7 @@ import {
 import { toneColor } from './lib/colors.js'
 import { useUndo } from './lib/useUndo.js'
 import {
-  makeSegment, readSegment, flattenSong, loadSegments, saveSegments, loadSong, saveSong, uniqueName,
+  makeSegment, readSegment, flattenSong, flattenMelody, loadSegments, saveSegments, loadSong, saveSong, uniqueName,
 } from './lib/song.js'
 
 import { Lockup } from './brand/Mark.jsx'
@@ -145,6 +145,9 @@ export default function App() {
   // While a song plays, roman numerals follow the section's own key.
   const [playbackKey, setPlaybackKey] = useState(null)
   const [exporting, setExporting] = useState(false)
+  // Whether exports carry the melody. One switch for both, sitting next to the
+  // two buttons it governs — the PDF dialog mirrors it, MIDI has no dialog.
+  const [includeMelody, setIncludeMelody] = useState(true)
   const [songTitle, setSongTitle] = useState('Untitled')
   const [pattern, setPattern] = useState('block')
   const [countIn, setCountIn] = useState(false)
@@ -661,10 +664,14 @@ export default function App() {
       ? songToEvents(song, segments)
       : progressionToEvents(progression, inversions, durations)
     if (!events.length) return
+    // A song's melody is every section's line laid end to end; the editor's is
+    // simply the one on the roll.
+    const line = hasSong ? flattenMelody(song, segments) : melody
     const bytes = buildMidi(events, {
       bpm,
       timeSignature,
       trackName: hasSong ? songTitle : 'Progression',
+      melody: includeMelody ? line : [],
     })
     downloadMidi(bytes, hasSong ? songTitle : 'progression')
   }
@@ -700,6 +707,7 @@ export default function App() {
       lines,
       lyrics,
       leadIns,
+      melody,
     })
     setSegments((list) => [...list, segment])
     // Saving is otherwise silent — the section lands in a tab you may not be
@@ -730,6 +738,7 @@ export default function App() {
     setLines(live.lines)
     setLyrics(live.lyrics ?? live.progression.map(() => ''))
     setLeadIns(live.leadIns.length ? live.leadIns : [''])
+    setMelody(live.melody ?? [])
     setTimeSignature(live.timeSignature)
     setActiveIndex(live.progression.length - 1)
     setPreview(null)
@@ -782,6 +791,12 @@ export default function App() {
    * so the only thing lost is which key each section was *thought* in, and the
    * player shows section names instead of roman numerals anyway.
    */
+  /** Does the arrangement carry a melody at all? Governs whether the option shows. */
+  const songHasMelody = useMemo(
+    () => (song.length ? flattenMelody(song, segments).length > 0 : melody.length > 0),
+    [song, segments, melody],
+  )
+
   const songBackingHref = useMemo(() => {
     const items = flattenSong(song, segments)
     if (!items.length) return null
@@ -1090,6 +1105,9 @@ export default function App() {
                 onClearSong={() => setSong([])}
                 onPlaySong={playSong}
                 backingHref={songBackingHref}
+                hasMelody={songHasMelody}
+                includeMelody={includeMelody}
+                onIncludeMelody={setIncludeMelody}
                 onStopSong={stopEverything}
                 onExport={() => setExporting(true)}
                 onExportMidi={exportMidi}
@@ -1160,7 +1178,8 @@ export default function App() {
               loop={loop}
               onLoop={setLoop}
               disabled={!progression.length}
-              hideChordDefaults={editorView === 'lyrics'}
+              hideNewChord={editorView !== 'chips'}
+              hideMetre={editorView === 'lyrics'}
             />
             )}
 
@@ -1507,10 +1526,11 @@ export default function App() {
         <ExportDialog
           defaultTitle={songTitle}
           lefty={lefty}
+          hasMelody={songHasMelody}
           onCancel={() => setExporting(false)}
-          onExport={({ title, instrument }) => {
+          onExport={({ title, instrument, includeMelody: withMelody }) => {
             setSongTitle(title)
-            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId: shapeTuningKey, lefty })
+            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId: shapeTuningKey, lefty, includeMelody: withMelody })
             setExporting(false)
           }}
         />

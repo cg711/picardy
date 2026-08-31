@@ -171,6 +171,18 @@ means one thing across the whole app. Hovering reads the note back in a sentence
 in the URL as `beat:length:midi` triples and plays back on a brighter lead voice over whatever the
 band is doing.
 
+The line is saved onto the section, alongside its lyrics and shapes, so it travels into the
+arrangement, the chart and the MIDI with the chords it was written against. Both exports carry it,
+governed by one switch next to the two buttons it applies to — shown only when there is a melody to
+include, because a toggle for something that does not exist is a question asked for nothing.
+
+In the PDF it is a contour lane under each row of bars, with note names on the notes wide enough to
+hold one. A contour rather than notation, because engraving a stave is a different project and a
+shaped line you can read at a glance is what actually helps: the vertical scale is fixed per section
+rather than per row, so the same pitch is drawn at the same height all the way down. In the MIDI it
+is its own track on its own channel, which is what makes a DAW open it as a separate part rather
+than a lump of notes inside the comping.
+
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 

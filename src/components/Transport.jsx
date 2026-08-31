@@ -24,9 +24,12 @@ export default function Transport({
   onLoop,
   disabled,
   playLabel = '▶ Play progression',
-  // Metre and the new-chord length both set *rhythm*, and the lyric lane no
-  // longer has anything to do with rhythm — so on that tab they are noise.
-  hideChordDefaults = false,
+  // Metre and the new-chord length both set *rhythm*, but they are not needed in
+  // the same places. The lyric lane has nothing to do with rhythm at all, while
+  // the melody roll draws its bar lines from the metre and so still wants it —
+  // it just has no chords to give a default length to.
+  hideMetre = false,
+  hideNewChord = false,
 }) {
   return (
     <div className="transport">
@@ -38,7 +41,7 @@ export default function Transport({
         <input type="range" min="40" max="200" value={bpm} onChange={(e) => onBpm(+e.target.value)} />
         <span className="val">{bpm}</span>
       </label>
-      <label className="ctl" hidden={hideChordDefaults}>
+      <label className="ctl" hidden={hideMetre}>
         <span className="lbl">Metre</span>
         <select value={timeSignature} onChange={(e) => onTimeSignature(e.target.value)}>
           {TIME_SIGNATURES.map((t) => (
@@ -46,7 +49,7 @@ export default function Transport({
           ))}
         </select>
       </label>
-      <label className="ctl" hidden={hideChordDefaults} title="Length given to each chord you add from here on">
+      <label className="ctl" hidden={hideNewChord} title="Length given to each chord you add from here on">
         <span className="lbl">New chord</span>
         <select value={String(newChordDuration)} onChange={(e) => onNewChordDuration(Number(e.target.value))}>
           {DURATIONS.map((d) => (

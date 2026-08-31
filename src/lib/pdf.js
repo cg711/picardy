@@ -6,7 +6,7 @@
 
 import { chordSymbol, chordId, chordNotes, voiceChord } from '../theory/chords.js'
 import { romanNumeral } from '../theory/keys.js'
-import { mod, pcOf, prettyName, noteName } from '../theory/notes.js'
+import { mod, pcOf, prettyName, noteName, midiName } from '../theory/notes.js'
 import { findVoicings, TUNINGS, decodeShape, shapeFromFrets } from '../theory/guitar.js'
 import { groupIntoBars, timeSignatureOf } from '../theory/rhythm.js'
 import { readSegment } from './song.js'
@@ -40,7 +40,7 @@ const ascii = (s) =>
  * dompurify into the main bundle — neither of which this chart needs, since
  * everything here is drawn with vector primitives.
  */
-export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, tuningId = 'standard', lefty = false }) {
+export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, tuningId = 'standard', lefty = false, includeMelody = false }) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   let y = MARGIN
@@ -90,9 +90,10 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
       live.timeSignature,
     )
 
+    const laneH = includeMelody && (live.melody ?? []).length ? 11 : 0
     const needed = hasLyrics
       ? 10 + lineCount(live) * 15
-      : 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * 18
+      : 10 + Math.ceil(bars.length / barsPerRow(live.timeSignature)) * (18 + laneH)
     if (y + needed > PAGE.h - MARGIN) {
       doc.addPage()
       y = MARGIN
@@ -114,7 +115,7 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
 
     y = hasLyrics
       ? drawLyricLines(doc, live, y, variants)
-      : drawBars(doc, bars, live.key, y, live.timeSignature, variants)
+      : drawBars(doc, bars, live.key, y, live.timeSignature, variants, includeMelody ? (live.melody ?? []) : [])
     y += 7
   }
 
@@ -321,16 +322,58 @@ function drawLyricLines(doc, live, startY, variants = new Map()) {
 
 // --- the chart --------------------------------------------------------------
 
-function drawBars(doc, bars, key, startY, timeSignatureId, variants = new Map()) {
+/**
+ * The melody lane drawn under a row of bars.
+ *
+ * A contour rather than notation: engraving a stave is a different project, and
+ * a shaped line with the note names on it is what actually helps someone reading
+ * a chart — you can see where it rises and land on the right pitch.
+ */
+function drawMelodyRow(doc, notes, startBeat, endBeat, range, x0, rowW, y, beatsAcross) {
+  const laneH = 11
+  doc.setFillColor(246, 243, 238)
+  doc.rect(x0, y, rowW, laneH, 'F')
+
+  const span = Math.max(1, range.high - range.low)
+  for (const note of notes) {
+    if (note.at >= endBeat - 1e-6 || note.at + note.beats <= startBeat + 1e-6) continue
+    const from = Math.max(note.at, startBeat)
+    const to = Math.min(note.at + note.beats, endBeat)
+    const nx = x0 + ((from - startBeat) / beatsAcross) * rowW
+    const nw = Math.max(1.4, ((to - from) / beatsAcross) * rowW - 0.6)
+    // High notes near the top of the lane, low near the bottom, with a margin so
+    // the extremes are not flush against the edge.
+    const ny = y + 1.5 + (1 - (note.midi - range.low) / span) * (laneH - 4.6)
+    doc.setFillColor(...ACCENT)
+    doc.rect(nx, ny, nw, 2, 'F')
+    if (nw > 7) {
+      doc.setFont('helvetica', 'normal').setFontSize(5).setTextColor(...MUTED)
+      doc.text(ascii(midiName(note.midi)), nx + 0.4, ny + 4.6)
+    }
+  }
+  return laneH
+}
+
+function drawBars(doc, bars, key, startY, timeSignatureId, variants = new Map(), melody = []) {
   const perRow = barsPerRow(timeSignatureId)
   const barW = CONTENT_W / perRow
   const barH = 16
+  const perBar = timeSignatureOf(timeSignatureId).beatsPerBar
   let y = startY
+
+  // Pitch range for the whole section, so the contour keeps one vertical scale
+  // from row to row — a lane rescaled per row would draw the same note at two
+  // different heights.
+  const pitches = melody.map((n) => n.midi)
+  const range = pitches.length
+    ? { low: Math.min(...pitches) - 1, high: Math.max(...pitches) + 1 }
+    : null
+  const laneH = range ? 11 : 0
 
   for (let i = 0; i < bars.length; i += perRow) {
     const row = bars.slice(i, i + perRow)
 
-    if (y + barH > PAGE.h - MARGIN) {
+    if (y + barH + laneH > PAGE.h - MARGIN) {
       doc.addPage()
       y = MARGIN
     }
@@ -360,7 +403,13 @@ function drawBars(doc, bars, key, startY, timeSignatureId, variants = new Map())
       })
     })
 
-    y += barH
+    if (range) {
+      const rowStart = (i / perRow) * perBar
+      const across = row.length * perBar
+      drawMelodyRow(doc, melody, rowStart, rowStart + across, range, MARGIN, row.length * barW, y + barH, across)
+    }
+
+    y += barH + laneH
   }
   return y
 }

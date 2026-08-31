@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { chordSymbol } from '../theory/chords.js'
+import { chordSymbol, voiceChord } from '../theory/chords.js'
 import { midiName, mod } from '../theory/notes.js'
 import { timeSignatureOf } from '../theory/rhythm.js'
 import { classifyNote, chordAtBeat, rollRange, normaliseMelody } from '../theory/melody.js'
+import { playChord } from '../audio/synth.js'
 
 const ROW = 13
 const BEAT = 30
@@ -70,14 +71,37 @@ export default function MelodyRoll({
     return { beat: +beat.toFixed(4), midi }
   }
 
+  /**
+   * Add or remove a note.
+   *
+   * onChange is called with an updater rather than a finished array, so two
+   * clicks that land in one React batch both survive — the second would
+   * otherwise be computed from the array as it was before the first, and one of
+   * the two notes would vanish.
+   */
   const click = (event) => {
     const spot = at(event)
     if (!spot || !onChange) return
-    const existing = notes.find(
+    const hit = (list) => list.find(
       (n) => n.midi === spot.midi && spot.beat >= n.at - 1e-6 && spot.beat < n.at + n.beats - 1e-6,
     )
-    if (existing) onChange(notes.filter((n) => n !== existing))
-    else onChange(normaliseMelody([...notes, { at: spot.beat, beats: noteLength, midi: spot.midi }]))
+    if (hit(notes)) {
+      onChange((prev) => {
+        const list = normaliseMelody(prev ?? [])
+        const gone = hit(list)
+        return gone ? list.filter((n) => n !== gone) : list
+      })
+      return
+    }
+    onChange((prev) => normaliseMelody([...(prev ?? []), { at: spot.beat, beats: noteLength, midi: spot.midi }]))
+    // Hear it as you place it. Writing a line by clicking silently is guessing;
+    // the chord underneath is what the note has to work against, so it sounds
+    // too, quietly enough that the melody note stays on top.
+    const under = chordAtBeat(progression, durations, spot.beat)
+    playChord([spot.midi], { duration: 0.7, timbre: 'lead' })
+    if (under.chord) {
+      playChord(voiceChord(under.chord, { bottom: 48 }), { duration: 0.7, timbre: 'pad', gain: 0.06 })
+    }
   }
 
   const hovered = hover ? chordAtBeat(progression, durations, hover.beat) : null

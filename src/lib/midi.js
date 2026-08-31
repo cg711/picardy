@@ -43,7 +43,7 @@ const END_OF_TRACK = [0x00, 0xff, 0x2f, 0x00]
  * @param events array of { midis, beats, marker? } in playback order
  * @returns Uint8Array
  */
-export function buildMidi(events, { bpm = 84, timeSignature = '4/4', trackName = 'Picardy', velocity = 80 } = {}) {
+export function buildMidi(events, { bpm = 84, timeSignature = '4/4', trackName = 'Picardy', velocity = 80, melody = [] } = {}) {
   // --- conductor track -------------------------------------------------------
   const ts = timeSignatureOf(timeSignature)
   const [top, bottom] = timeSignature.split('/').map((n) => parseInt(n, 10))
@@ -69,9 +69,7 @@ export function buildMidi(events, { bpm = 84, timeSignature = '4/4', trackName =
   }
   conductor.push(...END_OF_TRACK)
 
-  // --- chord track -----------------------------------------------------------
-  // Collect absolute-time note on/off pairs, then sort and delta-encode. Doing
-  // it in absolute time first is what keeps overlapping notes correct.
+  // --- note tracks -----------------------------------------------------------
   const absolute = []
   let cursor = 0
   for (const event of events) {
@@ -87,21 +85,53 @@ export function buildMidi(events, { bpm = 84, timeSignature = '4/4', trackName =
     cursor += beats
   }
 
-  // Note-offs before note-ons at the same tick, so a repeat of the same pitch
-  // does not silence the note that just started.
-  absolute.sort((a, b) => a.tick - b.tick || (a.type === 'off' ? -1 : 1) - (b.type === 'off' ? -1 : 1))
+  const chordTrack = noteTrack(absolute, 'Chords', 0, velocity)
 
-  const track = [...metaEvent(0, 0x03, ascii('Chords'))]
+  // The melody rides on its own track and its own channel, so a DAW opens it as
+  // a separate part you can hand to a different instrument rather than a lump of
+  // notes inside the comping.
+  const melodyAbsolute = []
+  for (const note of melody ?? []) {
+    if (!(note.beats > 0) || note.midi < 0 || note.midi > 127) continue
+    const startTick = Math.round(note.at * TICKS_PER_BEAT)
+    const lengthTicks = Math.max(1, Math.round(note.beats * TICKS_PER_BEAT * 0.96))
+    melodyAbsolute.push({ tick: startTick, type: 'on', midi: note.midi })
+    melodyAbsolute.push({ tick: startTick + lengthTicks, type: 'off', midi: note.midi })
+  }
+  const tracks = [chordTrack]
+  if (melodyAbsolute.length) tracks.push(noteTrack(melodyAbsolute, 'Melody', 1, Math.min(127, velocity + 15)))
+
+  const header = chunk('MThd', [...u16(1), ...u16(1 + tracks.length), ...u16(TICKS_PER_BEAT)])
+  return new Uint8Array([
+    ...header,
+    ...chunk('MTrk', conductor),
+    ...tracks.flatMap((t) => [...chunk('MTrk', t)]),
+  ])
+}
+
+/**
+ * Absolute-time on/off pairs into one delta-encoded track.
+ *
+ * Sorting note-offs before note-ons at the same tick is what stops a repeat of
+ * the same pitch silencing the note that just started.
+ */
+function noteTrack(absolute, name, channel, velocity) {
+  const sorted = [...absolute].sort(
+    (a, b) => a.tick - b.tick || (a.type === 'off' ? -1 : 1) - (b.type === 'off' ? -1 : 1),
+  )
+  const track = [...metaEvent(0, 0x03, ascii(name))]
   let last = 0
-  for (const event of absolute) {
+  for (const event of sorted) {
     track.push(...vlq(event.tick - last))
-    track.push(event.type === 'on' ? 0x90 : 0x80, event.midi & 0x7f, event.type === 'on' ? velocity : 0x40)
+    track.push(
+      (event.type === 'on' ? 0x90 : 0x80) | (channel & 0x0f),
+      event.midi & 0x7f,
+      event.type === 'on' ? velocity : 0x40,
+    )
     last = event.tick
   }
   track.push(...END_OF_TRACK)
-
-  const header = chunk('MThd', [...u16(1), ...u16(2), ...u16(TICKS_PER_BEAT)])
-  return new Uint8Array([...header, ...chunk('MTrk', conductor), ...chunk('MTrk', track)])
+  return track
 }
 
 /** Playable events for a whole arrangement, with a marker at each section. */

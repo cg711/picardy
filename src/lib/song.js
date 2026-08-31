@@ -55,7 +55,7 @@ export function chordFlow(segment, max = 4) {
 const uid = () => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 /** Snapshot the editor into a storable segment. Chords are stored as symbols. */
-export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lines, leadIns, lyrics }) {
+export function makeSegment({ name, key, progression, inversions, durations, timeSignature, shapes, lines, leadIns, lyrics, melody }) {
   return {
     id: uid(),
     name: name || 'Untitled',
@@ -71,6 +71,10 @@ export function makeSegment({ name, key, progression, inversions, durations, tim
     // each line. Alignment is this association — there is no position to store.
     lyrics: progression.map((_, i) => lyrics?.[i] ?? ''),
     leadIns: [...(leadIns ?? [])],
+    // The melody line, in beats from the start of the section. Stored on the
+    // section rather than beside it, so it travels into the arrangement, the
+    // chart and the MIDI along with the chords it was written against.
+    melody: (melody ?? []).map((n) => ({ at: n.at, beats: n.beats, midi: n.midi })),
     at: Date.now(),
   }
 }
@@ -92,8 +96,37 @@ export function readSegment(segment) {
     // old whole-line text becomes the line's lead-in, which reads the same even
     // though nothing sits under a chord yet.
     leadIns: [...(segment.leadIns ?? segment.lyricLines ?? [])],
+    // Sections saved before melodies existed simply have none.
+    melody: [...(segment.melody ?? [])],
     timeSignature: segment.timeSignature || DEFAULT_TIME_SIGNATURE,
   }
+}
+
+/**
+ * The melody of a whole arrangement, in beats from the start.
+ *
+ * Each occurrence of a section contributes its own copy, offset by where that
+ * occurrence begins — a section used twice has its line played twice, which is
+ * the whole point of repeats.
+ */
+export function flattenMelody(song, segments) {
+  const byId = new Map(segments.map((s) => [s.id, s]))
+  const out = []
+  let beat = 0
+  for (const entry of song) {
+    const segment = byId.get(entry.segmentId)
+    if (!segment) continue
+    const live = readSegment(segment)
+    const length = live.durations.reduce((a, b) => a + b, 0)
+    const repeats = Math.max(1, entry.repeats ?? 1)
+    for (let r = 0; r < repeats; r++) {
+      for (const note of live.melody ?? []) {
+        out.push({ at: beat + note.at, beats: note.beats, midi: note.midi })
+      }
+      beat += length
+    }
+  }
+  return out
 }
 
 export function segmentBeats(segment) {

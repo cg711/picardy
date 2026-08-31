@@ -221,6 +221,49 @@ console.log('\n--- lyrics under chords ---')
   eq('  and the first is offset by the lead-in', cRun.x > lyricRun.x, true)
 }
 
+console.log('\n--- melody in the chart ---')
+{
+  const { buildChart } = await import(B + 'lib/pdf.js')
+  const { makeSegment } = await import(B + 'lib/song.js')
+
+  const seg = makeSegment({
+    name: 'Verse', key: makeKey('C', 'major'),
+    progression: ['Cmaj7', 'Am7', 'Dm7', 'G7'].map(parseChord),
+    inversions: [0, 0, 0, 0], durations: [4, 4, 4, 4], timeSignature: '4/4',
+    shapes: [], lines: [], lyrics: [], leadIns: [],
+    melody: [{ at: 0, beats: 2, midi: 64 }, { at: 4, beats: 2, midi: 72 }],
+  })
+  eq('  a section stores its melody', seg.melody.length, 2)
+
+  const runsOf = async (opts) => {
+    const doc = await buildChart({ song: [{ segmentId: seg.id, repeats: 1 }], segments: [seg], instrument: 'none', ...opts })
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1')
+    const out = []
+    const re = /\(((?:[^()\\]|\\.)*)\)\s*Tj/g
+    let m
+    while ((m = re.exec(raw))) out.push(m[1])
+    return out
+  }
+
+  const off = await runsOf({ includeMelody: false })
+  const on = await runsOf({ includeMelody: true })
+
+  eq('  the chords print either way', on.includes('Cmaj7') && off.includes('Cmaj7'), true)
+  eq('  note names appear when the melody is included', on.some((r) => r === 'E4'), true)
+  eq('  …and the higher note too', on.some((r) => r === 'C5'), true)
+  eq('  but not when it is left out', off.some((r) => r === 'E4' || r === 'C5'), false)
+
+  // A section with no melody must draw no lane whatever the option says.
+  const bare = makeSegment({
+    name: 'Bare', key: makeKey('C', 'major'),
+    progression: ['C'].map(parseChord), inversions: [0], durations: [4],
+    timeSignature: '4/4', shapes: [], lines: [], lyrics: [], leadIns: [],
+  })
+  eq('  a section with no melody stores none', bare.melody.length, 0)
+  const bareDoc = await buildChart({ song: [{ segmentId: bare.id, repeats: 1 }], segments: [bare], instrument: 'none', includeMelody: true })
+  eq('  and asking for one changes nothing', bareDoc.internal.getNumberOfPages(), 1)
+}
+
 console.log('\n--- tunings ---')
 {
   const ids = Object.keys(TUNINGS)
@@ -765,25 +808,95 @@ console.log('\n--- chart import ---')
 
 console.log('\n--- MIDI ---')
 {
-  const verse = { id: 'a', name: 'Verse', key: 'C', timeSignature: '4/4', chords: ['Cmaj7', 'Am7', 'Dm7', 'G7'], inversions: [0, 0, 0, 0], durations: ['1', '1', '1', '1'] }
+  /** A real parser: chunk walk, VLQ deltas, running status. */
+  const parseMidi = (bytes) => {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    const out = { format: dv.getUint16(8), declared: dv.getUint16(10), division: dv.getUint16(12), tracks: [] }
+    let i = 8 + dv.getUint32(4)
+    while (i < bytes.length) {
+      const type = String.fromCharCode(...bytes.slice(i, i + 4))
+      const len = dv.getUint32(i + 4)
+      const body = bytes.slice(i + 8, i + 8 + len)
+      i += 8 + len
+      if (type !== 'MTrk') continue
+
+      const track = { name: null, notes: [], channels: new Set(), tick: 0 }
+      let p = 0
+      let status = 0
+      const vlq = () => { let v = 0; while (body[p] & 0x80) { v = (v << 7) | (body[p++] & 0x7f) } return (v << 7) | body[p++] }
+      while (p < body.length) {
+        track.tick += vlq()
+        let b = body[p]
+        if (b & 0x80) { status = b; p++ } // else running status
+        if (status === 0xff) {
+          const meta = body[p++]
+          const n = vlq()
+          if (meta === 0x03) track.name = String.fromCharCode(...body.slice(p, p + n))
+          p += n
+          if (meta === 0x2f) break
+        } else if (status === 0xf0 || status === 0xf7) {
+          p += vlq()
+        } else {
+          const kind = status & 0xf0
+          const channel = status & 0x0f
+          const data = kind === 0xc0 || kind === 0xd0 ? 1 : 2
+          if (kind === 0x90 || kind === 0x80) {
+            track.channels.add(channel)
+            const midi = body[p]
+            const velocity = body[p + 1]
+            track.notes.push({ tick: track.tick, midi, on: kind === 0x90 && velocity > 0, channel })
+          }
+          p += data
+        }
+      }
+      out.tracks.push(track)
+    }
+    return out
+  }
+
+  const verse = { id: 'a', name: 'Verse', key: 'C', timeSignature: '4/4', chords: ['Cmaj7', 'Am7', 'Dm7', 'G7'], inversions: [0, 0, 0, 0], durations: [1, 1, 1, 1] }
   const segments = [verse]
   const events = songToEvents([{ segmentId: 'a', repeats: 2 }], segments)
-  const bytes = buildMidi(events, { bpm: 96, timeSignature: '4/4' })
 
-  const header = String.fromCharCode(...bytes.slice(0, 4))
-  eq('  writes a MIDI header', header, 'MThd')
-  eq('  format 1', bytes[9], 1)
-  eq('  two tracks', bytes[11], 2)
+  const plain = parseMidi(buildMidi(events, { bpm: 96, timeSignature: '4/4' }))
+  eq('  format 1', plain.format, 1)
+  eq('  declares two tracks', plain.declared, 2)
+  eq('  and actually holds two', plain.tracks.length, 2)
+  eq('  named', plain.tracks.map((t) => t.name).join(', '), 'Picardy, Chords')
+  // Channels are zero-based in the file; a DAW shows them as 1 and 2.
+  eq('  chords are on channel 0', [...plain.tracks[1].channels].join(','), '0')
 
-  // Note-ons and note-offs must balance, or a DAW hangs notes forever.
-  let on = 0, off = 0
-  for (let i = 0; i < bytes.length - 2; i++) {
-    if ((bytes[i] & 0xf0) === 0x90 && bytes[i] !== 0x90 + 0) continue
+  const balanced = (track) => {
+    const open = new Map()
+    for (const n of track.notes) {
+      const k = `${n.channel}:${n.midi}`
+      open.set(k, (open.get(k) ?? 0) + (n.on ? 1 : -1))
+      if ((open.get(k) ?? 0) < 0) return false
+    }
+    return [...open.values()].every((v) => v === 0)
   }
+  eq('  every note is turned off again', balanced(plain.tracks[1]), true)
   const expectedNotes = events.reduce((n, e) => n + e.midis.length, 0)
-  eq('  every chord contributes notes', expectedNotes > 0, true)
-  eq('  file is non-trivial', bytes.length > 100, true)
-  void on; void off
+  eq('  one note-on per voiced note', plain.tracks[1].notes.filter((n) => n.on).length, expectedNotes)
+
+  // With a melody: a third track, its own channel, and nothing left hanging.
+  const line = [{ at: 0, beats: 1, midi: 72 }, { at: 2, beats: 2, midi: 76 }, { at: 6, beats: 1, midi: 79 }]
+  const withMel = parseMidi(buildMidi(events, { bpm: 96, timeSignature: '4/4', melody: line }))
+  eq('  a melody adds a track', withMel.declared, 3)
+  eq('  …that is really there', withMel.tracks.length, 3)
+  eq('  …and is named', withMel.tracks[2].name, 'Melody')
+  eq('  the melody is on its own channel', [...withMel.tracks[2].channels].join(','), '1')
+  eq('  with one note-on each', withMel.tracks[2].notes.filter((n) => n.on).length, line.length)
+  eq('  and none left hanging', balanced(withMel.tracks[2]), true)
+  eq('  the chord track is untouched by it',
+    withMel.tracks[1].notes.length, plain.tracks[1].notes.length)
+
+  // Position: the note at beat 2 must land two beats in, at 480 ticks a beat.
+  const firstOn = withMel.tracks[2].notes.filter((n) => n.on)
+  eq('  a note at beat 2 lands on tick 960', firstOn[1].tick, 2 * withMel.division)
+
+  // An empty melody must not add an empty track.
+  eq('  no melody, no extra track', parseMidi(buildMidi(events, { melody: [] })).declared, 2)
 }
 
 console.log('\n--- pinned shapes ---')

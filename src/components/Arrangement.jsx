@@ -104,6 +104,9 @@ export default function Arrangement({
   onClearSong,
   onPlaySong,
   backingHref,
+  hasMelody,
+  includeMelody,
+  onIncludeMelody,
   onStopSong,
   onOpenAddSection,
   onSetHue,
@@ -213,6 +216,19 @@ export default function Arrangement({
           <button className="btn" onClick={onExport}>Export PDF chart</button>
           <button className="btn" onClick={onExportMidi} title="A .mid file you can drop into a DAW">Export MIDI</button>
           <button className="btn ghost" onClick={onClearSong}>Clear song</button>
+          {/* One switch for both exports, next to the two buttons it governs.
+              Hidden when there is no melody, because a toggle for something that
+              does not exist is a question asked for nothing. */}
+          {hasMelody && (
+            <label className="check" title="Carry the melody into the PDF chart and the MIDI file">
+              <input
+                type="checkbox"
+                checked={includeMelody}
+                onChange={(e) => onIncludeMelody(e.target.checked)}
+              />
+              <span>with melody</span>
+            </label>
+          )}
         </div>
       )}
 
