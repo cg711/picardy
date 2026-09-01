@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { chordSymbol, chordNotes, inversionLabel, inversionShort, bassOf } from '../theory/chords.js'
 import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
@@ -20,6 +20,7 @@ export default function ProgressionBar({
   onDuration,
   onClear,
   onMove,
+  onReorder,
   onSurprise,
   onSmooth,
   onAddAt,
@@ -38,6 +39,9 @@ export default function ProgressionBar({
   // order on every render, and clearing the progression would otherwise change
   // how many are called.
   const stripRef = useRef(null)
+  // Which chip is being dragged, and which one the pointer is over.
+  const [dragging, setDragging] = useState(null)
+  const [dropAt, setDropAt] = useState(null)
   const focused = playingIndex >= 0 ? playingIndex : activeIndex
   useEffect(() => {
     // Keep the chord being played (or edited) in view — on a long progression
@@ -149,8 +153,18 @@ export default function ProgressionBar({
                 <span aria-hidden="true">+</span>
               </button>
             <div
-              className={`prog-chip ${i === activeIndex ? 'active' : ''} ${i === playingIndex ? 'playing' : ''} ${a.diatonic ? '' : 'chromatic'} ${barOf[i].startsBar ? 'bar-start' : ''}`}
+              className={`prog-chip ${i === activeIndex ? 'active' : ''} ${i === playingIndex ? 'playing' : ''} ${a.diatonic ? '' : 'chromatic'} ${barOf[i].startsBar ? 'bar-start' : ''}${
+                dragging === i ? ' dragging' : ''
+              }${dropAt === i && dragging !== null && dragging !== i
+                ? (dragging < i ? ' drop-after' : ' drop-before') : ''}`}
               onClick={() => onSelect(i)}
+              onDragOver={(e) => { if (dragging !== null) { e.preventDefault(); setDropAt(i) } }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragging !== null && dragging !== i) onReorder?.(dragging, i)
+                setDragging(null)
+                setDropAt(null)
+              }}
             >
               {barOf[i].startsBar && <span className="bar-num">bar {barOf[i].bar}</span>}
               <div className="chip-top">
@@ -226,6 +240,24 @@ export default function ProgressionBar({
               </label>
 
               <div className="chip-controls" onClick={(e) => e.stopPropagation()}>
+                {/* Only the handle starts a drag. The chip is full of selects and
+                    buttons, and making the whole card draggable makes those
+                    fight the drag on every browser that allows it at all. */}
+                <button
+                  className="drag-handle"
+                  draggable
+                  aria-label={`Reorder ${chordSymbol(chord)}`}
+                  title="Drag to reorder"
+                  onDragStart={(e) => {
+                    setDragging(i)
+                    e.dataTransfer.effectAllowed = 'move'
+                    // Firefox will not begin a drag with nothing on the transfer.
+                    e.dataTransfer.setData('text/plain', String(i))
+                  }}
+                  onDragEnd={() => { setDragging(null); setDropAt(null) }}
+                >
+                  ⠿
+                </button>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>
                 <span
                   className={`chip-inv-badge${bass.index > 0 || !bass.isChordTone ? ' on' : ''}`}

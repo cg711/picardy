@@ -1020,6 +1020,31 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 a.brand { text-decoration: none; color: inherit; }
 
+/* ---------- list rows ---------- */
+/*
+ * One row shape, used by the export tab and the song structure tab. They list
+ * different things but they are the same gesture — here is a thing, here is what
+ * it is, here is what you can do to it — so they should not look like two
+ * different inventions.
+ */
+
+.list-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--border-soft); background: #ffffff05;
+}
+.list-row.whole {
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  border-color: var(--border);
+}
+.list-row.whole .row-what strong { font-size: 16px; }
+.row-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 180px; }
+.row-what strong { font-size: 14px; letter-spacing: -0.01em; }
+.row-meta { font-size: 11.5px; color: var(--text-dim); }
+.row-flow { font-size: 11.5px; color: var(--accent); }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+.row-actions .btn { text-decoration: none; }
+
 /* ---------- export panel ---------- */
 
 .export-panel { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -1030,30 +1055,61 @@ a.brand { text-decoration: none; color: inherit; }
   margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
   padding: 14px; border: 1px dashed var(--border); border-radius: 8px; text-align: center;
 }
-
-.ex-row {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 12px; border-radius: 8px;
-  border: 1px solid var(--border-soft); background: #ffffff05;
-}
-/* The whole song reads as the headline; the sections under it are variations
-   on the same row rather than a different kind of thing. */
-.ex-row.whole {
-  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
-  border-color: var(--border);
-}
-.ex-row.whole .ex-row-what strong { font-size: 16px; }
-.ex-row-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
-.ex-row-what strong { font-size: 14px; letter-spacing: -0.01em; }
-.ex-row-meta { font-size: 11.5px; color: var(--text-dim); }
-.ex-row-flow { font-size: 11.5px; color: var(--accent); }
-.ex-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
-.ex-row-actions .btn { text-decoration: none; }
 .ex-melody { margin-top: 6px; }
 
+/* ---------- song rows ---------- */
+
+.song-rows { display: flex; flex-direction: column; gap: 6px; padding: 0 14px; }
+/* The chip version of this badge is absolutely positioned against the card it
+   sat on. In a flex row there is no positioned ancestor, so it escaped the row
+   entirely — 265px above it, in the panel header. Put it back in flow. */
+.song-row .song-pos {
+  position: static;
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px;
+  display: grid; place-items: center; font-size: 11px; padding: 0; opacity: 1;
+  background: #ffffff0d; border: 0; color: var(--text-dim);
+}
+.song-row.playing { border-color: var(--accent); background: #4a351226; }
+
+/* The handle is the only thing that starts a drag, so a row can still be
+   selected, renamed and clicked without one beginning by accident. */
+.drag-handle {
+  flex: 0 0 auto; cursor: grab; padding: 2px 4px; border: 0; background: transparent;
+  color: var(--text-dim); font-size: 13px; line-height: 1; border-radius: 4px;
+}
+.drag-handle:hover { color: var(--text); background: #ffffff0d; }
+.song-row.dragging { opacity: 0.4; }
+.song-row.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+.song-row.drop-after { box-shadow: 0 2px 0 var(--accent); }
+
+.song-repeats input { width: 40px; }
+
+/* Chord chips drag the same way the song rows do. */
+.prog-chip.dragging { opacity: 0.4; }
+.prog-chip.drop-before { box-shadow: -2px 0 0 var(--accent); }
+.prog-chip.drop-after { box-shadow: 2px 0 0 var(--accent); }
+.chip-controls .drag-handle { font-size: 11px; padding: 0 2px; }
+
+/* The same dotted invitation the chord strip ends with, laid out as a row
+   because that is the shape of the thing it adds. */
+.add-row {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px dashed var(--border); background: transparent; color: var(--text-dim);
+  font: inherit; font-size: 13px;
+}
+.add-row:hover { border-color: var(--accent); color: var(--accent); background: #ffffff05; }
+.add-row .add-card-plus { font-size: 16px; line-height: 1; }
+
+.seg-name {
+  border: 0; background: transparent; color: inherit; font: inherit;
+  font-size: 14px; font-weight: 600; padding: 0; cursor: pointer; text-align: left;
+}
+.seg-name:hover { color: var(--accent); }
+
 @media (max-width: 560px) {
-  .ex-row-actions { margin-left: 0; width: 100%; }
-  .ex-row-actions .btn { flex: 1 1 auto; text-align: center; }
+  .row-actions { margin-left: 0; width: 100%; }
+  .row-actions .btn { flex: 1 1 auto; text-align: center; }
 }
 
 /* ---------- melody roll ---------- */

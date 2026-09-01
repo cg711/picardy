@@ -489,6 +489,32 @@ export default function App() {
     setGenerated(null)
   }
 
+  /**
+   * Move a chord to another slot outright, for dragging.
+   *
+   * Everything about a chord lives in a parallel array beside it — its
+   * inversion, its length, its pinned shape, its words, its lyric line — so all
+   * six move together or the chord arrives wearing someone else's voicing.
+   */
+  const reorderChord = (from, to) => {
+    if (from === to || from < 0 || from >= progression.length || to < 0 || to >= progression.length) return
+    const move = (arr, pad) => {
+      const next = [...arr]
+      while (next.length < progression.length) next.push(pad)
+      const [taken] = next.splice(from, 1)
+      next.splice(to, 0, taken)
+      return next
+    }
+    setProgression((p) => move(p, null))
+    setInversions((iv) => move(iv, 0))
+    setDurations((d) => move(d, DEFAULT_DURATION))
+    setShapes((sh) => move(sh, null))
+    setLyrics((w) => move(w, ''))
+    setLines((ln) => move(ln, 0))
+    setActiveIndex(to)
+    setGenerated(null)
+  }
+
   const setInversionAt = (i, inv) => {
     setInversions((iv) => {
       const next = [...iv]
@@ -792,6 +818,23 @@ export default function App() {
   }
 
   const removeEntry = (i) => setSong((list) => list.filter((_, j) => j !== i))
+
+  /**
+   * Move an entry to another position outright, for dragging.
+   *
+   * Distinct from moveEntry, which swaps with a neighbour: dropping four rows
+   * down should land where you dropped it, not swap with whatever happens to be
+   * there.
+   */
+  const reorderEntry = (from, to) => {
+    setSong((list) => {
+      if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return list
+      const next = [...list]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  }
 
   /**
    * The whole arrangement as a backing-track link.
@@ -1137,6 +1180,7 @@ export default function App() {
                 onAddToSong={addToSong}
                 onSetRepeats={setRepeats}
                 onMoveEntry={moveEntry}
+                onReorder={reorderEntry}
                 onRemoveEntry={removeEntry}
                 onClearSong={() => setSong([])}
                 onPlaySong={playSong}
@@ -1159,6 +1203,7 @@ export default function App() {
               onInvert={setInversionAt}
               onDuration={setDurationAt}
               onMove={moveChord}
+              onReorder={reorderChord}
               onSurprise={surprise}
               onFlavour={setFlavour}
               flavour={flavour}
@@ -1188,7 +1233,7 @@ export default function App() {
               }}
             />
 
-            {editorView !== 'sections' && (
+            {editorView !== 'sections' && editorView !== 'export' && (
             <Transport
               playing={playing}
               onPlay={play}
@@ -1220,7 +1265,10 @@ export default function App() {
                 Still outside the Sections tab on purpose: it acts on the
                 progression, not on the library, so it should not hide behind the
                 tab that lists what you have already saved. */}
-            {editorView !== 'sections' && (
+            {/* Both act on the progression. The export tab is about what leaves
+                the app, so a transport and a save-as-section field there are two
+                controls for a thing you are not doing. */}
+            {editorView !== 'sections' && editorView !== 'export' && (
               <SaveSectionRow canSave={progression.length > 0} onSave={saveSegment} savedNote={savedNote} />
             )}
           </div>

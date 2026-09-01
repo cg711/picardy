@@ -100,6 +100,7 @@ export default function Arrangement({
   onAddToSong,
   onSetRepeats,
   onMoveEntry,
+  onReorder,
   onRemoveEntry,
   onClearSong,
   onPlaySong,
@@ -111,6 +112,9 @@ export default function Arrangement({
   const [renaming, setRenaming] = useState(null)
   const [draftName, setDraftName] = useState('')
   const [picking, setPicking] = useState(null)
+  // Which row is being dragged, and which one the pointer is currently over.
+  const [dragging, setDragging] = useState(null)
+  const [dropAt, setDropAt] = useState(null)
 
   const byId = new Map(segments.map((s) => [s.id, s]))
   const totalBeats = songBeats(song, segments)
@@ -138,40 +142,52 @@ export default function Arrangement({
         )}
       </div>
 
-      <div className="song-strip prog-strip">
+      <div className="song-rows">
         {song.map((entry, i) => {
           const s = byId.get(entry.segmentId)
           if (!s) return null
           const hue = segmentHue(s)
           return (
-            <React.Fragment key={`${entry.segmentId}-${i}`}>
-            {/* Same insert slot as the chord strip: a section can go between two
-                others rather than only on the end. */}
-            <button
-              className="insert-slot"
-              onClick={() => onOpenAddSection(i)}
-              title={`Insert a section before ${s.name}`}
-              aria-label={`Insert a section before ${s.name}`}
-            >
-              <span aria-hidden="true">+</span>
-            </button>
             <div
-              className={`song-chip${i === playingSongIndex ? ' playing' : ''}`}
-              style={chip(hue)}
+              key={`${entry.segmentId}-${i}`}
+              className={`list-row song-row${i === playingSongIndex ? ' playing' : ''}${
+                dragging === i ? ' dragging' : ''
+              }${dropAt === i && dragging !== null && dragging !== i
+                ? (dragging < i ? ' drop-after' : ' drop-before') : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setDropAt(i) }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragging !== null && dragging !== i) onReorder(dragging, i)
+                setDragging(null)
+                setDropAt(null)
+              }}
             >
+              {/* Only the handle starts a drag, so the repeat field and the
+                  buttons in the row still behave like controls. */}
+              <button
+                className="drag-handle"
+                draggable
+                aria-label={`Reorder ${s.name}`}
+                title="Drag to reorder"
+                onDragStart={(e) => {
+                  setDragging(i)
+                  e.dataTransfer.effectAllowed = 'move'
+                  // Firefox will not start a drag without data on the transfer.
+                  e.dataTransfer.setData('text/plain', String(i))
+                }}
+                onDragEnd={() => { setDragging(null); setDropAt(null) }}
+              >
+                ⠿
+              </button>
               <span className="song-pos">{i + 1}</span>
-              <div className="song-chip-top">
-                <span className="song-name">{s.name}</span>
-                <button className="chip-x" title="Remove from song" onClick={() => onRemoveEntry(i)}>×</button>
+
+              <div className="row-what">
+                <strong style={{ color: `hsl(${hue} 70% 68%)` }}>{s.name}</strong>
+                <span className="row-meta">{s.key} · {describeLength(s.durations, s.timeSignature)}</span>
+                <span className="row-flow" title={s.chords.join(' – ')}>{chordFlow(s)}</span>
               </div>
-              {/* What the section actually is, so a chip is recognisable without
-                  loading it. */}
-              <div className="song-flow" title={s.chords.join(' – ')}>{chordFlow(s)}</div>
-              <div className="song-chip-meta">
-                {s.key} · {describeLength(s.durations, s.timeSignature)}
-              </div>
-              <div className="song-chip-controls">
-                <button title="Move earlier" onClick={() => onMoveEntry(i, -1)} disabled={i === 0}>‹</button>
+
+              <div className="row-actions">
                 <label className="song-repeats" title="Repeat count">
                   ×
                   <input
@@ -182,16 +198,24 @@ export default function Arrangement({
                     onChange={(e) => onSetRepeats(i, Math.max(1, Math.min(16, +e.target.value || 1)))}
                   />
                 </label>
-                <button title="Move later" onClick={() => onMoveEntry(i, 1)} disabled={i === song.length - 1}>›</button>
+                {/* Kept alongside the handle: dragging is not available on touch,
+                    and these are also the only way through this list by keyboard. */}
+                <button className="btn ghost tiny" title="Move earlier" onClick={() => onMoveEntry(i, -1)} disabled={i === 0}>‹</button>
+                <button className="btn ghost tiny" title="Move later" onClick={() => onMoveEntry(i, 1)} disabled={i === song.length - 1}>›</button>
+                <button className="btn ghost tiny" title="Insert a section before this one" onClick={() => onOpenAddSection(i)}>+</button>
+                <button className="btn ghost tiny" title="Remove from song" onClick={() => onRemoveEntry(i)}>×</button>
               </div>
             </div>
-            </React.Fragment>
           )
         })}
 
-        <button className="add-card" onClick={() => onOpenAddSection(song.length)} title="Add a section to the end of the song">
+        <button
+          className="add-row"
+          onClick={() => onOpenAddSection(song.length)}
+          title="Add a section to the end of the song"
+        >
           <span className="add-card-plus" aria-hidden="true">+</span>
-          <span className="add-card-label">Add section</span>
+          <span>Add section</span>
         </button>
       </div>
 
@@ -213,16 +237,15 @@ export default function Arrangement({
             <h3>Sections</h3>
             <span className="muted small">click a name to load it into the editor</span>
           </div>
-          {/* The same chip as the song strip above, minus the position badge and
-              the repeat count — the library holds sections, the song holds
-              placements of them. Sharing .song-chip is the point: it is the same
-              object seen in two places. */}
-          <div className="song-strip section-strip">
+          {/* The same row as the song above, minus the position and the repeat
+              count — the library holds sections, the song holds placements of
+              them. Sharing the shape is the point: it is one object seen twice. */}
+          <div className="song-rows">
             {segments.map((s) => {
               const hue = segmentHue(s)
               return (
-                <div key={s.id} className="song-chip section-chip" style={chip(hue)}>
-                  <div className="song-chip-top">
+                <div key={s.id} className="list-row song-row">
+                  <div className="row-what">
                     {renaming === s.id ? (
                       <input
                         className="rename"
@@ -239,45 +262,43 @@ export default function Arrangement({
                         }}
                       />
                     ) : (
-                      <button className="song-name seg-name" onClick={() => onLoad(s.id)} title="Load into the editor">
+                      <button
+                        className="seg-name"
+                        style={{ color: `hsl(${hue} 70% 68%)` }}
+                        onClick={() => onLoad(s.id)}
+                        title="Load into the editor"
+                      >
                         {s.name}
                       </button>
                     )}
-                    <button className="chip-x" onClick={() => onDeleteSegment(s.id)} title="Delete section">×</button>
+                    <span className="row-meta">{s.key} · {describeLength(s.durations, s.timeSignature)}</span>
+                    <span className="row-flow" title={s.chords.join(' – ')}>{chordFlow(s) || 'empty'}</span>
                   </div>
 
-                  <div className="song-flow" title={s.chords.join(' – ')}>{chordFlow(s) || 'empty'}</div>
-                  <div className="song-chip-meta">
-                    {s.key} · {describeLength(s.durations, s.timeSignature)}
-                  </div>
-
-                  {/* The picker replaces the controls rather than joining them, so the
-                      chip keeps its fixed height while you are choosing. */}
                   {picking === s.id ? (
                     <HuePicker current={hue} onPick={(h) => onSetHue(s.id, h)} onClose={() => setPicking(null)} />
                   ) : (
-                  <div className="song-chip-controls">
-                    <button
-                      className="hue-swatch"
-                      style={{ background: `hsl(${hue} 60% 52%)` }}
-                      title="Colour"
-                      aria-haspopup="menu"
-                      aria-expanded={picking === s.id}
-                      onClick={() => setPicking(picking === s.id ? null : s.id)}
-                    />
-                    <button
-                      onClick={() => {
-                        setRenaming(s.id)
-                        setDraftName(s.name)
-                      }}
-                      title="Rename"
-                    >
-                      ✎
-                    </button>
-                    <button className="add-to-song" onClick={() => onAddToSong(s.id)} title="Append to the song">
-                      + song
-                    </button>
-                  </div>
+                    <div className="row-actions">
+                      <button
+                        className="hue-swatch"
+                        style={{ background: `hsl(${hue} 60% 52%)` }}
+                        title="Colour"
+                        aria-haspopup="menu"
+                        aria-expanded={picking === s.id}
+                        onClick={() => setPicking(picking === s.id ? null : s.id)}
+                      />
+                      <button
+                        className="btn ghost tiny"
+                        onClick={() => { setRenaming(s.id); setDraftName(s.name) }}
+                        title="Rename"
+                      >
+                        ✎
+                      </button>
+                      <button className="btn ghost tiny" onClick={() => onAddToSong(s.id)} title="Append to the song">
+                        + song
+                      </button>
+                      <button className="btn ghost tiny" onClick={() => onDeleteSegment(s.id)} title="Delete section">×</button>
+                    </div>
                   )}
                 </div>
               )

@@ -46,13 +46,13 @@ export default function ExportPanel({
   const totalBeats = hasSong ? songBeats(song, segments) : 0
 
   const Row = ({ scope, title, meta, flow, hue, wide }) => (
-    <div className={`ex-row${wide ? ' whole' : ''}`}>
-      <div className="ex-row-what">
+    <div className={`list-row${wide ? ' whole' : ''}`}>
+      <div className="row-what">
         <strong style={hue != null ? { color: `hsl(${hue} 70% 68%)` } : undefined}>{title}</strong>
-        <span className="ex-row-meta">{meta}</span>
-        {flow && <span className="ex-row-flow">{flow}</span>}
+        <span className="row-meta">{meta}</span>
+        {flow && <span className="row-flow">{flow}</span>}
       </div>
-      <div className="ex-row-actions">
+      <div className="row-actions">
         {/* A real load, not an in-app link: the player reads the whole track out
             of the hash once, on mount. */}
         <a className="btn ghost tiny" href={backingHrefFor(scope)}>Backing track</a>

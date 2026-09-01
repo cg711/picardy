@@ -144,6 +144,17 @@ The three exports were previously scattered — a link in the top bar, two butto
 arrangement — and all three could only ever act on the whole song. Gathering them made the missing
 option obvious, because a backing track of just the chorus is the one people actually ask for.
 
+The song structure tab uses the same row, because it is the same gesture: here is a thing, here is
+what it is, here is what you can do to it. Both lists share one `.list-row` rather than each being
+invented separately. Song rows and chord chips can be dragged to reorder, from a handle rather than
+the whole element — a chip is full of selects and buttons, and making the card itself draggable
+makes those fight the drag. The ‹ › buttons stay: HTML5 drag does not exist on touch, and they are
+also the only way through the list by keyboard.
+
+Reordering splices rather than swaps, so dropping four rows down lands where you dropped it. For
+chords that means moving six parallel arrays together — inversion, length, pinned shape, words,
+lyric line — or the chord arrives wearing someone else's voicing.
+
 It works because everything already operated on a `(song, segments)` pair, so a scope — the whole
 song, one section, or what is in the editor — is just a different subset. `entriesFor()` does that
 translation once and all three exporters gained per-section output without any of them learning a
