@@ -1904,6 +1904,16 @@ a.brand { text-decoration: none; color: inherit; }
 .song-chip .hue-picker { margin-top: auto; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; }
 .song-chip .hue-dot { border-width: 2px; }
 
+/* In a row the picker is handed no width to be a percentage of, so `1fr`
+   columns collapse and `width: 100%` dots resolve to nothing — they came out
+   four pixels across. Fixed track and dot sizes here instead of stretching to a
+   container that is not telling it anything. */
+.song-row .hue-picker {
+  grid-template-columns: repeat(5, 24px);
+  gap: 6px; margin: 0 0 0 auto; padding: 7px;
+}
+.song-row .hue-dot { width: 24px; height: 24px; aspect-ratio: auto; }
+
 /* ---------- tuning picker ---------- */
 
 .tuning-picker { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
