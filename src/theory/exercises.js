@@ -129,8 +129,8 @@ export const LEVELS = [
     id: 'ear',
     rank: 2,
     label: 'By ear',
-    blurb: 'Nothing written down. Listen, then name what you heard.',
-    types: ['earInterval', 'earChord'],
+    blurb: 'Nothing written down. Hear a degree against its key, an interval, or a chord — and name it.',
+    types: ['degree', 'degree', 'earInterval', 'earChord'],
   },
   {
     id: 'instrument',
@@ -693,6 +693,73 @@ function findIntervalQ(levelId, rng) {
   return null
 }
 
+// --- scale degrees, in a key --------------------------------------------------
+
+/**
+ * What each degree of a major scale does.
+ *
+ * Functional ear training is not interval training with extra steps: the skill
+ * is hearing a note *against a tonic you are still holding in your head*, which
+ * is what you actually do when picking out a tune. So the explanation names the
+ * pull, not the distance.
+ */
+const DEGREES_IN_KEY = [
+  { n: 1, semis: 0, generic: 1, name: 'tonic', why: 'home — the note everything else is heard against, and the only one that sounds finished.' },
+  { n: 2, semis: 2, generic: 2, name: 'supertonic', why: 'a step above home, and it leans back down onto it.' },
+  { n: 3, semis: 4, generic: 3, name: 'mediant', why: 'the note that makes the key major. Bright, and restful without being final.' },
+  { n: 4, semis: 5, generic: 4, name: 'subdominant', why: 'it pulls downward, usually onto the third — the note a suspension resolves from.' },
+  { n: 5, semis: 7, generic: 5, name: 'dominant', why: 'the strongest note after the tonic. Open, stable, and the one a melody sits on to wait.' },
+  { n: 6, semis: 9, generic: 6, name: 'submediant', why: 'warm and a little wistful — it is the home note of the relative minor.' },
+  { n: 7, semis: 11, generic: 7, name: 'leading tone', why: 'a half step below home, and it pulls up to it hard. The most unfinished note in the key.' },
+]
+
+/**
+ * A short cadence to plant the tonic, then the note to name.
+ *
+ * Without the cadence this is just interval training from an arbitrary starting
+ * pitch. The whole question is "where does this sit in the key", so the key has
+ * to be established first — I, IV, V, I is the shortest figure that does it
+ * unambiguously.
+ */
+const CADENCE_DEGREES = [[0, 1, 'maj'], [5, 4, 'maj'], [7, 5, 'maj'], [0, 1, 'maj']]
+
+function degreeQ(levelId, rng) {
+  // Major only. Minor has two sixths and two sevenths depending on which form
+  // is in play, and "which degree is this" stops having one answer.
+  const pool = KEYS[levelId] ?? KEYS.basics
+  const key = makeKey(pick(pool.major.length ? pool.major : ['C'], rng), 'major')
+
+  const spec = pick(DEGREES_IN_KEY, rng)
+  const tonicPc = pcOf(key.tonic)
+  // Put the tonic somewhere singable, then the degree above it in the same octave.
+  const tonicMidi = 55 + (((tonicPc - 55) % 12) + 12) % 12
+  const noteMidi = tonicMidi + spec.semis
+
+  const cadence = CADENCE_DEGREES.map((d) => ({
+    midis: voiceChord(buildDegree(key, d), { bottom: 48 }),
+    beats: 1.2,
+  }))
+
+  const others = shuffle(DEGREES_IN_KEY.filter((d) => d.n !== spec.n), rng)
+  const options = distinct([String(spec.n), ...others.map((d) => String(d.n))]).slice(0, 4)
+
+  return {
+    type: 'degree',
+    prompt: 'A cadence, then one note. Which degree of the key is it?',
+    options,
+    answer: String(spec.n),
+    key,
+    play: [...cadence, { midis: [noteMidi], beats: 3 }],
+    playBpm: 132,
+    secret: true,
+    autoPlay: true,
+    // The degree number, then the note it landed on — naming the pitch only
+    // after the answer, so the question stays about the key rather than about
+    // absolute pitch.
+    explain: `${spec.n} — the ${spec.name}: ${spec.why} In ${keyName(key)} that is ${prettyName(spellDegree(key, spec.semis, spec.generic))}.`,
+  }
+}
+
 const BUILDERS = {
   numeral: numeralQ,
   fn: fnQ,
@@ -706,6 +773,7 @@ const BUILDERS = {
   noteOn: noteOnQ,
   findNote: findNoteQ,
   findInterval: findIntervalQ,
+  degree: degreeQ,
 }
 
 export const TYPE_LABELS = {
@@ -721,6 +789,7 @@ export const TYPE_LABELS = {
   noteOn: 'Reading the instrument',
   findNote: 'Finding notes',
   findInterval: 'Intervals on the instrument',
+  degree: 'Degrees in the key',
 }
 
 /**

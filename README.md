@@ -426,6 +426,17 @@ the first time the engine was corrected and then contradict the app in front of 
 learn; this cannot. When the minor-plagal shadowing bug was fixed in `analyze.js`, the drill started
 asking about minor plagal cadences the same day, with no content change.
 
+**Functional ear training** is the strongest of the drills, and lives in the By ear topic. A short
+I–IV–V–I plants the key, then one note sounds, and the question is which degree of the key it was.
+That is a different skill from interval training: it is hearing a note against a tonic you are still
+holding in your head, which is what you actually do when picking out a tune. Without the cadence it
+would just be intervals from an arbitrary pitch, so the check asserts the cadence is there, that the
+thing to name is a single note, and — re-derived from the played MIDI against the key's tonic — that
+the marked degree is the one that actually sounded.
+
+Major keys only. Minor has two sixths and two sevenths depending on which form is in play, and
+"which degree is this" stops having one answer.
+
 Six topics gate the vocabulary — keys, seventh chords, chromatic harmony, and which cadence names
 are even offered as wrong answers. Distractors have to come from the same world as the answer: a
 Phrygian half cadence against a plain V–I in Basics is eliminable without knowing any theory.

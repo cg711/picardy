@@ -767,6 +767,23 @@ console.log('\n--- exercises ---')
             problems.push(`${where}: the answer note is audible before answering`)
           }
         }
+        // A degree question is only a degree question if the key was planted
+        // first: without the cadence it is interval training from an arbitrary
+        // pitch, which is a different skill with a different answer.
+        if (q.type === 'degree') {
+          const played = q.play ?? []
+          if (played.length < 3) problems.push(`${where}: no cadence to establish the key`)
+          const last = played[played.length - 1]
+          const note = Array.isArray(last) ? last : last?.midis
+          if (!note || note.length !== 1) problems.push(`${where}: the thing to name is not a single note`)
+          else {
+            // Re-derive: the note really is that degree above the key's tonic.
+            const semis = ((note[0] - pcOfNote(q.key.tonic)) % 12 + 12) % 12
+            const want = { 0: '1', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 11: '7' }[semis]
+            if (want !== q.answer) problems.push(`${where}: says degree ${q.answer}, sounds ${want ?? semis}`)
+          }
+          if (q.key.mode !== 'major') problems.push(`${where}: minor has two sixths and sevenths, so the degree is ambiguous`)
+        }
         if (q.type === 'earChord') {
           // Two qualities that are the same pitch set from one root would be
           // indistinguishable however good the ear.
@@ -819,7 +836,7 @@ console.log('\n--- exercises ---')
   eq('  every level builds a question every time', problems.length, 0)
   if (problems.length) console.log('   ' + problems.slice(0, 8).join('\n   '))
   eq('  questions generated', built, EX_LEVELS.length * 120 * 12)
-  eq('  every question type appears', typesSeen.size, 12)
+  eq('  every question type appears', typesSeen.size, 13)
   console.log('     mix — ' + [...typesSeen].map(([t, n]) => `${t} ${n}`).join(', '))
 
   // Same seed, same question. Without this the check above proves nothing about

@@ -120,15 +120,21 @@ export default function ExercisesPage() {
   const hear = useCallback(() => {
     if (!voices.length) return
     stopPlayback()
-    if (voices.length === 1) {
-      playChord(voices[0], { duration: 1.8 })
+    // An entry is either bare MIDI or { midis, beats }: a cadence that plants a
+    // key wants short chords and a long note after it, and one length for
+    // everything would make that either rushed or interminable.
+    const items = voices.map((v) => (Array.isArray(v) ? { midis: v, beats: 2 } : v))
+    if (items.length === 1) {
+      playChord(items[0].midis, { duration: 1.8 })
       return
     }
-    playProgression(
-      voices.map((midis) => ({ midis, beats: 2 })),
-      { bpm: 92, timbre: 'piano', pattern: 'block', strum: 0.008 },
-    )
-  }, [voices])
+    playProgression(items, {
+      bpm: question?.playBpm ?? 92,
+      timbre: 'piano',
+      pattern: 'block',
+      strum: 0.008,
+    })
+  }, [voices, question])
 
   // Ear questions play themselves on arrival — the whole question is the sound,
   // and pressing play every single time is friction with no purpose. Before the
