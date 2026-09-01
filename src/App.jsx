@@ -583,6 +583,27 @@ export default function App() {
     })
   }
 
+  /**
+   * Start a new lyric line at chord `i`, or fold it back into the line above.
+   *
+   * A line break lives *between two chords*, so this is what the editor should
+   * expose — not "move a chord to another line", which is the same idea stated
+   * backwards and leaves everything after it behind. Every chord from here on
+   * shifts, because a break moves the rest of the lyric down with it.
+   */
+  const setLineBreakAt = (i, on) => {
+    setLines((ln) => {
+      const next = [...ln]
+      while (next.length < progression.length) next.push(0)
+      if (!on && (next[i] ?? 0) <= 0) return next
+      const delta = on ? 1 : -1
+      for (let j = i; j < progression.length; j++) next[j] = Math.max(0, (next[j] ?? 0) + delta)
+      return next
+    })
+    // A new line needs a lead-in slot; folding one away leaves a harmless spare.
+    if (on) setLeadIns((ls) => [...ls, ''])
+  }
+
   const moveChordToLine = (i, line) => {
     if (line < 0) return
     setLines((ln) => {
@@ -833,8 +854,6 @@ export default function App() {
     // Drop any arrangement entries that pointed at it.
     setSong((list) => list.filter((e) => e.segmentId !== id))
   }
-
-  const addToSong = (segmentId) => setSong((list) => [...list, { segmentId, repeats: 1 }])
 
   /** Same shape as inserting a chord: the index is a gap, not a position. */
   const insertIntoSong = (at, segmentId) => {
@@ -1198,8 +1217,7 @@ export default function App() {
                 onSelect={selectChord}
                 onLyric={setLyricAt}
                 onLeadIn={setLeadInAt}
-                onAddLine={() => setLeadIns((l) => [...l, ''])}
-                onMoveChordToLine={moveChordToLine}
+                onSetLineBreak={setLineBreakAt}
                 onRemove={removeChord}
               />
             )}
@@ -1217,7 +1235,6 @@ export default function App() {
                 onDeleteSegment={deleteSegment}
                 onOpenAddSection={(at) => setAddSectionAt(at)}
                 onSetHue={setSegmentHue}
-                onAddToSong={addToSong}
                 onSetRepeats={setRepeats}
                 onMoveEntry={moveEntry}
                 onReorder={reorderEntry}

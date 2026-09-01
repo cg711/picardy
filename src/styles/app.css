@@ -1953,43 +1953,94 @@ a.brand { text-decoration: none; color: inherit; }
 
 /* ---------- lyrics under their chords ---------- */
 
-.lyric-editor { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
-.lyric-line { display: flex; flex-direction: column; gap: 5px; }
-.lyric-line-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.lyric-preview {
-  font-size: 12px; color: var(--text-dim); font-style: italic;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-}
+.lyric-editor { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 
-.lyric-paste { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.lyric-paste input { flex: 1 1 220px; min-width: 0; }
+/* Each line is a card, because a line is the unit you write and rearrange. */
+.lyric-line {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 10px; border-radius: 9px;
+  border: 1px solid var(--border-soft); background: #ffffff04;
+}
+.lyric-line:focus-within { border-color: var(--border); background: #ffffff07; }
+
+.lyric-line-head { display: flex; align-items: center; gap: 8px; }
+.tl-line-num {
+  flex: 0 0 auto; width: 18px; height: 18px; border-radius: 4px;
+  display: grid; place-items: center;
+  font-size: 10px; color: var(--text-dim); background: #ffffff0d;
+}
+/* The line as one sentence: what it reads like, and where you type it. */
+.line-field {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 13.5px; padding: 5px 9px; border-radius: 6px;
+  background: #14110c; border: 1px solid var(--border-soft); color: var(--text);
+}
+.line-field:focus { border-color: var(--accent); outline: none; }
+.line-field:disabled { opacity: 0.5; }
+.lyric-line-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 
 /* The cells wrap like text, so a long line runs on rather than scrolling. */
 .lyric-row {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px;
-  padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px;
-  background: #00000028;
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 5px;
 }
-.lyric-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Cells share the width rather than being sized by their contents: columns that
+   resize on every keystroke are unreadable, and the point of this row is that a
+   chord sits over its own words. */
+.lyric-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 92px; }
 .lyric-cell input {
+  width: 100%; min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px; padding: 4px 6px; min-width: 0;
+  font-size: 13px; padding: 5px 7px;
   background: #14110c; border: 1px solid var(--border-soft); border-radius: 5px; color: var(--text);
 }
 .lyric-cell input:focus { border-color: var(--accent); outline: none; }
 .lyric-cell.active input { border-color: var(--accent); }
 .lyric-cell.playing input { box-shadow: 0 0 0 2px var(--accent-2) inset; }
-/* The lead-in is deliberately quieter — it belongs to the line, not to a chord. */
+/* The lead-in is deliberately quieter and narrower — it belongs to the line
+   rather than to a chord, and usually holds a word or two. */
+.lyric-cell.lead-in { flex: 0 1 76px; }
+.lyric-cell.lead-in.filled { flex: 1 1 92px; }
 .lyric-cell.lead-in input { background: #100d09; }
-.lyric-cell.lead-in .lyric-cell-chord { font-size: 9px; }
+.lyric-cell.lead-in .lyric-cell-chord {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em;
+}
 
-.lyric-cell-chord { display: flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.1; }
+.lyric-cell-chord {
+  display: flex; align-items: baseline; gap: 4px; min-width: 0;
+  font-size: 11px; line-height: 1.1;
+}
 .lyric-chord-name {
   font: inherit; font-size: 13px; font-weight: 600; color: var(--accent);
   background: none; border: 0; padding: 0; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .lyric-chord-name:hover { text-decoration: underline; }
-.lyric-chord-roman { font-size: 9px; color: var(--text-dim); }
-.lyric-chord-x { font-size: 11px; color: var(--text-dim); cursor: pointer; line-height: 1; }
+.lyric-chord-roman { font-size: 9px; color: var(--text-dim); flex: 0 0 auto; }
+/* The line-break toggle. Dim until you go near the cell, lit when this chord is
+   the one that starts a line — so the breaks in a lyric are visible at a glance
+   without a control shouting on every column. */
+.lyric-break {
+  font: inherit; font-size: 11px; line-height: 1; padding: 0 2px; flex: 0 0 auto;
+  background: none; border: 0; border-radius: 3px; cursor: pointer;
+  color: var(--text-dim); opacity: 0.25; transition: opacity 120ms, color 120ms;
+}
+.lyric-cell:hover .lyric-break, .lyric-cell:focus-within .lyric-break { opacity: 1; }
+.lyric-break.on { opacity: 1; color: var(--accent); background: #4a351240; }
+.lyric-break:hover { color: var(--accent); }
+/* Only on hover or focus: an × on every cell turns the row into a row of
+   delete buttons with some words in it. */
+.lyric-chord-x {
+  font: inherit; font-size: 12px; line-height: 1; padding: 0; margin-left: auto;
+  background: none; border: 0; color: var(--text-dim); cursor: pointer;
+  opacity: 0; transition: opacity 120ms; flex: 0 0 auto;
+}
+.lyric-cell:hover .lyric-chord-x,
+.lyric-cell:focus-within .lyric-chord-x { opacity: 1; }
 .lyric-chord-x:hover { color: var(--danger); }
-.lyric-empty { font-size: 12px; align-self: center; }
+.lyric-empty { font-size: 12px; align-self: center; padding: 4px 2px; }
+.lyric-add-line { align-self: flex-start; }
+
+@media (max-width: 560px) {
+  .lyric-cell { flex: 1 1 78px; }
+  .lyric-cell.lead-in { flex: 0 1 64px; }
+}

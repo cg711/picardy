@@ -97,7 +97,6 @@ export default function Arrangement({
   onLoad,
   onRename,
   onDeleteSegment,
-  onAddToSong,
   onSetRepeats,
   onMoveEntry,
   onReorder,
@@ -235,7 +234,7 @@ export default function Arrangement({
         <>
           <div className="sub-head">
             <h3>Sections</h3>
-            <span className="muted small">click a name to load it into the editor</span>
+            <span className="muted small">✎ opens a section for editing · click its name to rename</span>
           </div>
           {/* The same row as the song above, minus the position and the repeat
               count — the library holds sections, the song holds placements of
@@ -265,8 +264,8 @@ export default function Arrangement({
                       <button
                         className="seg-name"
                         style={{ color: `hsl(${hue} 70% 68%)` }}
-                        onClick={() => onLoad(s.id)}
-                        title="Load into the editor"
+                        onClick={() => { setRenaming(s.id); setDraftName(s.name) }}
+                        title="Rename this section"
                       >
                         {s.name}
                       </button>
@@ -287,15 +286,15 @@ export default function Arrangement({
                         aria-expanded={picking === s.id}
                         onClick={() => setPicking(picking === s.id ? null : s.id)}
                       />
+                      {/* The pencil edits the section — its chords, lyrics and
+                          melody — which is what a pencil on a section should
+                          mean. The name is renamed by clicking the name. */}
                       <button
                         className="btn ghost tiny"
-                        onClick={() => { setRenaming(s.id); setDraftName(s.name) }}
-                        title="Rename"
+                        onClick={() => onLoad(s.id)}
+                        title="Edit this section: load its chords, lyrics and melody into the editor"
                       >
                         ✎
-                      </button>
-                      <button className="btn ghost tiny" onClick={() => onAddToSong(s.id)} title="Append to the song">
-                        + song
                       </button>
                       <button className="btn ghost tiny" onClick={() => onDeleteSegment(s.id)} title="Delete section">×</button>
                     </div>

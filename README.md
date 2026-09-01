@@ -235,7 +235,26 @@ than a lump of notes inside the comping.
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
 strum, arpeggio, and bass + comp.
 
-**Lyrics under their chords.** Each chord owns a box holding the words sung on it, plus a lead-in
+**Lyrics under their chords.** Each line is a card: the whole line in one editable field at the
+top, and under it a row of chord-over-words cells, one column per chord. Typing in the line field
+splits the words across that line's chords; editing a cell updates the line. Writing a lyric a
+syllable at a time is not how anyone writes a lyric, and the fast way used to be behind a "paste
+words" button — one click further away than the fiddly way.
+
+Cells share the row's width rather than being sized by their contents, so the columns stop jittering
+with every keystroke and a chord actually sits over its own words.
+
+In the section library the pencil edits the *section* — it loads its chords, lyrics and melody into
+the editor — and the name is renamed by clicking the name. It was the other way round, which put the
+pencil on the one property of a section that is not its content.
+
+Line breaks are a toggle on the chord that would start the new line, marked ↵. A break lives
+*between two chords*, so that is what the control should say — the arrows it replaced moved "this
+line's first chord up to the previous line", which is the same idea stated backwards and left every
+chord after it behind. Breaking shifts the rest of the lyric down with it, and folding one away
+takes no other break with it.
+
+Each chord owns a box holding the words sung on it, plus a lead-in
 for whatever comes before the first chord of a line. A chord change mid-word is two boxes —
 `wait` under one and `ing` under the next, no space between — which is the case every
 proportional scheme handles badly. Pasting a line splits it across that line's chords at word
