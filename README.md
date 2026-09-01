@@ -133,6 +133,23 @@ arrangement can change key between sections, and a numeral measured from the wro
 than no numeral — in the Verse/Chorus/Verse test the E♭ chorus reads `Imaj7 vi7 ii7 V7`, not the
 `♭IIImaj7 i7 iv7 ♭VII7` it would be if read from the verse's C.
 
+## Exporting
+
+Everything that leaves the app lives on the studio's **Export** tab: the whole song as a headline
+row, then one row per section used in the arrangement, each offering a backing track, a PDF chart
+and a MIDI file. Sections are listed in first-appearance order and deduplicated — a section used
+three times is one thing you can export, not three, since the file would be identical.
+
+The three exports were previously scattered — a link in the top bar, two buttons under the
+arrangement — and all three could only ever act on the whole song. Gathering them made the missing
+option obvious, because a backing track of just the chorus is the one people actually ask for.
+
+It works because everything already operated on a `(song, segments)` pair, so a scope — the whole
+song, one section, or what is in the editor — is just a different subset. `entriesFor()` does that
+translation once and all three exporters gained per-section output without any of them learning a
+new shape. A section taken alone keeps its own key and rebases its melody to its own beat zero
+rather than staying where it sat in the arrangement; both are asserted.
+
 A whole arrangement can travel too. `Backing track` in the song actions flattens the song with
 `flattenSong` and encodes it, which is safe across sections in different keys because chord symbols
 are absolute — a section written in E♭ contributes E♭ chords, not degrees. Section boundaries ride

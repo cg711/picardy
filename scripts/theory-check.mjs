@@ -6,7 +6,7 @@
 
 const B = '../src/'
 const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort, QUALITIES } = await import(B + 'theory/chords.js')
-const { makeKey, romanNumeral, detectKey, scaleNotes, harmonicFunction, isDiatonic } = await import(B + 'theory/keys.js')
+const { makeKey, romanNumeral, detectKey, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
 const { prettyName, noteName, parseNote, pcOf: pcOfNote } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
@@ -219,6 +219,39 @@ console.log('\n--- lyrics under chords ---')
   // Both chords sit to the right of the line start, and Am to the right of C.
   eq('  chords print in order along the line', cRun.x < amRun.x, true)
   eq('  and the first is offset by the lead-in', cRun.x > lyricRun.x, true)
+}
+
+console.log('\n--- exporting one section or all of them ---')
+{
+  const { makeSegment, flattenSong, flattenMelody, songBeats } = await import(B + 'lib/song.js')
+  const verse = makeSegment({
+    name: 'Verse', key: makeKey('C', 'major'),
+    progression: ['Cmaj7', 'Am7'].map(parseChord), inversions: [0, 0], durations: [4, 4],
+    timeSignature: '4/4', shapes: [], lines: [], lyrics: [], leadIns: [],
+    melody: [{ at: 0, beats: 1, midi: 64 }],
+  })
+  const chorus = makeSegment({
+    name: 'Chorus', key: makeKey('Eb', 'major'),
+    progression: ['Ebmaj7', 'Bb7'].map(parseChord), inversions: [0, 0], durations: [4, 4],
+    timeSignature: '4/4', shapes: [], lines: [], lyrics: [], leadIns: [],
+    melody: [{ at: 4, beats: 1, midi: 70 }],
+  })
+  const segs = [verse, chorus]
+  const whole = [{ segmentId: verse.id, repeats: 1 }, { segmentId: chorus.id, repeats: 1 }, { segmentId: verse.id, repeats: 1 }]
+  const justChorus = [{ segmentId: chorus.id, repeats: 1 }]
+
+  eq('  the whole song is every entry', flattenSong(whole, segs).length, 6)
+  eq('  one section is only itself', flattenSong(justChorus, segs).length, 2)
+  eq('  and keeps its own key', keyName(flattenSong(justChorus, segs)[0].key), 'E♭ major')
+
+  // The point of a per-section export: the melody rebases to that section's own
+  // start instead of staying where it sat in the arrangement.
+  eq('  in the whole song the chorus melody is late', flattenMelody(whole, segs).map((n) => n.at).join(','), '0,12,16')
+  eq('  taken alone it starts at its own beat 4', flattenMelody(justChorus, segs).map((n) => n.at).join(','), '4')
+
+  eq('  a repeated section is played twice', flattenMelody(whole, segs).filter((n) => n.midi === 64).length, 2)
+  eq('  beats add up', songBeats(whole, segs), 24)
+  eq('  and a single section is shorter', songBeats(justChorus, segs), 8)
 }
 
 console.log('\n--- melody in the chart ---')

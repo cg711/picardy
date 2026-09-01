@@ -925,6 +925,14 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   background: transparent; color: var(--text-dim); cursor: pointer;
 }
 .view-tabs button.on { background: var(--surface-2); color: var(--text); }
+/* A fifth tab is one too many for a phone in one row: flex:1 squeezes every
+   label to about sixty pixels and the two-word ones wrap inside their own
+   button. Two tidy rows read better than five cramped columns, and nothing gets
+   hidden the way a scrolling tab strip would hide it. */
+@media (max-width: 560px) {
+  .view-tabs { flex-wrap: wrap; }
+  .view-tabs button { flex: 1 1 30%; white-space: nowrap; }
+}
 
 .lyric-timeline { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .lyric-timeline.dragging { cursor: grabbing; user-select: none; }
@@ -1011,6 +1019,42 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 /* ---------- legal pages ---------- */
 
 a.brand { text-decoration: none; color: inherit; }
+
+/* ---------- export panel ---------- */
+
+.export-panel { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.export-panel .ex-title { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.export-panel .ex-title input { flex: 1 1 auto; min-width: 0; }
+.export-panel .sub-head { margin-top: 10px; }
+.export-panel .empty-note {
+  margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  padding: 14px; border: 1px dashed var(--border); border-radius: 8px; text-align: center;
+}
+
+.ex-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--border-soft); background: #ffffff05;
+}
+/* The whole song reads as the headline; the sections under it are variations
+   on the same row rather than a different kind of thing. */
+.ex-row.whole {
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  border-color: var(--border);
+}
+.ex-row.whole .ex-row-what strong { font-size: 16px; }
+.ex-row-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
+.ex-row-what strong { font-size: 14px; letter-spacing: -0.01em; }
+.ex-row-meta { font-size: 11.5px; color: var(--text-dim); }
+.ex-row-flow { font-size: 11.5px; color: var(--accent); }
+.ex-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.ex-row-actions .btn { text-decoration: none; }
+.ex-melody { margin-top: 6px; }
+
+@media (max-width: 560px) {
+  .ex-row-actions { margin-left: 0; width: 100%; }
+  .ex-row-actions .btn { flex: 1 1 auto; text-align: center; }
+}
 
 /* ---------- melody roll ---------- */
 

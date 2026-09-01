@@ -43,6 +43,7 @@ import AnalysisPanel from './components/AnalysisPanel.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
 import ReharmPanel from './components/ReharmPanel.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
+import ExportPanel from './components/ExportPanel.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, linkProps } from './lib/router.js'
@@ -144,7 +145,8 @@ export default function App() {
   const [playingSongIndex, setPlayingSongIndex] = useState(-1)
   // While a song plays, roman numerals follow the section's own key.
   const [playbackKey, setPlaybackKey] = useState(null)
-  const [exporting, setExporting] = useState(false)
+  // What the PDF dialog is about to export: null when shut, otherwise the scope.
+  const [exporting, setExporting] = useState(null)
   // Whether exports carry the melody. One switch for both, sitting next to the
   // two buttons it governs — the PDF dialog mirrors it, MIDI has no dialog.
   const [includeMelody, setIncludeMelody] = useState(true)
@@ -658,22 +660,30 @@ export default function App() {
     playChord(voiceChord(chord, { bottom: 48 }), { timbre })
   }
 
-  const exportMidi = () => {
-    const hasSong = song.length > 0
-    const events = hasSong
-      ? songToEvents(song, segments)
+  /** A readable name for whatever is being exported. */
+  const nameFor = (scope) => {
+    if (scope?.kind === 'section') return segments.find((s) => s.id === scope.id)?.name ?? 'Section'
+    return songTitle || 'Untitled'
+  }
+
+  const exportMidi = (scope = { kind: 'song' }) => {
+    const entries = entriesFor(scope)
+    const fromSong = entries.length > 0
+    const events = fromSong
+      ? songToEvents(entries, segments)
       : progressionToEvents(progression, inversions, durations)
     if (!events.length) return
     // A song's melody is every section's line laid end to end; the editor's is
     // simply the one on the roll.
-    const line = hasSong ? flattenMelody(song, segments) : melody
+    const line = fromSong ? flattenMelody(entries, segments) : melody
+    const name = nameFor(scope)
     const bytes = buildMidi(events, {
       bpm,
       timeSignature,
-      trackName: hasSong ? songTitle : 'Progression',
+      trackName: name,
       melody: includeMelody ? line : [],
     })
-    downloadMidi(bytes, hasSong ? songTitle : 'progression')
+    downloadMidi(bytes, name)
   }
 
   const loadChart = (parsed, detectedKey) => {
@@ -791,22 +801,41 @@ export default function App() {
    * so the only thing lost is which key each section was *thought* in, and the
    * player shows section names instead of roman numerals anyway.
    */
+  /**
+   * A scope — the whole song, one section, or what is in the editor — as the
+   * (song, segments) pair every exporter already takes. Doing the translation
+   * once is what lets the backing track, the chart and the MIDI all gain
+   * per-section export without any of them learning a new shape.
+   */
+  const entriesFor = useCallback((scope) => {
+    if (scope?.kind === 'section') return [{ segmentId: scope.id, repeats: 1 }]
+    if (scope?.kind === 'progression') return []
+    return song
+  }, [song])
+
   /** Does the arrangement carry a melody at all? Governs whether the option shows. */
   const songHasMelody = useMemo(
     () => (song.length ? flattenMelody(song, segments).length > 0 : melody.length > 0),
     [song, segments, melody],
   )
 
-  const songBackingHref = useMemo(() => {
-    const items = flattenSong(song, segments)
-    if (!items.length) return null
+  const backingHrefFor = useCallback((scope) => {
+    const entries = entriesFor(scope)
+    // No arrangement to draw on: hand over whatever is in the editor.
+    if (!entries.length) {
+      if (!progression.length) return BACKING_PATH
+      return `${BACKING_PATH}#${encodeState({
+        key: musicKey, progression, inversions, durations, timeSignature,
+        bpm, style: isBand(pattern) ? pattern : 'pop', melody,
+      })}`
+    }
+    const items = flattenSong(entries, segments)
+    if (!items.length) return BACKING_PATH
 
     const sections = []
     let lastEntry = null
     items.forEach((item, i) => {
       if (item.entryIndex !== lastEntry) {
-        // The section's own key travels with it, so the player can read each
-        // section's numerals from the tonic it was actually written in.
         sections.push({
           at: i,
           name: item.segmentName,
@@ -824,9 +853,10 @@ export default function App() {
       timeSignature: items[0].timeSignature ?? timeSignature,
       bpm,
       style: isBand(pattern) ? pattern : 'pop',
+      melody: flattenMelody(entries, segments),
       sections,
     })}`
-  }, [song, segments, bpm, pattern, timeSignature])
+  }, [entriesFor, segments, progression, inversions, durations, musicKey, timeSignature, bpm, pattern, melody])
 
   const playSong = () => {
     const items = flattenSong(song, segments)
@@ -942,20 +972,6 @@ export default function App() {
             on. Share stays: it copies a link to the whole app state, not to one
             panel, so a bar that lyrics the app is where it belongs. */}
         <div className="topbar-right">
-          {/* A real load, not an in-app link: the player reads the whole track
-              from the hash once, on mount. */}
-          <a
-            className={`btn ghost${progression.length ? '' : ' disabled'}`}
-            href={progression.length
-              // A backing track with no band is not a backing track, so a
-              // chord-only style does not travel — the player opens on a band.
-              ? `${BACKING_PATH}#${encodeState({ key: musicKey, progression, inversions, durations, timeSignature, bpm, style: isBand(pattern) ? pattern : 'pop' })}`
-              : BACKING_PATH}
-            aria-disabled={progression.length ? undefined : 'true'}
-            title="Open this progression as a backing track to play over"
-          >
-            Backing track
-          </a>
           <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
           </button>
@@ -1003,6 +1019,7 @@ export default function App() {
                 ['melody', 'Melody'],
                 ['lyrics', 'Lyrics & timing'],
                 ['sections', 'Song structure'],
+                ['export', 'Export'],
               ].map(([id, label]) => (
                 <button
                   key={id}
@@ -1013,6 +1030,25 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {editorView === 'export' && (
+              <ExportPanel
+                song={song}
+                segments={segments}
+                songTitle={songTitle}
+                onSongTitle={setSongTitle}
+                progression={progression}
+                timeSignature={timeSignature}
+                musicKey={musicKey}
+                bpm={bpm}
+                hasMelody={songHasMelody}
+                includeMelody={includeMelody}
+                onIncludeMelody={setIncludeMelody}
+                backingHrefFor={backingHrefFor}
+                onExportPdf={(scope) => setExporting(scope)}
+                onExportMidi={exportMidi}
+              />
+            )}
 
             {editorView === 'melody' && progression.length === 0 && (
               <div className="progression empty">
@@ -1104,13 +1140,9 @@ export default function App() {
                 onRemoveEntry={removeEntry}
                 onClearSong={() => setSong([])}
                 onPlaySong={playSong}
-                backingHref={songBackingHref}
-                hasMelody={songHasMelody}
-                includeMelody={includeMelody}
-                onIncludeMelody={setIncludeMelody}
+
                 onStopSong={stopEverything}
-                onExport={() => setExporting(true)}
-                onExportMidi={exportMidi}
+
               />
               </>
             )}
@@ -1524,14 +1556,27 @@ export default function App() {
 
       {exporting && (
         <ExportDialog
-          defaultTitle={songTitle}
+          defaultTitle={nameFor(exporting)}
           lefty={lefty}
           hasMelody={songHasMelody}
-          onCancel={() => setExporting(false)}
+          onCancel={() => setExporting(null)}
           onExport={({ title, instrument, includeMelody: withMelody }) => {
-            setSongTitle(title)
-            exportChart({ song, segments, title, bpm, instrument, tuning, tuningId: shapeTuningKey, lefty, includeMelody: withMelody })
-            setExporting(false)
+            const entries = entriesFor(exporting)
+            // A section keeps its own name on the chart; the whole song takes
+            // the title, and typing one here is also how you rename the song.
+            if (exporting?.kind !== 'section') setSongTitle(title)
+            exportChart({
+              song: entries,
+              segments,
+              title,
+              bpm,
+              instrument,
+              tuning,
+              tuningId: shapeTuningKey,
+              lefty,
+              includeMelody: withMelody,
+            })
+            setExporting(null)
           }}
         />
       )}
