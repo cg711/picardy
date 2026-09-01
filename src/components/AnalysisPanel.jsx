@@ -25,6 +25,10 @@ export default function AnalysisPanel({
   playingIndex,
   onSelect,
   onUseKey,
+  // The single-chord readout, merged in below the whole-progression one. Passed
+  // as children rather than rebuilt here: it is the same panel's second half,
+  // not a second panel, and it needs half of App's state to render.
+  children,
 }) {
   // Read the progression in the key the user has set, so the numerals here
   // agree with the ones on the chips. What the chords *imply* is reported
@@ -75,6 +79,7 @@ export default function AnalysisPanel({
             they imply, what each chord is doing, and how the phrase closes.
           </p>
         </div>
+        {children}
       </div>
     )
   }
@@ -153,6 +158,7 @@ export default function AnalysisPanel({
           </ul>
         )}
       </div>
+      {children}
     </div>
   )
 }

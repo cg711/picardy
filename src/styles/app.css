@@ -162,13 +162,13 @@ a.brand:hover .tagline { color: var(--accent); }
      the whole page sideways. Put it back on what is now the flex item. */
   .layout > .col > .panel { min-width: 0; }
   .p-progression { order: 1; }
-  /* Reading the progression back comes straight after writing it, and before
-     any panel about a single chord. Without an order of its own it would
-     default to 0 and sit above the progression it is describing. */
+  /* Reading the progression back comes straight after writing it. Without an
+     order of its own it would default to 0 and sit above the progression it is
+     describing. The single-chord readout lives inside it now, so there is no
+     separate chord panel to place. */
   .p-analysis { order: 2; }
   .p-instruments { order: 3; }
-  .p-chord { order: 4; }
-  .p-recent { order: 5; }
+  .p-recent { order: 4; }
 }
 
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -473,6 +473,8 @@ select { cursor: pointer; }
 
 /* ---------- chord detail ---------- */
 
+.p-analysis .sub-head .playing-dot { margin-left: 6px; }
+.chip-reharm { font-size: 11px; }
 .chord-detail { padding: 12px 14px; display: flex; flex-direction: column; gap: 11px; align-items: flex-start; }
 .tone-legend { display: flex; gap: 5px; flex-wrap: wrap; }
 .tone-tag {

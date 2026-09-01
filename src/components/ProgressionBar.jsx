@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { chordSymbol, chordNotes, inversionLabel, inversionShort, bassOf } from '../theory/chords.js'
+import { chordSymbol, chordNotes, inversionLabel, bassOf } from '../theory/chords.js'
 import { prettyName } from '../theory/notes.js'
 import { romanNumeral } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
@@ -21,6 +21,7 @@ export default function ProgressionBar({
   onClear,
   onMove,
   onReorder,
+  onReharm,
   onSurprise,
   onSmooth,
   onAddAt,
@@ -259,13 +260,17 @@ export default function ProgressionBar({
                   ⠿
                 </button>
                 <button title="Move left" onClick={() => onMove(i, -1)} disabled={i === 0}>‹</button>
-                <span
-                  className={`chip-inv-badge${bass.index > 0 || !bass.isChordTone ? ' on' : ''}`}
-                  title={inversionLabel(chord, inv)}
-                >
-                  {inversionShort(chord, inv)}
-                </span>
                 <button title="Move right" onClick={() => onMove(i, 1)} disabled={i === progression.length - 1}>›</button>
+                {/* Reharmonising belongs to a chord, so it opens from the chord
+                    rather than from a tab two panels away. */}
+                <button
+                  className="chip-reharm"
+                  title={`Reharmonise ${chordSymbol(chord)}`}
+                  aria-label={`Reharmonise ${chordSymbol(chord)}`}
+                  onClick={() => onReharm?.(i)}
+                >
+                  ⟳
+                </button>
               </div>
             </div>
             </React.Fragment>

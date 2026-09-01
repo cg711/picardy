@@ -73,7 +73,10 @@ listed with reasons, because chord-scale choices are genuinely contested. Guide 
 7th that spell the chord) and the notes held in common with the next chord are marked on both
 instruments.
 
-**Reharmonisation.** Point the engine at a chord already written and it offers substitutions in
+**Reharmonisation.** Opened from the chord itself — the ⟳ on its card in the strip — in the same
+sidebar the chord picker uses. It was a tab inside the chord panel, which put it two clicks from the
+chord it acts on and hid it behind whichever tab you last left selected. Point the engine at a chord
+already written and it offers substitutions in
 place — tritone subs, rootless dominants, third swaps, borrowed variants, richer extensions, bass
 inversions — and chords to slip in before it: applied dominants, related ii chords, chromatic
 approach diminished chords.

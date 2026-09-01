@@ -41,7 +41,7 @@ import AddSectionDialog from './components/AddSectionDialog.jsx'
 import ExportDialog from './components/ExportDialog.jsx'
 import AnalysisPanel from './components/AnalysisPanel.jsx'
 import ScalePanel from './components/ScalePanel.jsx'
-import ReharmPanel from './components/ReharmPanel.jsx'
+import ReharmDialog from './components/ReharmDialog.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import ExportPanel from './components/ExportPanel.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
@@ -156,7 +156,8 @@ export default function App() {
   const [loop, setLoop] = useState(false)
   const [showScale, setShowScale] = useState(false)
   const [scaleId, setScaleId] = useState(null)
-  const [detailTab, setDetailTab] = useState('scale')
+  // Which chord the reharmonise sidebar is open on, or null when it is shut.
+  const [reharmAt, setReharmAt] = useState(null)
   const prevLen = useRef(progression.length)
   const activeIndexRef = useRef(activeIndex)
   useEffect(() => {
@@ -359,7 +360,23 @@ export default function App() {
   const openAddChord = (at) => {
     setActiveIndex(at - 1)
     setPreview(null)
+    setReharmAt(null)
     setAddOpen(true)
+  }
+
+  /**
+   * Reharmonise the chord at `i`.
+   *
+   * Selecting it first is what makes reharmOptions describe the right chord —
+   * and it is also what you want anyway, since the analysis below then reads the
+   * chord you are about to change.
+   */
+  const openReharm = (i) => {
+    if (i < 0 || i >= progression.length) return
+    setAddOpen(false)
+    setPreview(null)
+    setActiveIndex(i)
+    setReharmAt(i)
   }
 
   /**
@@ -1204,6 +1221,7 @@ export default function App() {
               onDuration={setDurationAt}
               onMove={moveChord}
               onReorder={reorderChord}
+              onReharm={openReharm}
               onSurprise={surprise}
               onFlavour={setFlavour}
               flavour={flavour}
@@ -1324,7 +1342,76 @@ export default function App() {
             playingIndex={playingIndex}
             onSelect={setActiveIndex}
             onUseKey={setMusicKey}
-          />
+          >
+            {/* The chord readout, merged into the analysis panel rather than
+                sitting in one of its own. They answer the same question at two
+                scales — what is this, and what is it doing — and a chart the
+                width of the column between them was mostly border. */}
+            {activeChord && (
+              <>
+                <div className="sub-head">
+                  <h3>{chordSymbol(activeChord)}</h3>
+                  <span className="muted small">
+                    {chordName(activeChord)} · {romanNumeral(activeChord, displayKey, activeInversion)} · {analysis.fnLabel}
+                    {preview ? ' · preview' : ''}
+                    {followingPlayback ? ` · bar ${playingBar}` : ''}
+                  </span>
+                  {followingPlayback && <span className="playing-dot" title="Following playback" />}
+                </div>
+
+                <div className="chord-detail">
+                  <div className="tone-legend">
+                    {chordNotes(activeChord).map((e, i) => (
+                      <span key={i} className="tone-tag" style={{ background: toneColor(e) }}>
+                        {prettyName(e.note)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="inv-row">
+                    <span className="lbl">Inversion</span>
+                    {Array.from({ length: nTones }, (_, i) => (
+                      <button
+                        key={i}
+                        className={`inv-pill ${activeInversion === i ? 'on' : ''}`}
+                        title={inversionLabel(activeChord, i)}
+                        onClick={() => {
+                          // focusIndex, not activeIndex: what you edit is the
+                          // chord named above the button, which during playback
+                          // is the sounding one.
+                          if (preview) setDisplayInversion(i)
+                          else if (focusIndex >= 0) setInversionAt(focusIndex, i)
+                        }}
+                      >
+                        {i === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][i - 1] ?? `${i}th`}
+                      </button>
+                    ))}
+                    <span className="muted small">{inversionLabel(activeChord, activeInversion)}</span>
+                  </div>
+                  {preview && (
+                    <button className="btn primary tiny" onClick={() => addChord(preview)}>
+                      Add {chordSymbol(preview)} to the progression
+                    </button>
+                  )}
+                </div>
+
+                {/* Reharmonise used to be the other half of a tab pair here. It
+                    opens from the chord in the strip now, so this is just the
+                    scales — no tabs, nothing hidden behind the one you left
+                    selected last time. */}
+                <ScalePanel
+                  chord={activeChord}
+                  scales={scales}
+                  activeScaleId={activeScale?.id}
+                  onSelectScale={setScaleId}
+                  showScale={showScale}
+                  onToggleShow={setShowScale}
+                  guideTones={guideTones(activeChord)}
+                  commonWithNext={nextChord ? commonTones(activeChord, nextChord) : []}
+                  nextChord={nextChord}
+                />
+              </>
+            )}
+          </AnalysisPanel>
 
           {/* One instrument at a time. Both show the same chord and both feed the
               same pool of selected notes, so the toggle changes the view rather
@@ -1468,108 +1555,26 @@ export default function App() {
             )}
           </div>
 
-          <div className="panel p-chord">
-            <div className="panel-head">
-              <h2>
-                {activeChord ? chordSymbol(activeChord) : 'No chord selected'}
-                {/* Say so when the panel has left your selection to follow the
-                    playhead, or the change looks like the app losing your place. */}
-                {followingPlayback && <span className="playing-dot" title="Following playback" />}
-              </h2>
-              {activeChord && (
-                <span className="muted">
-                  {chordName(activeChord)} · {romanNumeral(activeChord, displayKey, activeInversion)} · {analysis.fnLabel}
-                  {preview ? ' · preview' : ''}
-                  {followingPlayback ? ` · bar ${playingBar}` : ''}
-                </span>
-              )}
-            </div>
-
-            {activeChord && (
-              <div className="chord-detail">
-                <div className="tone-legend">
-                  {chordNotes(activeChord).map((e, i) => (
-                    <span key={i} className="tone-tag" style={{ background: toneColor(e) }}>
-                      {prettyName(e.note)}
-                    </span>
-                  ))}
-                </div>
-                <div className="inv-row">
-                  <span className="lbl">Inversion</span>
-                  {Array.from({ length: nTones }, (_, i) => (
-                    <button
-                      key={i}
-                      className={`inv-pill ${activeInversion === i ? 'on' : ''}`}
-                      title={inversionLabel(activeChord, i)}
-                      onClick={() => {
-                        // focusIndex, not activeIndex: what you edit is the chord
-                        // named above the button, which during playback is the
-                        // sounding one.
-                        if (preview) setDisplayInversion(i)
-                        else if (focusIndex >= 0) setInversionAt(focusIndex, i)
-                      }}
-                    >
-                      {i === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][i - 1] ?? `${i}th`}
-                    </button>
-                  ))}
-                  <span className="muted small">{inversionLabel(activeChord, activeInversion)}</span>
-                </div>
-                {preview && (
-                  <button className="btn primary tiny" onClick={() => addChord(preview)}>
-                    Add {chordSymbol(preview)} to the progression
-                  </button>
-                )}
-              </div>
-            )}
-
-            {activeChord && (
-              <>
-                <div className="detail-tabs">
-                  {[
-                    ['scale', 'Scale applications'],
-                    ['reharm', 'Reharmonise'],
-                  ].map(([id, label]) => (
-                    <button
-                      key={id}
-                      className={detailTab === id ? 'on' : ''}
-                      onClick={() => setDetailTab(id)}
-                      disabled={id === 'reharm' && (preview || focusIndex < 0)}
-                      title={id === 'reharm' && preview ? 'Select a chord in the progression first' : undefined}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {detailTab === 'scale' && (
-                  <ScalePanel
-                    chord={activeChord}
-                    scales={scales}
-                    activeScaleId={activeScale?.id}
-                    onSelectScale={setScaleId}
-                    showScale={showScale}
-                    onToggleShow={setShowScale}
-                    guideTones={guideTones(activeChord)}
-                    commonWithNext={nextChord ? commonTones(activeChord, nextChord) : []}
-                    nextChord={nextChord}
-                  />
-                )}
-
-                {detailTab === 'reharm' && !preview && focusIndex >= 0 && (
-                  <ReharmPanel
-                    chord={progression[focusIndex]}
-                    options={reharmOptions}
-                    onPreview={previewChord}
-                    onReplace={(chord) => replaceChordAt(focusIndex, chord)}
-                    onInsert={(chord) => insertChordAt(focusIndex, chord)}
-                  />
-                )}
-              </>
-            )}
-          </div>
-
         </section>
       </main>
+
+      <ReharmDialog
+        open={reharmAt !== null}
+        chord={reharmAt !== null ? progression[reharmAt] : null}
+        index={reharmAt ?? 0}
+        musicKey={musicKey}
+        options={reharmOptions}
+        onClose={() => setReharmAt(null)}
+        onPreview={previewChord}
+        onReplace={(chord) => {
+          if (reharmAt !== null) replaceChordAt(reharmAt, chord)
+          setReharmAt(null)
+        }}
+        onInsert={(chord) => {
+          if (reharmAt !== null) insertChordAt(reharmAt, chord)
+          setReharmAt(null)
+        }}
+      />
 
       <AddChordDialog
         open={addOpen}
