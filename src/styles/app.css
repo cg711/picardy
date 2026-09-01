@@ -166,8 +166,8 @@ a.brand:hover .tagline { color: var(--accent); }
      order of its own it would default to 0 and sit above the progression it is
      describing. The single-chord readout lives inside it now, so there is no
      separate chord panel to place. */
-  .p-analysis { order: 2; }
-  .p-instruments { order: 3; }
+  .p-instruments { order: 2; }
+  .p-analysis { order: 3; }
   .p-recent { order: 4; }
 }
 
@@ -474,6 +474,7 @@ select { cursor: pointer; }
 /* ---------- chord detail ---------- */
 
 .p-analysis .sub-head .playing-dot { margin-left: 6px; }
+.p-analysis > .sub-head:first-of-type { margin-top: 0; border-top: 0; padding-top: 4px; }
 .chip-reharm { font-size: 11px; }
 .chord-detail { padding: 12px 14px; display: flex; flex-direction: column; gap: 11px; align-items: flex-start; }
 .tone-legend { display: flex; gap: 5px; flex-wrap: wrap; }

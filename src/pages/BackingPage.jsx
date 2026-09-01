@@ -39,7 +39,6 @@ export default function BackingPage() {
   // The scheduler asks for these at the top of every pass, so nudging the tempo
   // mid-track takes effect next time round rather than being ignored.
   const live = useRef({ bpm, pattern: style })
-  live.current = { bpm, pattern: style }
 
   const progression = track?.progression ?? []
   const inversions = track?.inversions ?? []
@@ -110,6 +109,17 @@ export default function BackingPage() {
     setPlaying(false)
     setIndex(-1)
   }, [])
+
+  // Refreshed every render, and read once a bar by the scheduler.
+  live.current = {
+    bpm,
+    pattern: style,
+    items: progression.map((chord, i) => ({
+      midis: voiceChord(chord, { inversion: inversions[i] ?? 0, bottom: 48 }),
+      beats: toBeats(durations[i]),
+      bassPc: pcOf(bassOf(chord, inversions[i] ?? 0).note),
+    })),
+  }
 
   const start = useCallback(() => {
     if (!progression.length) return

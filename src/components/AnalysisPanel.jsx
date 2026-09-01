@@ -73,13 +73,13 @@ export default function AnalysisPanel({
         <div className="panel-head">
           <h2>Analysis</h2>
         </div>
+        {children}
         <div className="analysis-body">
           <p className="empty-note">
             Add a couple of chords and Picardy will read them back to you — the key
             they imply, what each chord is doing, and how the phrase closes.
           </p>
         </div>
-        {children}
       </div>
     )
   }
@@ -91,7 +91,17 @@ export default function AnalysisPanel({
     <div className="panel p-analysis">
       <div className="panel-head">
         <h2>Analysis</h2>
-        <span className="muted">
+      </div>
+
+      {/* The chord you are on, then the progression it sits in — narrowest
+          first, because that is the one you are looking at while you edit. The
+          key and the chord count belong to the progression, so they moved down
+          with it rather than staying in a head that now covers both. */}
+      {children}
+
+      <div className="sub-head">
+        <h3>Progression</h3>
+        <span className="muted small">
           read in {keyName(musicKey)}
           {progression.length === 1 ? ' · one chord' : ` · ${progression.length} chords`}
         </span>
@@ -158,7 +168,6 @@ export default function AnalysisPanel({
           </ul>
         )}
       </div>
-      {children}
     </div>
   )
 }

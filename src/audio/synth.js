@@ -156,6 +156,7 @@ let scheduled = []
 let playbackTimer = null
 
 export function stopPlayback() {
+  stopTransport()
   scheduled.forEach((id) => clearTimeout(id))
   scheduled = []
   if (playbackTimer) {
@@ -260,162 +261,214 @@ const spanAt = (spans, beat) =>
 const bassPcOf = (item) =>
   item?.bassPc != null ? item.bassPc : (item?.midis?.length ? Math.min(...item.midis) % 12 : 0)
 
-function scheduleBand(items, o) {
-  const { start, secondsPerBeat, timbre, styleId, ts, onStep, sectionStartBeats } = o
+/**
+ * One bar of the band, into a live scheduler.
+ *
+ * Takes the beat range rather than the whole piece: the rolling scheduler calls
+ * this a bar at a time, reading the current chords and style each time, which is
+ * what lets an edit be heard without restarting.
+ */
+function scheduleBandBar(o) {
+  const { spans, total, barBeat, barLen, timeOf, styleId, ts, timbre, isFill, crash } = o
   const bar = barFor(styleId, ts)
-  const { spans, total } = spansOf(items)
+  if (!bar) return
+
+  const emit = (beat, fn) => fn(timeOf(beat))
+
+  // barFor has already swung these and trimmed them to the bar; the only thing
+  // left to check is a final bar shorter than a full one.
+  for (const hit of isFill ? bar.fill : bar.drums) {
+    if (hit.at >= barLen - 1e-6) continue
+    emit(barBeat + hit.at, (when) => {
+      const v = playDrum(ctx, drumBus, hit.voice, when, hit.gain ?? 1)
+      if (v) voices.push(v)
+    })
+  }
+  // A crash on the downbeat after a fill, which is what the fill was for.
+  if (crash) {
+    emit(barBeat, (when) => {
+      const v = playDrum(ctx, drumBus, 'crash', when, 0.7)
+      if (v) voices.push(v)
+    })
+  }
+
+  for (const hit of bar.comp) {
+    if (hit.at >= barLen - 1e-6) continue
+    const span = spanAt(spans, barBeat + hit.at)
+    const dur = Math.min(hit.dur, barLen - hit.at)
+    emit(barBeat + hit.at, (when) => {
+      for (const m of span.item.midis ?? []) {
+        playNote(m, when, dur * secondsAt(o), timbre, 0.13 * (hit.gain ?? 1))
+      }
+    })
+  }
+
+  for (const hit of bar.bass) {
+    if (hit.at >= barLen - 1e-6) continue
+    const span = spanAt(spans, barBeat + hit.at)
+    const midi = bassMidiFor(bassPcOf(span.item)) + (hit.degree ?? 0)
+    const dur = Math.min(hit.dur, barLen - hit.at)
+    emit(barBeat + hit.at, (when) => playNote(midi, when, dur * secondsAt(o), 'bass', 0.3 * (hit.gain ?? 1)))
+  }
+  void total
+}
+
+/** Seconds per beat currently in force, for turning a length in beats into one in seconds. */
+const secondsAt = (o) => o.spb
+
+// --- the transport ------------------------------------------------------------
+//
+// Playback is a rolling scheduler rather than one big up-front pass: it keeps
+// about a bar of audio queued and builds each bar from the state as it is at
+// that moment. That is what lets a melody note you add, or a tempo you nudge, be
+// heard without stopping — the alternative is scheduling the whole piece once,
+// which is exactly why nothing used to take effect until you restarted.
+//
+// A bar is the unit because the groove is already generated per bar, bars tile
+// the piece contiguously so the loop join stays sample-accurate, and "within a
+// bar" is as live as a metrical instrument can sensibly be.
+
+/** How much audio to keep queued, and how often to top it up. */
+const LOOKAHEAD = 0.35
+const TICK_MS = 40
+
+let transport = null
+
+function stopTransport() {
+  if (transport?.timer) clearInterval(transport.timer)
+  transport = null
+}
+
+/**
+ * Beat to AudioContext time.
+ *
+ * Everything is placed through this one mapping so that a tempo change cannot
+ * pull the groove and the chords apart: re-anchoring moves both at once, always
+ * at a bar line, and never retimes anything already scheduled.
+ */
+const timeOfBeat = (t, beat) => t.anchorTime + (beat - t.anchorBeat) * t.spb
+
+function scheduleNextBar(t) {
+  const live = typeof t.opts.settings === 'function' ? (t.opts.settings() ?? {}) : {}
+  const items = live.items ?? t.opts.items
+  const melody = live.melody ?? t.opts.melody ?? []
+  const sectionStartBeats = live.sectionStartBeats ?? t.opts.sectionStartBeats ?? []
+  const pattern = live.pattern ?? t.opts.pattern
+  const bpm = Math.max(20, live.bpm ?? t.opts.bpm)
+  const timbre = live.timbre ?? t.opts.timbre
+  const ts = t.opts.timeSignature ?? { beatsPerBar: t.opts.beatsPerBar, top: t.opts.beatsPerBar, bottom: 4 }
   const perBar = ts.beatsPerBar
+
+  const { spans, total } = spansOf(items ?? [])
+  if (!(total > 0)) { finish(t); return }
+
+  // Reached the end: go round again, or stop.
+  if (t.beat >= total - 1e-6) {
+    if (!t.opts.loop) {
+      const when = timeOfBeat(t, total)
+      t.done = true
+      scheduled.push(setTimeout(
+        () => { stopTransport(); t.opts.onDone && t.opts.onDone() },
+        Math.max(0, (when - ctx.currentTime) * 1000),
+      ))
+      return
+    }
+    // Wrap without a gap: the next cycle starts exactly where this one ended.
+    t.anchorTime = timeOfBeat(t, total)
+    t.anchorBeat = 0
+    t.beat = 0
+  }
+
+  // Tempo changes take hold at a bar line, never inside one, and re-anchor from
+  // this bar's own start so nothing already scheduled moves.
+  const spb = 60 / bpm
+  if (Math.abs(spb - t.spb) > 1e-9) {
+    t.anchorTime = timeOfBeat(t, t.beat)
+    t.anchorBeat = t.beat
+    t.spb = spb
+  }
+
+  const barBeat = t.beat
+  const barLen = Math.min(perBar, total - barBeat)
+  const barIndex = Math.round(barBeat / perBar)
   const barCount = Math.max(1, Math.ceil(total / perBar - 1e-6))
 
-  // A fill goes in the bar before something changes: a new section, or the loop
-  // coming round again. Without them a groove stops being a performance and
-  // starts being wallpaper.
   const fills = new Set([barCount - 1])
   for (const b of sectionStartBeats) {
     if (b > 0) fills.add(Math.max(0, Math.ceil(b / perBar) - 1))
   }
 
-  const emit = (beat, fn) => {
-    if (beat < -1e-6 || beat > total + 1e-6) return
-    fn(start + beat * secondsPerBeat)
-  }
+  const timeOf = (beat) => timeOfBeat(t, beat)
+  const style = styleOf(pattern)
 
-  for (let b = 0; b < barCount; b++) {
-    const barStart = b * perBar
-    const barLen = Math.min(perBar, total - barStart)
-    const isFill = fills.has(b)
-
-    // barFor has already swung these and trimmed them to the bar; the only
-    // thing left to check is a final bar that is shorter than a full one.
-    for (const hit of isFill ? bar.fill : bar.drums) {
-      const at = hit.at
-      if (at >= barLen - 1e-6) continue
-      emit(barStart + at, (when) => {
-        const v = playDrum(ctx, drumBus, hit.voice, when, hit.gain ?? 1)
-        if (v) voices.push(v)
-      })
-    }
-    // A crash on the downbeat after a fill, which is what the fill was for.
-    if (b > 0 && fills.has(b - 1)) {
-      emit(barStart, (when) => {
-        const v = playDrum(ctx, drumBus, 'crash', when, 0.7)
-        if (v) voices.push(v)
-      })
-    }
-
-    for (const hit of bar.comp) {
-      const at = hit.at
-      if (at >= barLen - 1e-6) continue
-      const span = spanAt(spans, barStart + at)
-      const dur = Math.min(hit.dur, barLen - at) * secondsPerBeat
-      emit(barStart + at, (when) => {
-        for (const m of span.item.midis ?? []) playNote(m, when, dur, timbre, 0.13 * (hit.gain ?? 1))
-      })
-    }
-
-    for (const hit of bar.bass) {
-      const at = hit.at
-      if (at >= barLen - 1e-6) continue
-      const span = spanAt(spans, barStart + at)
-      const midi = bassMidiFor(bassPcOf(span.item)) + (hit.degree ?? 0)
-      const dur = Math.min(hit.dur, barLen - at) * secondsPerBeat
-      emit(barStart + at, (when) => playNote(midi, when, dur, 'bass', 0.3 * (hit.gain ?? 1)))
+  if (style.band) {
+    scheduleBandBar({
+      spans, total, barBeat, barLen, timeOf, styleId: pattern, ts, timbre,
+      isFill: fills.has(barIndex),
+      crash: barIndex > 0 && fills.has(barIndex - 1),
+      spb: t.spb,
+    })
+  } else {
+    // Chord-only patterns render a whole chord at a time, so a chord is
+    // scheduled when its start falls in this bar; its notes may run past the
+    // bar line, which is fine because they are placed in absolute time.
+    for (const span of spans) {
+      if (span.start < barBeat - 1e-6 || span.start >= barBeat + barLen - 1e-6) continue
+      const seconds = Math.max(0.05, (span.end - span.start) * t.spb)
+      const when = timeOf(span.start)
+      for (const note of renderPattern(span.item.midis, seconds, pattern, t.opts.strum)) {
+        playNote(note.midi, when + note.at, note.duration, timbre)
+      }
     }
   }
 
-  // The playhead still moves chord by chord, whatever the band is doing.
-  spans.forEach((span, i) => {
-    const when = start + span.start * secondsPerBeat
-    scheduled.push(setTimeout(() => onStep && onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
-  })
+  // The melody is read live too, so a note added ahead of the playhead sounds
+  // this time round rather than the next.
+  for (const note of melody) {
+    if (!(note.beats > 0)) continue
+    if (note.at < barBeat - 1e-6 || note.at >= barBeat + barLen - 1e-6) continue
+    playNote(note.midi, timeOf(note.at), note.beats * t.spb * 0.95, 'lead', 0.2)
+  }
 
-  return start + total * secondsPerBeat
+  // The playhead still moves chord by chord, whatever is playing underneath.
+  if (t.opts.onStep) {
+    spans.forEach((span, i) => {
+      if (span.start < barBeat - 1e-6 || span.start >= barBeat + barLen - 1e-6) return
+      const when = timeOf(span.start)
+      scheduled.push(setTimeout(() => t.opts.onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
+    })
+  }
+
+  t.beat = barBeat + barLen
 }
 
-function scheduleChords(items, o) {
-  const { start, secondsPerBeat, timbre, pattern, strum, onStep } = o
-  let cursor = start
-  items.forEach((item, i) => {
-    const seconds = Math.max(0.05, (item.beats ?? 4) * secondsPerBeat)
-    const when = cursor
-    for (const note of renderPattern(item.midis, seconds, pattern, strum)) {
-      playNote(note.midi, when + note.at, note.duration, timbre)
-    }
-    scheduled.push(setTimeout(() => onStep && onStep(i), Math.max(0, (when - ctx.currentTime) * 1000)))
-    cursor += seconds
-  })
-  return cursor
+function finish(t) {
+  t.done = true
+  stopTransport()
+  t.opts.onDone && t.opts.onDone()
+}
+
+function tick() {
+  const t = transport
+  if (!t || t.done) return
+  let guard = 0
+  while (!t.done && timeOfBeat(t, t.beat) < ctx.currentTime + LOOKAHEAD) {
+    scheduleNextBar(t)
+    // A pathological state — a zero-length bar, say — must not spin forever.
+    if (++guard > 64) break
+  }
 }
 
 /**
- * How far ahead of the end the next pass is scheduled, in seconds.
- *
- * A loop that re-arms *at* the end is never seamless: the timer fires late, and
- * the new pass then starts relative to whenever that happened. Scheduling early
- * against an explicit start time means the next downbeat is placed in
- * AudioContext time before the current pass has finished sounding, so the join
- * is sample-accurate rather than merely quick.
+ * Start playing. `items` is the starting point; a `settings` callback can hand
+ * back fresher chords, melody, tempo and style, and is consulted once per bar.
  */
-const LOOP_LOOKAHEAD = 0.25
-
-function runPass(items, opts, startAt) {
-  // `settings` is consulted once per pass rather than captured at play time, so
-  // a tempo nudge or a style change lands on the next time round instead of
-  // being ignored until playback is restarted. Restarting would be the worse
-  // instrument: you would lose your place every time you touched the tempo.
-  const live = typeof opts.settings === 'function' ? (opts.settings() ?? {}) : {}
-  const {
-    timbre, strum, countIn, beatsPerBar,
-    timeSignature, loop, onStep, onDone, sectionStartBeats,
-  } = opts
-  const bpm = live.bpm ?? opts.bpm
-  const pattern = live.pattern ?? opts.pattern
-  const secondsPerBeat = 60 / bpm
-  let start = startAt
-
-  if (countIn > 0) {
-    for (let i = 0; i < countIn; i++) {
-      playClick(start + i * secondsPerBeat, i % beatsPerBar === 0)
-    }
-    start += countIn * secondsPerBeat
-  }
-
-  const ts = timeSignature ?? { beatsPerBar, top: beatsPerBar, bottom: 4 }
-  const style = styleOf(pattern)
-  const end = style.band
-    ? scheduleBand(items, { start, secondsPerBeat, timbre, styleId: pattern, ts, onStep, sectionStartBeats })
-    : scheduleChords(items, { start, secondsPerBeat, timbre, pattern, strum, onStep })
-
-  // The melody rides on the same timeline as everything else, so it does not
-  // care whether a band is playing underneath or just block chords.
-  for (const note of opts.melody ?? []) {
-    if (!(note.beats > 0)) continue
-    playNote(
-      note.midi,
-      start + note.at * secondsPerBeat,
-      note.beats * secondsPerBeat * 0.95,
-      'lead',
-      0.2,
-    )
-  }
-
-  if (loop) {
-    // Re-arm one pass at a time rather than scheduling the whole loop up front,
-    // so tempo and style changes take effect on the next pass and Stop always
-    // works — but arm it early, and hand it the exact time this pass ends.
-    const fireIn = Math.max(0, (end - LOOP_LOOKAHEAD - ctx.currentTime) * 1000)
-    playbackTimer = setTimeout(() => runPass(items, { ...opts, countIn: 0 }, end), fireIn)
-  } else {
-    playbackTimer = setTimeout(() => onDone && onDone(), Math.max(0, (end - ctx.currentTime) * 1000))
-  }
-  return end
-}
-
 export function playProgression(items, opts = {}) {
   ensureContext()
   resumeAudio()
   stopPlayback()
-  runPass(items, {
+
+  const o = {
     bpm: 84,
     timbre: 'piano',
     strum: 0.012,
@@ -430,7 +483,23 @@ export function playProgression(items, opts = {}) {
     settings: null,
     melody: [],
     ...opts,
-  }, ctx.currentTime + 0.08)
+    items,
+  }
+
+  const first = typeof o.settings === 'function' ? (o.settings() ?? {}) : {}
+  const spb = 60 / Math.max(20, first.bpm ?? o.bpm)
+  let start = ctx.currentTime + 0.08
+
+  if (o.countIn > 0) {
+    for (let i = 0; i < o.countIn; i++) {
+      playClick(start + i * spb, i % o.beatsPerBar === 0)
+    }
+    start += o.countIn * spb
+  }
+
+  transport = { opts: o, beat: 0, anchorBeat: 0, anchorTime: start, spb, timer: null, done: false }
+  tick()
+  transport.timer = setInterval(tick, TICK_MS)
 }
 
 export function isAudioReady() {

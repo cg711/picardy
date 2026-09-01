@@ -617,7 +617,29 @@ export default function App() {
     })
   }
 
-  const playChords = (chords, invs, durs = []) => {
+  /**
+   * What the transport should be playing *now*, read once a bar by the
+   * scheduler. Held in a ref rather than passed by value because the whole point
+   * is that it is newer than whatever was true when Play was pressed.
+   */
+  const liveRef = useRef(null)
+  liveRef.current = {
+    bpm,
+    pattern,
+    timbre,
+    melody,
+    items: progression.map((c, i) => ({
+      midis: voiceChord(c, { inversion: inversions[i] ?? 0, bottom: 48 }),
+      beats: toBeats(durations[i]),
+      bassPc: pcOf(bassOf(c, inversions[i] ?? 0).note),
+    })),
+  }
+
+  /**
+   * @param live when true the scheduler follows the editor as it changes; false
+   *   for one-off auditions of something that is not the progression.
+   */
+  const playChords = (chords, invs, durs = [], { live = false } = {}) => {
     if (!chords.length) return
     const voiced = chords.map((c, i) => ({
       midis: voiceChord(c, { inversion: invs[i] ?? 0, bottom: 48 }),
@@ -636,6 +658,7 @@ export default function App() {
       beatsPerBar: timeSignatureOf(timeSignature).beatsPerBar,
       timeSignature: timeSignatureOf(timeSignature),
       melody,
+      settings: live ? () => liveRef.current : null,
       strum: timbre === 'guitar' ? 0.02 : 0.008,
       onStep: (i) => setPlayingIndex(i),
       onDone: () => {
@@ -645,7 +668,7 @@ export default function App() {
     })
   }
 
-  const play = () => playChords(progression, inversions, durations)
+  const play = () => playChords(progression, inversions, durations, { live: true })
 
   /** Generate a whole progression that lands on a real cadence, and play it. */
   const surprise = () => {
@@ -1332,91 +1355,6 @@ export default function App() {
         </section>
 
         <section className="col col-right">
-          {/* Reads the whole progression, so it sits above the panels that read a
-              single chord — you look at what you have written before you look at
-              how to play any one part of it. */}
-          <AnalysisPanel
-            progression={progression}
-            musicKey={musicKey}
-            activeIndex={activeIndex}
-            playingIndex={playingIndex}
-            onSelect={setActiveIndex}
-            onUseKey={setMusicKey}
-          >
-            {/* The chord readout, merged into the analysis panel rather than
-                sitting in one of its own. They answer the same question at two
-                scales — what is this, and what is it doing — and a chart the
-                width of the column between them was mostly border. */}
-            {activeChord && (
-              <>
-                <div className="sub-head">
-                  <h3>{chordSymbol(activeChord)}</h3>
-                  <span className="muted small">
-                    {chordName(activeChord)} · {romanNumeral(activeChord, displayKey, activeInversion)} · {analysis.fnLabel}
-                    {preview ? ' · preview' : ''}
-                    {followingPlayback ? ` · bar ${playingBar}` : ''}
-                  </span>
-                  {followingPlayback && <span className="playing-dot" title="Following playback" />}
-                </div>
-
-                <div className="chord-detail">
-                  <div className="tone-legend">
-                    {chordNotes(activeChord).map((e, i) => (
-                      <span key={i} className="tone-tag" style={{ background: toneColor(e) }}>
-                        {prettyName(e.note)}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="inv-row">
-                    <span className="lbl">Inversion</span>
-                    {Array.from({ length: nTones }, (_, i) => (
-                      <button
-                        key={i}
-                        className={`inv-pill ${activeInversion === i ? 'on' : ''}`}
-                        title={inversionLabel(activeChord, i)}
-                        onClick={() => {
-                          // focusIndex, not activeIndex: what you edit is the
-                          // chord named above the button, which during playback
-                          // is the sounding one.
-                          if (preview) setDisplayInversion(i)
-                          else if (focusIndex >= 0) setInversionAt(focusIndex, i)
-                        }}
-                      >
-                        {i === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][i - 1] ?? `${i}th`}
-                      </button>
-                    ))}
-                    <span className="muted small">{inversionLabel(activeChord, activeInversion)}</span>
-                  </div>
-                  {preview && (
-                    <button className="btn primary tiny" onClick={() => addChord(preview)}>
-                      Add {chordSymbol(preview)} to the progression
-                    </button>
-                  )}
-                </div>
-
-                {/* Reharmonise used to be the other half of a tab pair here. It
-                    opens from the chord in the strip now, so this is just the
-                    scales — no tabs, nothing hidden behind the one you left
-                    selected last time. */}
-                <ScalePanel
-                  chord={activeChord}
-                  scales={scales}
-                  activeScaleId={activeScale?.id}
-                  onSelectScale={setScaleId}
-                  showScale={showScale}
-                  onToggleShow={setShowScale}
-                  guideTones={guideTones(activeChord)}
-                  commonWithNext={nextChord ? commonTones(activeChord, nextChord) : []}
-                  nextChord={nextChord}
-                />
-              </>
-            )}
-          </AnalysisPanel>
-
-          {/* One instrument at a time. Both show the same chord and both feed the
-              same pool of selected notes, so the toggle changes the view rather
-              than the state — switching mid-selection keeps the notes you picked
-              on the other instrument. */}
           <div className="panel p-instruments">
             <div className="panel-head">
               <h2>Instruments</h2>
@@ -1554,6 +1492,91 @@ export default function App() {
             </>
             )}
           </div>
+
+          {/* The chord you are on comes first inside this panel, then the whole
+              progression underneath it — see AnalysisPanel. */}
+          <AnalysisPanel
+            progression={progression}
+            musicKey={musicKey}
+            activeIndex={activeIndex}
+            playingIndex={playingIndex}
+            onSelect={setActiveIndex}
+            onUseKey={setMusicKey}
+          >
+            {/* The chord readout, merged into the analysis panel rather than
+                sitting in one of its own. They answer the same question at two
+                scales — what is this, and what is it doing — and a chart the
+                width of the column between them was mostly border. */}
+            {activeChord && (
+              <>
+                <div className="sub-head">
+                  <h3>{chordSymbol(activeChord)}</h3>
+                  <span className="muted small">
+                    {chordName(activeChord)} · {romanNumeral(activeChord, displayKey, activeInversion)} · {analysis.fnLabel}
+                    {preview ? ' · preview' : ''}
+                    {followingPlayback ? ` · bar ${playingBar}` : ''}
+                  </span>
+                  {followingPlayback && <span className="playing-dot" title="Following playback" />}
+                </div>
+
+                <div className="chord-detail">
+                  <div className="tone-legend">
+                    {chordNotes(activeChord).map((e, i) => (
+                      <span key={i} className="tone-tag" style={{ background: toneColor(e) }}>
+                        {prettyName(e.note)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="inv-row">
+                    <span className="lbl">Inversion</span>
+                    {Array.from({ length: nTones }, (_, i) => (
+                      <button
+                        key={i}
+                        className={`inv-pill ${activeInversion === i ? 'on' : ''}`}
+                        title={inversionLabel(activeChord, i)}
+                        onClick={() => {
+                          // focusIndex, not activeIndex: what you edit is the
+                          // chord named above the button, which during playback
+                          // is the sounding one.
+                          if (preview) setDisplayInversion(i)
+                          else if (focusIndex >= 0) setInversionAt(focusIndex, i)
+                        }}
+                      >
+                        {i === 0 ? 'root' : ['1st', '2nd', '3rd', '4th', '5th'][i - 1] ?? `${i}th`}
+                      </button>
+                    ))}
+                    <span className="muted small">{inversionLabel(activeChord, activeInversion)}</span>
+                  </div>
+                  {preview && (
+                    <button className="btn primary tiny" onClick={() => addChord(preview)}>
+                      Add {chordSymbol(preview)} to the progression
+                    </button>
+                  )}
+                </div>
+
+                {/* Reharmonise used to be the other half of a tab pair here. It
+                    opens from the chord in the strip now, so this is just the
+                    scales — no tabs, nothing hidden behind the one you left
+                    selected last time. */}
+                <ScalePanel
+                  chord={activeChord}
+                  scales={scales}
+                  activeScaleId={activeScale?.id}
+                  onSelectScale={setScaleId}
+                  showScale={showScale}
+                  onToggleShow={setShowScale}
+                  guideTones={guideTones(activeChord)}
+                  commonWithNext={nextChord ? commonTones(activeChord, nextChord) : []}
+                  nextChord={nextChord}
+                />
+              </>
+            )}
+          </AnalysisPanel>
+
+          {/* One instrument at a time. Both show the same chord and both feed the
+              same pool of selected notes, so the toggle changes the view rather
+              than the state — switching mid-selection keeps the notes you picked
+              on the other instrument. */}
 
         </section>
       </main>

@@ -177,6 +177,24 @@ The whole track arrives in the URL — `encodeState` carries tempo and style alo
 which means the link is also the save button. `Backing track` in the studio's top bar opens the
 current progression there, forcing a band style if the studio was on a chord-only one.
 
+**Playback follows the editor.** The scheduler is a rolling one: it keeps about a third of a second
+of audio queued and builds each bar from the state as it is at that moment, rather than scheduling
+the whole piece once when you press play. A melody note you add, a chord you change, a tempo you
+nudge and a style you switch are all heard within a bar, without stopping.
+
+A bar is the unit because the groove is already generated per bar, bars tile the piece contiguously
+so the loop join stays sample-accurate, and "within a bar" is as live as a metrical instrument can
+sensibly be — anything finer would land notes in the middle of themselves.
+
+Everything is placed through one beat-to-time mapping (`timeOfBeat`), and a tempo change re-anchors
+it at a bar line. That is the part worth being careful about: if the groove and the chords each
+accumulated their own seconds-per-beat, a tempo change mid-cycle would pull them apart in time. One
+anchor, moved only at bar lines, and nothing already scheduled is ever retimed.
+
+Measured: median event spacing halved from 0.3571s to 0.1786s when the tempo went from 84 to 168
+mid-playback — exactly eighth notes at each — and a melody note added two bars ahead of the playhead
+was scheduled on every subsequent pass with no clicking and no restart.
+
 Looping is sample-accurate. A loop that re-arms *at* the end never is: the timer fires late and the
 next pass starts relative to whenever that happened. `runPass` instead schedules the following pass
 a quarter-second early against the exact AudioContext time the current one ends, so the join is
