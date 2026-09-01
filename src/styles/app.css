@@ -497,6 +497,12 @@ select { cursor: pointer; }
 
 /* ---------- piano ---------- */
 
+.midi-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 14px 0;
+}
+.midi-row .btn.on { color: var(--accent); border-color: var(--accent); }
+
 .piano { padding: 12px 14px; }
 .piano-svg { width: 100%; height: auto; display: block; user-select: none; }
 .key-group { cursor: pointer; }

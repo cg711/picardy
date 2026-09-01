@@ -23,6 +23,7 @@ import {
   loadPrefs, savePref,
 } from './lib/share.js'
 import { toneColor } from './lib/colors.js'
+import { isMidiSupported, openMidi } from './lib/midiInput.js'
 import { useUndo } from './lib/useUndo.js'
 import {
   makeSegment, readSegment, flattenSong, flattenMelody, loadSegments, saveSegments, loadSong, saveSong, uniqueName,
@@ -104,6 +105,12 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false)
   // Instruments show one at a time now, so this is which one.
   const [instrument, setInstrument] = useState('piano')
+  // A MIDI controller, when there is one. `held` is what is under your fingers
+  // right now; the selection keeps the last chord you played after you let go,
+  // because a chord that vanishes when you lift your hands cannot be read.
+  const [midi, setMidi] = useState({ on: false, devices: [], error: null })
+  const midiHandle = useRef(null)
+  const held = useRef(new Set())
   // Name of the section just saved, shown briefly as confirmation.
   const [savedNote, setSavedNote] = useState(null)
   const savedTimer = useRef(null)
@@ -414,6 +421,58 @@ export default function App() {
     },
     [activeIndex, progression.length, timbre, newChordDuration],
   )
+
+  /**
+   * Notes from a controller land in the same set the instruments write to, so
+   * everything downstream — the diagrams, identifyChord, the "from notes" tab —
+   * works without knowing a keyboard is attached.
+   */
+  const onMidiNote = useCallback(({ type, note, velocity }) => {
+    if (type === 'on') {
+      // A note arriving with nothing held starts a new chord rather than adding
+      // to the one still on screen from last time.
+      if (!held.current.size) held.current = new Set()
+      held.current.add(note)
+      setSelection(new Set(held.current))
+      resumeAudio()
+      // An audition, not a playable instrument: the synth has no note-off, so a
+      // held key sounds for a fixed length rather than until you release it.
+      playChord([note], { timbre, duration: 1.1, gain: 0.1 + (velocity / 127) * 0.12 })
+      return
+    }
+    // A release never touches the selection, only what is under your fingers.
+    // Updating it on the way down instead walked the chord backwards — lifting
+    // C-E-G-B one finger at a time left the selection showing a single B, and
+    // the chord you had just played was gone before you could read it. The next
+    // note-on starts the next chord.
+    held.current.delete(note)
+  }, [timbre])
+
+  const toggleMidi = useCallback(async () => {
+    if (midiHandle.current) {
+      midiHandle.current.close()
+      midiHandle.current = null
+      held.current.clear()
+      setMidi({ on: false, devices: [], error: null })
+      return
+    }
+    try {
+      midiHandle.current = await openMidi({
+        onNote: onMidiNote,
+        onDevices: (devices) => setMidi((m) => ({ ...m, devices })),
+      })
+      // Not a fresh object: openMidi reports its devices synchronously, before
+      // it returns, so replacing the whole state here wiped the names it had
+      // just delivered and the row always read "no device found yet".
+      setMidi((m) => ({ ...m, on: true, error: null }))
+    } catch (err) {
+      // Denied permission, or a browser without Web MIDI. Either way the app is
+      // unchanged — this is an extra way in, not the only one.
+      setMidi({ on: false, devices: [], error: err?.message || 'Could not open MIDI.' })
+    }
+  }, [onMidiNote])
+
+  useEffect(() => () => { midiHandle.current?.close() }, [])
 
   const previewChord = useCallback(
     (chord) => {
@@ -1383,6 +1442,29 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* Offered only where the browser can actually do it, rather than a
+                button that exists to explain why it does not work. */}
+            {isMidiSupported() && (
+              <div className="midi-row">
+                <button
+                  className={`btn ghost tiny${midi.on ? ' on' : ''}`}
+                  onClick={toggleMidi}
+                  title="Play a connected MIDI keyboard to pick notes"
+                >
+                  {midi.on ? '● MIDI on' : 'Connect MIDI'}
+                </button>
+                <span className="muted small">
+                  {midi.error
+                    ? midi.error
+                    : midi.on
+                      ? (midi.devices.length
+                        ? midi.devices.join(', ')
+                        : 'listening — no device found yet')
+                      : 'play a keyboard to pick notes'}
+                </span>
+              </div>
+            )}
 
             {instrument === 'piano' && (
             <Piano

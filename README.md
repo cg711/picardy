@@ -296,6 +296,14 @@ single step instead of one per keystroke.
 `C7#9`, `Abger6`), click roman numerals from a grid organised by function, click suggestions to
 extend the chain, or click notes on the piano/fretboard and let the app identify what you played.
 
+**Or play it.** With a MIDI controller plugged in, *Connect MIDI* in the Instruments panel feeds
+the notes you play into that same selection, so the piano, the fretboard and chord identification
+all work through it without a second code path. Notes stay lit after you let go — you play a
+voicing, then read what it was — and the next key you press starts a fresh chord. A note-on at
+zero velocity is treated as a release, which is the form many controllers send exclusively;
+reading it as a press leaves keys stuck down forever. Devices plugged in mid-session are picked
+up as they arrive. Web MIDI is Chromium-only, so the control appears only where it exists.
+
 **Both instruments, with inversions.** Every chord shows its guitar shapes (searched, not looked
 up — so alternate tunings and odd chords work), the full neck map of chord tones, and a piano
 voicing. Selecting an inversion re-searches the guitar for shapes with the right note in the
@@ -536,7 +544,8 @@ src/
     ExercisesPage.jsx  the drill page at /exercises
   lib/            URL/share encoding, colour tokens, segment + song model,
                   ready-made backing tracks (backings.js),
-                  PDF export, MIDI writer, chart text import
+                  PDF export, MIDI writer, chart text import,
+                  Web MIDI input (midiInput.js)
 ```
 
 ### How chords are represented

@@ -28,6 +28,7 @@ const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/gu
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
 const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
 const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
+const { parseMidiMessage } = await import(B + 'lib/midiInput.js')
 const { BACKINGS, BACKING_KEYS, buildBacking } = await import(B + 'lib/backings.js')
 const { STYLES, barFor, swingBeat, isCompound, pulseOf } = await import(B + 'audio/styles.js')
 const { DRUM_VOICES } = await import(B + 'audio/drums.js')
@@ -1194,6 +1195,32 @@ console.log('\n--- playback styles ---')
   eq('  6/8 is compound', isCompound(sixEight), true)
   eq('  and its pulse is a dotted quarter', pulseOf(sixEight), 1.5)
   eq('  4/4 is not compound', isCompound(TIME_SIGNATURES.find((t) => t.id === '4/4')), false)
+}
+
+console.log('\n--- MIDI input ---')
+{
+  const msg = (...bytes) => parseMidiMessage(Uint8Array.from(bytes))
+
+  eq('  a note-on is a note-on', msg(0x90, 60, 100)?.type, 'on')
+  eq('  and carries the note', msg(0x90, 60, 100)?.note, 60)
+  eq('  and the velocity', msg(0x90, 60, 100)?.velocity, 100)
+  eq('  a note-off is a note-off', msg(0x80, 60, 0)?.type, 'off')
+
+  // The one that bites: plenty of controllers never send 0x80 at all, and say
+  // "off" as a note-on with zero velocity. Reading that as a note-on leaves the
+  // key stuck down for the rest of the session.
+  eq('  a note-on at velocity 0 is a release', msg(0x90, 60, 0)?.type, 'off')
+
+  // Channels are the low nibble, and this app listens to all sixteen.
+  eq('  channel 10 note-on still reads', msg(0x99, 64, 80)?.type, 'on')
+  eq('  channel 16 note-off still reads', msg(0x8f, 64, 0)?.type, 'off')
+
+  // Everything else is someone else's business.
+  eq('  a pitch bend is ignored', msg(0xe0, 0, 64), null)
+  eq('  a control change is ignored', msg(0xb0, 7, 100), null)
+  eq('  clock is ignored', msg(0xf8, 0, 0), null)
+  eq('  a truncated message is ignored', parseMidiMessage(Uint8Array.from([0x90, 60])), null)
+  eq('  and nothing at all is ignored', parseMidiMessage(null), null)
 }
 
 console.log('\n--- keeping the strip in view ---')
