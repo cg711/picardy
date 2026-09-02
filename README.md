@@ -178,6 +178,15 @@ clip. A three-second tail is added so the last chord's release and the reverb ar
 marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
 dependency.
 
+**Practice trainer.** Tick *speed up* beside *loop* and the tempo rises 5 bpm each time round, to a
+ceiling of 200 — the way you actually get a passage up to speed. Ticking it turns loop on rather
+than sitting inert next to an unticked box.
+
+Nearly free, because the rolling scheduler already re-reads tempo once per bar and re-anchors at
+bar lines, which was the hard part and was built for something else. All this needed was a signal
+at the loop wrap: `onLoop` fires there rather than being inferred from the step index, which cannot
+tell a loop from a progression that happens to return to its first chord.
+
 **Backing tracks.** Four band styles — pop/rock, jazz swing, ballad and bossa nova — put drums,
 bass and comping behind the progression, so you can play over it rather than only read it. The kit
 is synthesised (`src/audio/drums.js`): a few oscillators and filtered noise, because shipping

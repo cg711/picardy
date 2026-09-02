@@ -394,6 +394,11 @@ function scheduleNextBar(t) {
     t.anchorTime = timeOfBeat(t, total)
     t.anchorBeat = 0
     t.beat = 0
+    // Announced at the wrap rather than inferred from the step index, which
+    // cannot tell a loop from a progression that happens to return to its
+    // first chord. A practice trainer raising the tempo each time round needs
+    // to know which of those just happened.
+    t.opts.onLoop && t.opts.onLoop()
   }
 
   // Tempo changes take hold at a bar line, never inside one, and re-anchor from
@@ -496,6 +501,7 @@ export function playProgression(items, opts = {}) {
     loop: false,
     onStep: undefined,
     onDone: undefined,
+    onLoop: undefined,
     sectionStartBeats: [],
     settings: null,
     melody: [],

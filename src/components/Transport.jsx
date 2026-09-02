@@ -21,6 +21,8 @@ export default function Transport({
   countIn,
   onCountIn,
   loop,
+  trainer = false,
+  onTrainer,
   onLoop,
   disabled,
   playLabel = '▶ Play progression',
@@ -88,6 +90,20 @@ export default function Transport({
       <label className="check" title="Repeat until stopped">
         <input type="checkbox" checked={loop} onChange={(e) => onLoop(e.target.checked)} />
         loop
+      </label>
+      {/* Only offered with loop on, because a tempo ramp needs something to
+          come round again. Ticking it turns loop on rather than sitting there
+          inert next to an unticked box. */}
+      <label className="check" title="Loop, and add 5 bpm each time round — the way you actually get a passage up to speed">
+        <input
+          type="checkbox"
+          checked={trainer}
+          onChange={(e) => {
+            onTrainer(e.target.checked)
+            if (e.target.checked && !loop) onLoop(true)
+          }}
+        />
+        speed up
       </label>
     </div>
   )

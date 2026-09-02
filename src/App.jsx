@@ -170,6 +170,12 @@ export default function App() {
   const [pattern, setPattern] = useState('block')
   const [countIn, setCountIn] = useState(false)
   const [loop, setLoop] = useState(false)
+  // Practice trainer: loop, and go a little faster each time round. The
+  // scheduler already re-reads the tempo once per bar, which was the hard part;
+  // this only has to raise the number and know when a cycle ended.
+  const [trainer, setTrainer] = useState(false)
+  const TRAINER_STEP = 5
+  const TRAINER_CAP = 200
   const [showScale, setShowScale] = useState(false)
   const [scaleId, setScaleId] = useState(null)
   // Which chord the reharmonise sidebar is open on, or null when it is shut.
@@ -760,6 +766,7 @@ export default function App() {
       timeSignature: timeSignatureOf(timeSignature),
       melody,
       settings: live ? () => liveRef.current : null,
+      onLoop: trainer ? () => setBpm((b) => Math.min(TRAINER_CAP, b + TRAINER_STEP)) : undefined,
       strum: timbre === 'guitar' ? 0.02 : 0.008,
       onStep: (i) => setPlayingIndex(i),
       onDone: () => {
@@ -1469,6 +1476,8 @@ export default function App() {
               onCountIn={setCountIn}
               loop={loop}
               onLoop={setLoop}
+              trainer={trainer}
+              onTrainer={setTrainer}
               disabled={!progression.length}
               hideNewChord={editorView !== 'chips'}
               hideMetre={editorView === 'lyrics'}
