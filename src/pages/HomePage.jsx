@@ -38,7 +38,7 @@ const TOOLS = [
     tagline: 'The theory behind the tool, in short articles.',
     points: [
       'Roman numerals, function, cadences, ii–V–I, secondary dominants',
-      'Borrowed chords, inversions, the twelve-bar blues, tritone subs',
+      'Borrowed chords, sequences, modulation, the blues, augmented sixths',
       'Every example plays, and opens in the studio with one click',
       'Examples are built by the engine, so they cannot contradict the app',
     ],

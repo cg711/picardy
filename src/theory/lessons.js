@@ -33,11 +33,16 @@ export function buildExample(example) {
 
   const progression = []
   const durations = []
-  for (const [semis, generic, qualityId, beats] of example.chords) {
+  const inversions = []
+  // The fifth slot is the inversion. Several of these lessons are *about* a
+  // chord's position — a cadential 6/4 in root position is not the figure at
+  // all — so an example has to be able to say which one it means.
+  for (const [semis, generic, qualityId, beats, inversion] of example.chords) {
     const chord = makeChord(spellDegree(key, semis, generic), qualityId)
     if (!chord) return null
     progression.push(chord)
     durations.push(beats ?? 4)
+    inversions.push(inversion ?? 0)
   }
 
   const cadence = cadenceAt(progression, progression.length - 1, key)
@@ -46,12 +51,12 @@ export function buildExample(example) {
     key,
     progression,
     durations,
-    inversions: progression.map(() => 0),
+    inversions,
     timeSignature: example.timeSignature ?? '4/4',
     bpm: example.bpm ?? 96,
     style: example.style ?? 'block',
     symbols: progression.map((chord) => chordSymbol(chord)),
-    numerals: progression.map((chord) => romanNumeral(chord, key)),
+    numerals: progression.map((chord, i) => romanNumeral(chord, key, inversions[i])),
     cadence: cadence ? cadence.label : null,
     cadenceWhy: cadence ? cadence.why : null,
   }
@@ -559,6 +564,537 @@ export const LESSONS = [
     ],
   },
 ]
+
+// The second tranche, read out of Aldwell & Schachter. The first nine lean jazz
+// and pop — ii–V–I, the blues, tritone substitution — so these come at the music
+// from the common-practice side instead of adding more of the same. Six of them
+// teach something the engine learned at the same time, which is why they can
+// show it rather than describe it.
+LESSONS.push(
+  {
+    id: 'cadential-six-four',
+    title: 'The cadential 6/4',
+    blurb: 'A chord that spells a tonic and behaves like a dominant — the best argument there is that analysis is a reading.',
+    minutes: 6,
+    sections: [
+      {
+        heading: 'A tonic that is not one',
+        body: [
+          `Put a tonic triad over the dominant in the bass, just before the dominant
+           arrives, and something odd happens: it stops sounding like the tonic. The bass
+           is already where the dominant will be and does not move. The 6th and 4th above
+           it are dissonances, and they fall to the 5th and 3rd.`,
+          `Spelled out, it is a I chord. Heard, it is an ornamented V. Aldwell & Schachter
+           give it a whole unit and write it under V rather than under I.`,
+        ],
+        example: {
+          caption: 'I 6/4 leaning into V7',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4, 2], [7, 5, 'dom7', 4], [0, 1, 'maj', 8]],
+          expect: { symbols: ['C', 'G7', 'C'], numerals: ['I 6/4', 'V7', 'I'], cadence: 'perfect authentic cadence' },
+        },
+      },
+      {
+        heading: 'Why the position matters',
+        body: [
+          `Play the same three chords with the first in root position and the effect is
+           gone. It is a tonic going to a dominant going back to the tonic — three
+           harmonies, one after another, rather than a dominant with a decoration on the
+           front of it.`,
+        ],
+        example: {
+          caption: 'The same chords, root position — not the same figure',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [7, 5, 'dom7', 4], [0, 1, 'maj', 8]],
+          expect: { symbols: ['C', 'G7', 'C'], numerals: ['I', 'V7', 'I'], cadence: 'perfect authentic cadence' },
+        },
+      },
+      {
+        heading: 'In minor, and in the app',
+        body: [
+          `The same figure works identically in a minor key. Open either example in the
+           studio and the analysis panel colours the first chord as a dominant and prints
+           "V 6/4" underneath it — because Picardy reads it the way this lesson does.`,
+          `It also has to fall on a strong beat. A 6/4 on a weak beat between two positions
+           of the same chord is a passing chord, which is a different thing entirely — the
+           next lesson.`,
+        ],
+        example: {
+          caption: 'i 6/4 in A minor',
+          tonic: 'A', mode: 'minor',
+          chords: [[0, 1, 'min', 4, 2], [7, 5, 'dom7', 4], [0, 1, 'min', 8]],
+          expect: { symbols: ['Am', 'E7', 'Am'], numerals: ['i 6/4', 'V7', 'i'], cadence: 'perfect authentic cadence' },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'contrapuntal-chords',
+    title: 'Chords that are not harmonies',
+    blurb: 'Some chords carry the structure and some decorate it. Telling them apart changes what a progression is.',
+    minutes: 7,
+    sections: [
+      {
+        heading: 'Three chords, one harmony',
+        body: [
+          `Here is a tonic, then a diminished chord, then the tonic again in first
+           inversion. It looks like three chords. It is one: the bass walks C–D–E and the
+           chord in the middle exists to carry it there.`,
+          `Nothing has left the tonic. The vii°6 is a passing chord, and an analysis writes
+           it in parentheses to say so.`,
+        ],
+        example: {
+          caption: 'I–(vii°6)–I6, one tonic prolonged',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [11, 7, 'dim', 2, 1], [0, 1, 'maj', 4, 1], [7, 5, 'dom7', 4], [0, 1, 'maj', 8]],
+          expect: {
+            symbols: ['C', 'B°', 'C', 'G7', 'C'],
+            numerals: ['I', 'vii° 6', 'I 6', 'V7', 'I'],
+            cadence: 'perfect authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'The pedal version',
+        body: [
+          `The same idea with a bass that does not move at all. The upper voices step away
+           and come back; for one beat they spell a IV chord, but no subdominant has
+           arrived — the tonic is still in force underneath.`,
+        ],
+        example: {
+          caption: 'I–(IV 6/4)–I over a held bass',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [5, 4, 'maj', 4, 2], [0, 1, 'maj', 8]],
+          expect: { symbols: ['C', 'F', 'C'], numerals: ['I', 'IV 6/4', 'I'], cadence: 'plagal cadence' },
+        },
+      },
+      {
+        heading: 'How to tell',
+        body: [
+          `Two questions. Does the bass step through, or hold? And is the chord standing on
+           its own root, or borrowing a bass from the harmony either side of it?`,
+          `A chord on its own root is almost always a real harmony. C–Dm–C is I–ii–I, not a
+           tonic with a decoration inside it. Every contrapuntal chord in the textbooks is
+           an inversion, and that is not a coincidence — sitting over a borrowed bass is
+           what makes it subordinate.`,
+        ],
+        points: [
+          'Passing: the bass walks by step from one position of a chord to another',
+          'Neighbour: the harmony either side is the same and the bass steps away and back',
+          'Pedal: the bass holds while the voices above it move and return',
+          'On its own root, in root position: almost certainly a harmony, not decoration',
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'suspensions',
+    title: 'Suspensions',
+    blurb: 'Prepare, suspend, resolve — the oldest way of making a line pull against its chord.',
+    minutes: 5,
+    sections: [
+      {
+        heading: 'Three parts',
+        body: [
+          `A suspension is a note that was consonant, stayed where it was while the harmony
+           changed underneath it, and then fell by step into the new chord. The three
+           stages have names: preparation, suspension, resolution.`,
+          `The middle stage is the point. For a moment the note is wrong, and everyone can
+           hear where it has to go.`,
+        ],
+      },
+      {
+        heading: 'As a chord',
+        body: [
+          `The commonest one is the 4–3 over a dominant: the fourth above the bass held
+           from the chord before, resolving down to the third. It is common enough to have
+           its own chord symbol.`,
+        ],
+        example: {
+          caption: 'A 4–3 suspension over the dominant',
+          tonic: 'C', mode: 'major',
+          chords: [[7, 5, 'sevenSus4', 4], [7, 5, 'dom7', 4], [0, 1, 'maj', 8]],
+          expect: { symbols: ['G7sus4', 'G7', 'C'], numerals: ['V7sus4', 'V7', 'I'], cadence: 'perfect authentic cadence' },
+        },
+      },
+      {
+        heading: 'As a melody',
+        body: [
+          `Written into a line rather than a chord symbol, it is a note that overlaps the
+           bar. Open the Melody tab, draw a note that starts under one chord and is still
+           sounding under the next, then step it down — Picardy will mark it "sus" and say
+           what it is.`,
+          `Resolve it upward instead and it becomes a retardation, which is rarer and
+           sounds like a held breath rather than a sigh.`,
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'tonicisation-and-modulation',
+    title: 'Tonicisation and modulation',
+    blurb: 'When does a borrowed dominant become a new key? The answer is about how long you stay.',
+    minutes: 6,
+    sections: [
+      {
+        heading: 'Visiting',
+        body: [
+          `An applied dominant points at a chord that is not the tonic and makes it feel,
+           briefly, like home. A7 in C major has a C♯ in it — a note from outside the key —
+           and it resolves to D minor.`,
+          `But nothing has changed key. The next chord is a plain V7 in C and the phrase
+           closes in C. The visit lasted one chord.`,
+        ],
+        example: {
+          caption: 'A tonicisation of ii — still C major throughout',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [9, 6, 'dom7', 4], [2, 2, 'min', 4], [7, 5, 'dom7', 4], [0, 1, 'maj', 8]],
+          expect: {
+            symbols: ['C', 'A7', 'Dm', 'G7', 'C'],
+            numerals: ['I', 'V7/ii', 'ii', 'V7', 'I'],
+            cadence: 'perfect authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'Moving in',
+        body: [
+          `Now the same idea, held. Four bars establish C, and then the music goes to G and
+           stays: its own dominant, its own tonic, twice over. By the end, G is not a chord
+           in C major any more — it is where the music lives.`,
+          `Open this one in the studio. The analysis panel reads the first half in C and the
+           second in G, marks the join, and names the pivot — because the difference between
+           the two examples on this page is exactly the difference the engine had to learn.`,
+        ],
+        example: {
+          caption: 'A modulation to the dominant',
+          tonic: 'C', mode: 'major',
+          chords: [
+            [0, 1, 'maj', 4], [5, 4, 'maj', 4], [7, 5, 'maj', 4], [0, 1, 'maj', 4],
+            [2, 2, 'dom7', 4], [7, 5, 'maj', 4], [2, 2, 'dom7', 4], [7, 5, 'maj', 8],
+          ],
+          expect: {
+            symbols: ['C', 'F', 'G', 'C', 'D7', 'G', 'D7', 'G'],
+            numerals: ['I', 'IV', 'V', 'I', 'V7/V', 'V', 'V7/V', 'V'],
+            cadence: 'half cadence',
+          },
+        },
+      },
+      {
+        heading: 'Where the line is',
+        body: [
+          `There is no bar count that settles it, and reasonable analysts disagree about
+           particular passages. What everyone agrees on is the principle: a tonicisation is
+           a chord borrowing a dominant, a modulation is a key you stay in long enough to
+           be confirmed — usually by a cadence in the new key.`,
+          `Notice also that the numerals above change meaning halfway through. The same G
+           chord is V in the first half and I in the second. That is not the engine being
+           inconsistent; it is what modulating means.`,
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'sequences',
+    title: 'Sequences',
+    blurb: 'One pattern, moved. Four of them generate an enormous amount of tonal music.',
+    minutes: 6,
+    sections: [
+      {
+        heading: 'The falling fifths',
+        body: [
+          `Take a root motion and repeat it down the scale. The commonest by far is the
+           descending fifth: every chord is the dominant of the next, all the way round the
+           key and back to where it started.`,
+          `One link is not a perfect fifth — in C major, F to B is a tritone, because the
+           scale has only the notes it has. That is why a sequence is counted in scale
+           steps rather than in semitones.`,
+        ],
+        example: {
+          caption: 'Descending fifths, all seven diatonic chords',
+          tonic: 'C', mode: 'major',
+          chords: [
+            [0, 1, 'maj', 4], [5, 4, 'maj', 4], [11, 7, 'dim', 4], [4, 3, 'min', 4],
+            [9, 6, 'min', 4], [2, 2, 'min', 4], [7, 5, 'maj', 4], [0, 1, 'maj', 8],
+          ],
+          expect: {
+            symbols: ['C', 'F', 'B°', 'Em', 'Am', 'Dm', 'G', 'C'],
+            numerals: ['I', 'IV', 'vii°', 'iii', 'vi', 'ii', 'V', 'I'],
+            cadence: 'authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'Falling thirds',
+        body: [
+          `Up a fifth, then up a step, repeated — which lands the roots a third lower each
+           time round. Pachelbel, and about half of everything written since.`,
+        ],
+        example: {
+          caption: 'The falling-thirds sequence',
+          tonic: 'C', mode: 'major',
+          chords: [
+            [0, 1, 'maj', 4], [7, 5, 'maj', 4], [9, 6, 'min', 4],
+            [4, 3, 'min', 4], [5, 4, 'maj', 4], [0, 1, 'maj', 8],
+          ],
+          expect: {
+            symbols: ['C', 'G', 'Am', 'Em', 'F', 'C'],
+            numerals: ['I', 'V', 'vi', 'iii', 'IV', 'I'],
+            cadence: 'plagal cadence',
+          },
+        },
+      },
+      {
+        heading: 'What they are for',
+        body: [
+          `A sequence is how tonal music covers ground. It takes you somewhere without
+           requiring a new idea at every step, and because the pattern is audible the ear
+           will follow it a long way before it tires.`,
+          `Both examples above are named by the studio's analysis panel rather than
+           described as a count of falling fifths — which is what it used to say.`,
+        ],
+        points: [
+          'Descending fifths — every chord the dominant of the next; the strongest pull',
+          'Ascending fifths — the same motion reversed, and much rarer',
+          'Ascending 5–6 — down a third, up a fourth; a rising line without parallel fifths',
+          'Descending 5–6 — up a fifth, up a step; the roots fall in thirds',
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'parallel-fifths',
+    title: 'Why parallel fifths',
+    blurb: 'The rule everyone has heard and few can justify. It is a style constraint, not a law.',
+    minutes: 5,
+    sections: [
+      {
+        heading: 'What the rule says',
+        body: [
+          `If two voices are a fifth apart and both move to another fifth in the same
+           direction, they stop sounding like two voices. The interval is stable enough,
+           and the motion parallel enough, that the ear fuses them into one line with a
+           bright edge.`,
+          `Common-practice writing avoids it for exactly that reason: the whole point of
+           four-part texture is four independent parts, and a parallel fifth spends two of
+           them on one line.`,
+        ],
+        example: {
+          caption: 'V–IV in root position — the classic trap',
+          tonic: 'C', mode: 'major',
+          chords: [[7, 5, 'maj', 4], [5, 4, 'maj', 4]],
+          expect: { symbols: ['G', 'F'], numerals: ['V', 'IV'], cadence: null },
+        },
+      },
+      {
+        heading: 'Why that example',
+        body: [
+          `Two root-position triads a step apart have no notes in common, so every voice
+           has to move, and if they all move the same way the fifth between the outer two
+           moves with them. This is why textbooks teach V–IV as a special case: it is
+           hard to write without parallels unless the upper voices come down.`,
+          `Open it in the studio, turn on the Voice leading reading in the analysis panel,
+           and it will tell you. Then press Smooth voicing and watch it fix itself by
+           choosing an inversion instead.`,
+        ],
+      },
+      {
+        heading: 'And when it is not a fault',
+        body: [
+          `Rock guitar is built on parallel fifths. So is organum, so is a great deal of
+           film music, and so is every power chord ever played. The rule belongs to a
+           style, and outside that style it describes a sound rather than a mistake.`,
+          `Picardy reports them only when you ask, and says so on the panel. It is a
+           writing tool, not a homework marker.`,
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'leading-tone-sevenths',
+    title: 'Leading-tone sevenths',
+    blurb: 'Dominants with the root taken away — and the one chord that resolves in four directions.',
+    minutes: 5,
+    sections: [
+      {
+        heading: 'A dominant without its root',
+        body: [
+          `Take G7 in C — G B D F — and remove the G. What is left is B D F, a diminished
+           triad, and it still contains the tritone that made the chord pull. Add another
+           third on top and you have B D F A♭: a fully diminished seventh.`,
+          `It behaves like a dominant because it is one, minus its root.`,
+        ],
+        example: {
+          caption: 'vii°7 resolving to the tonic',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [11, 7, 'dim7', 4], [0, 1, 'maj', 8]],
+          expect: { symbols: ['C', 'B°7', 'C'], numerals: ['I', 'vii°7', 'I'], cadence: null },
+        },
+      },
+      {
+        heading: 'Applied to anything',
+        body: [
+          `Because it is a dominant, it can be aimed at any chord, the same way an applied
+           V7 can. A diminished seventh a half step below a chord will lead to it.`,
+        ],
+        example: {
+          caption: 'vii°7/V, aimed at the dominant',
+          tonic: 'C', mode: 'major',
+          chords: [[0, 1, 'maj', 4], [6, 4, 'dim7', 4], [7, 5, 'maj', 4], [0, 1, 'maj', 8]],
+          expect: {
+            symbols: ['C', 'F♯°7', 'G', 'C'],
+            numerals: ['I', 'vii°7/V', 'V', 'I'],
+            cadence: 'authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'The half-diminished one',
+        body: [
+          `Half-diminished — a diminished triad with a minor seventh rather than a
+           diminished one — is a softer chord and usually has a different job. Away from
+           home it is nearly always the ii of a minor ii–V, which is how Picardy labels it
+           when it appears.`,
+        ],
+        example: {
+          caption: 'iiø7–V7–i in C minor',
+          tonic: 'C', mode: 'minor',
+          chords: [[2, 2, 'm7b5', 4], [7, 5, 'dom7', 4], [0, 1, 'min', 8]],
+          bpm: 120, style: 'swing',
+          expect: { symbols: ['Dm7♭5', 'G7', 'Cm'], numerals: ['iiø7', 'V7', 'i'], cadence: 'perfect authentic cadence' },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'neapolitan',
+    title: 'The Neapolitan',
+    blurb: 'A major chord on the flattened second degree, and the most dramatic way into a cadence.',
+    minutes: 5,
+    sections: [
+      {
+        heading: 'A predominant from outside the key',
+        body: [
+          `♭II is a major triad built on the lowered second degree — D♭ major in C. It is
+           not in either C major or C minor, and it functions as a predominant: it leads to
+           the dominant, and then home.`,
+          `The effect is heavy and a little theatrical, which is why it turns up at the ends
+           of slow movements and in a great deal of nineteenth-century opera.`,
+        ],
+        example: {
+          caption: 'The Neapolitan in first inversion, its usual form',
+          tonic: 'C', mode: 'minor',
+          chords: [[0, 1, 'min', 4], [1, 2, 'maj', 4, 1], [7, 5, 'dom7', 4], [0, 1, 'min', 8]],
+          expect: {
+            symbols: ['Cm', 'D♭', 'G7', 'Cm'],
+            numerals: ['i', '♭II 6', 'V7', 'i'],
+            cadence: 'perfect authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'Why first inversion',
+        body: [
+          `Almost always ♭II6 rather than ♭II, which is why it is often called the
+           Neapolitan sixth. In first inversion its bass is the fourth degree — F in C
+           minor — which is where a predominant normally sits, so the chord arrives in a
+           familiar place wearing an unfamiliar colour.`,
+          `Root position is possible and sounds heavier still.`,
+        ],
+        example: {
+          caption: 'Root position, for comparison',
+          tonic: 'C', mode: 'minor',
+          chords: [[0, 1, 'min', 4], [1, 2, 'maj', 4], [7, 5, 'dom7', 4], [0, 1, 'min', 8]],
+          expect: {
+            symbols: ['Cm', 'D♭', 'G7', 'Cm'],
+            numerals: ['i', '♭II', 'V7', 'i'],
+            cadence: 'perfect authentic cadence',
+          },
+        },
+      },
+      {
+        heading: 'Spelling',
+        body: [
+          `It is spelled as a flattened second, not a raised first: D♭ in C, not C♯. That is
+           not pedantry — the chord's function is to fall to the dominant, and a flat that
+           falls is a different musical idea from a sharp that rises, whatever the piano
+           does about it.`,
+        ],
+      },
+    ],
+  },
+
+  {
+    id: 'augmented-sixths',
+    title: 'Augmented sixths',
+    blurb: 'Three chords named after countries none of them come from, all doing the same job.',
+    minutes: 6,
+    sections: [
+      {
+        heading: 'An interval, not a root',
+        body: [
+          `An augmented sixth chord is named for the interval inside it: a ♭6 at the bottom
+           and a ♯4 above it, six letter-names apart but a whole step wider than a normal
+           sixth. Both notes want to move outward by a half step, and where they land is
+           the dominant.`,
+          `That is the whole chord. Everything else is which notes fill the middle.`,
+        ],
+        example: {
+          caption: 'Italian: just the two outer notes and the tonic',
+          tonic: 'C', mode: 'minor',
+          chords: [[0, 1, 'min', 4], [8, 6, 'it6', 4], [7, 5, 'maj', 8]],
+          expect: { symbols: ['Cm', 'A♭+6(It)', 'G'], numerals: ['i', 'It+6', 'V'], cadence: 'half cadence' },
+        },
+      },
+      {
+        heading: 'The other two',
+        body: [
+          `The French adds the second degree, which gives it a whole-tone brightness. The
+           German adds the third degree instead, which makes it sound exactly like a
+           dominant seventh on ♭VI — and that resemblance is the most useful thing about
+           it.`,
+        ],
+        example: {
+          caption: 'French',
+          tonic: 'C', mode: 'minor',
+          chords: [[0, 1, 'min', 4], [8, 6, 'fr6', 4], [7, 5, 'maj', 8]],
+          expect: { symbols: ['Cm', 'A♭+6(Fr)', 'G'], numerals: ['i', 'Fr+6', 'V'], cadence: 'half cadence' },
+        },
+      },
+      {
+        heading: null,
+        body: [
+          `The German, and then the chord it sounds identical to. Same pitches on a
+           keyboard; different spelling, and so a different obligation. The augmented sixth
+           expands outward to the dominant; the dominant seventh falls a fifth to D♭.`,
+          `This is the clearest case in the whole language for why Picardy spells notes
+           rather than storing pitch numbers. These two chords are the same sound and
+           different music, and only the spelling knows which one you meant.`,
+        ],
+        example: {
+          caption: 'German sixth, then ♭VI7 — the same keys, different chords',
+          tonic: 'C', mode: 'minor',
+          chords: [[8, 6, 'ger6', 4], [8, 6, 'dom7', 4]],
+          expect: { symbols: ['A♭+6(Ger)', 'A♭7'], numerals: ['Ger+6', '♭VI7'], cadence: null },
+        },
+      },
+      {
+        heading: 'Where they go',
+        body: [
+          `To the dominant, usually via a cadential 6/4 — which is the first lesson in this
+           second group, and worth reading before this one if you have not.`,
+        ],
+      },
+    ],
+  },
+)
 
 export const lessonById = (id) => LESSONS.find((lesson) => lesson.id === id) ?? null
 

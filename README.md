@@ -590,8 +590,16 @@ tonicisation. Both are asserted.
 
 ## Lessons
 
-Nine short articles at `/lessons`: roman numerals, harmonic function, cadences, ii–V–I, secondary
-dominants, borrowed chords, inversions, the twelve-bar blues, and tritone substitution.
+Eighteen short articles at `/lessons`. The first nine come at the music from the jazz and pop side —
+roman numerals, harmonic function, cadences, ii–V–I, secondary dominants, borrowed chords,
+inversions, the twelve-bar blues, tritone substitution. The second nine come from Aldwell &
+Schachter and are common-practice: the cadential 6/4, chords that are not harmonies, suspensions,
+tonicisation and modulation, sequences, parallel fifths, leading-tone sevenths, the Neapolitan and
+augmented sixths.
+
+Six of the second group teach something the engine learned at the same time, which is the argument
+for having done the engine work first — the lesson can show the reading rather than describe it, and
+the studio agrees with the page when you open the example in it.
 
 The design constraint is that a lesson must not be able to contradict the tool it teaches. The
 obvious way to write one — typing "try Dm7–G7–Cmaj7" into a paragraph — creates a second source of
@@ -603,7 +611,7 @@ the page is written by hand, and *Open in the studio* hands over the real progre
 description of it.
 
 What is written by hand is `expect`: what the author believes the engine will say. The check suite
-compiles every example and compares — 60 claims across 20 examples — so an engine change that would
+compiles every example and compares — 117 claims across 39 examples — so an engine change that would
 make an article wrong fails the build instead of quietly teaching the wrong thing. It also asserts
 that every example names a style the audio layer actually has, since `styleOf` falls back to block
 chords silently and an example would otherwise play something other than what it claims.
