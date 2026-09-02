@@ -897,6 +897,15 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   padding: 0 5px; white-space: nowrap;
 }
 
+/* A melody note doing something nameable — a suspension, a passing tone. The
+   outline marks it without changing the colour, which still carries whether the
+   note is a chord tone, a tension or outside the key. */
+.roll-note.figure rect {
+  stroke: var(--ink);
+  stroke-width: 1.1;
+  stroke-dasharray: 2.5 1.5;
+}
+
 /* A chord that decorates rather than structures. Smaller and set back, so the
    spine of the progression reads first and the decoration reads as decoration —
    which is the claim the parentheses around its numeral are making. */

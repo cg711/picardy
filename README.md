@@ -407,6 +407,32 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## What a melody note is doing
+
+`classifyNote` reads a pitch against a chord, one note at a time. That is the wrong question for
+most of what a melody does: a suspension and an appoggiatura can be the same pitch over the same
+chord on the same beat and are different events entirely. What separates them is where the note came
+from and where it goes, which a vertical reading cannot see.
+
+`classifyFigure` reads horizontally — approach, departure, and metrical position — and names
+passing tones (accented and not), upper and lower neighbours, incomplete neighbours, appoggiaturas,
+escape tones, anticipations, suspensions and retardations. Ordered first-match-wins like the cadence
+table and for the same reason: a suspension also satisfies the accented-passing-tone test, and an
+appoggiatura also satisfies the looser incomplete-neighbour test, so the specific figures are tried
+before the general ones.
+
+A suspension is recognised written either way a piano roll allows: as a repeated pitch struck again
+under the new chord, or as one note still sounding when the harmony changes underneath it.
+
+The bug worth recording: deciding whether a note sustains into the next chord needs a step back from
+its end larger than `chordAtBeat`'s own tolerance. At exactly that tolerance the two cancel, and a
+note ending flush against a chord change reads as sounding into it — which is most notes in a normal
+melody, and it invented figures for chord tones that were doing nothing. Asserted directly.
+
+The roll outlines a note that is doing something and labels it with the figure rather than the
+interval, since "sus" says more about a note than "11" does; colour still carries chord tone,
+tension or outside. Hovering explains it in full.
+
 ## Chords that are not harmonies
 
 The central claim of Aldwell & Schachter, and the one thing the engine had no vocabulary for: some
@@ -663,7 +689,8 @@ src/
                   progression
     guitar.js     fretboard voicing search and playability filtering
     identify.js   reverse lookup — notes to chord symbol
-    melody.js     what a melody note is doing against the chord underneath
+    melody.js     what a melody note is against the chord underneath, and what it
+                  is doing — passing, neighbour, suspension, appoggiatura
     exercises.js  question generator — every answer comes from the engine
     intervals.js  naming the distance between two notes
     lessons.js    the written lessons; examples stored as degrees and compiled,

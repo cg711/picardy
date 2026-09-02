@@ -21,7 +21,7 @@ const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression, cadenceAt, contrapuntalRole } = await import(B + 'theory/analyze.js')
 const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
 const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
-const { classifyNote, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
+const { classifyNote, classifyFigure, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
@@ -1409,6 +1409,71 @@ console.log('\n--- lessons ---')
 // Some chords carry the structure and some decorate it. The risk here is not
 // missing one, it is claiming an ordinary harmony is decoration — so the
 // negative cases outnumber the positive ones.
+// classifyNote reads a pitch against a chord, one note at a time. That cannot
+// tell a suspension from an appoggiatura — they can be the same pitch over the
+// same chord on the same beat, and what separates them is where the note came
+// from and where it goes.
+console.log('\n--- melodic figures ---')
+{
+  const ts44 = timeSignatureOf('4/4')
+  const P = (s) => s.split(/\s+/).map(parseChord)
+  const M = (a) => a.map(([at, beats, midi]) => ({ at, beats, midi }))
+  const figure = (chart, durs, mel, i, ts = ts44) => {
+    const r = classifyFigure(M(mel), i, P(chart), durs, ts)
+    return r ? r.role : null
+  }
+
+  // C4 = 60. C major: C60 D62 E64 F65 G67 A69 B71.
+  eq('  a passing tone off the beat', figure('C C', [4, 4], [[0, 1, 64], [1, 1, 62], [2, 1, 60]], 1), 'passing')
+  eq('  an accented passing tone', figure('C C', [4, 4], [[0, 2, 64], [2, 1, 62], [3, 1, 60]], 1), 'passing')
+  eq('  an upper neighbour', figure('C C', [4, 4], [[0, 1, 64], [1, 1, 65], [2, 1, 64]], 1), 'neighbour')
+  eq('  a lower neighbour', figure('C C', [4, 4], [[0, 1, 64], [1, 1, 62], [2, 1, 64]], 1), 'neighbour')
+  eq('  an escape tone', figure('C C', [4, 4], [[0, 1, 64], [1, 1, 65], [2, 1, 60]], 1), 'escape')
+  eq('  an appoggiatura', figure('C C', [4, 4], [[0, 2, 60], [4, 1, 65], [5, 1, 64]], 1), 'appoggiatura')
+  eq('  an anticipation', figure('C F', [4, 4], [[0, 3, 64], [3, 1, 69], [4, 2, 69]], 1), 'anticipation')
+  eq('  a retardation', figure('F G7', [4, 4], [[0, 4, 69], [4, 2, 69], [6, 2, 71]], 1), 'retardation')
+
+  // A suspension is written either way in a roll: as a repeated pitch, or as
+  // one note still sounding when the chord changes underneath it.
+  eq('  a suspension, as a repeated pitch', figure('C G7', [4, 4], [[0, 4, 60], [4, 2, 60], [6, 2, 59]], 1), 'suspension')
+  eq('  a suspension, as one sustained note', figure('C G7', [4, 4], [[0, 6, 60], [6, 2, 59]], 0), 'suspension')
+
+  // Chord tones are not figures, whatever shape the line makes around them.
+  eq('  a chord tone is not a figure', figure('C C', [4, 4], [[0, 1, 60], [1, 1, 64], [2, 1, 67]], 1), null)
+  eq('  …even on a strong beat', figure('C C', [4, 4], [[0, 4, 64], [4, 4, 60]], 0), null)
+  eq('  the first note has nothing before it', figure('C C', [4, 4], [[0, 1, 62], [1, 1, 60]], 0), null)
+
+  // The order is load-bearing in the same way the cadence table is: a
+  // suspension also passes the accented-passing-tone test, and an appoggiatura
+  // also passes the looser incomplete-neighbour test.
+  eq('  a suspension is not called an accented passing tone',
+    figure('C G7', [4, 4], [[0, 4, 60], [4, 2, 60], [6, 2, 59]], 1), 'suspension')
+  eq('  an appoggiatura is not called an incomplete neighbour',
+    figure('C C', [4, 4], [[0, 2, 60], [4, 1, 65], [5, 1, 64]], 1), 'appoggiatura')
+
+  // Metre decides between two of these. The same three pitches, moved off the
+  // downbeat, stop being an appoggiatura.
+  eq('  the same leap-and-step off the beat is not an appoggiatura',
+    figure('C C', [4, 4], [[0, 1, 60], [1, 1, 65], [2, 1, 64]], 1), 'incomplete')
+
+  // In 3/4 the accented positions are different, so the reading must follow.
+  const ts34 = timeSignatureOf('3/4')
+  eq('  metre is read from the time signature, not assumed',
+    figure('C C', [3, 3], [[0, 2, 60], [3, 1, 65], [4, 1, 64]], 1, ts34), 'appoggiatura')
+
+  // A note ending flush against a chord change is not sounding into the next
+  // chord. Deciding otherwise needs a step back larger than chordAtBeat's own
+  // tolerance — at exactly that tolerance the two cancel, and nearly every note
+  // in a normal melody looked like it spanned the change, which invented
+  // figures for chord tones that were doing nothing.
+  eq('  a note ending flush on a chord change does not span it',
+    figure('C G7 C', [4, 4, 4], [[0, 4, 60], [4, 2, 60], [6, 2, 59], [8, 2, 64]], 2), null)
+  eq('  …and the suspension before it still reads',
+    figure('C G7 C', [4, 4, 4], [[0, 4, 60], [4, 2, 60], [6, 2, 59], [8, 2, 64]], 1), 'suspension')
+  eq('  …and its preparation is not a figure',
+    figure('C G7 C', [4, 4, 4], [[0, 4, 60], [4, 2, 60], [6, 2, 59], [8, 2, 64]], 0), null)
+}
+
 console.log('\n--- contrapuntal chords ---')
 {
   const chords = (chart) => parseChart(chart).chords

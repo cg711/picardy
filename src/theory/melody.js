@@ -102,6 +102,142 @@ const chordToneWhy = (label, chord) => {
   return `the ${label} of the chord.`
 }
 
+/**
+ * What a melody note is *doing*, as opposed to what it is.
+ *
+ * classifyNote answers vertically: this pitch against that chord, one note at a
+ * time. That is the wrong question for most of what a melody does. A suspension
+ * and an appoggiatura can be the same pitch over the same chord on the same beat
+ * and are different events entirely — what separates them is where the note came
+ * from and where it goes, which a vertical reading cannot see.
+ *
+ * So this one reads horizontally: approach, departure, and metrical position.
+ * Ordered first-match-wins like the cadence table, and for the same reason —
+ * a suspension also satisfies the test for an accented passing tone, and an
+ * appoggiatura also satisfies the looser incomplete-neighbour test, so the
+ * specific figures have to be tried before the general ones.
+ *
+ * @returns { role, label, why } or null when the note is simply a chord tone.
+ */
+export function classifyFigure(melody, index, progression, durations, ts) {
+  const note = melody?.[index]
+  if (!note || !progression?.length) return null
+  const prev = melody[index - 1]
+  const next = melody[index + 1]
+
+  const onset = chordAtBeat(progression, durations, note.at)
+  if (!onset.chord) return null
+
+  // Where the note ends up: a note may be struck under one chord and still be
+  // sounding under the next, which is how a suspension is usually written.
+  //
+  // The step back has to be larger than chordAtBeat's own tolerance. At 1e-6 —
+  // exactly that tolerance — the two cancelled, and a note ending flush against
+  // a chord change was reported as sounding into the next chord. That is most
+  // notes, and it invented figures for chord tones that were doing nothing.
+  const endBeat = Math.max(note.at, note.at + note.beats - 1e-3)
+  const atEnd = chordAtBeat(progression, durations, endBeat)
+  const landsIn = atEnd.chord ?? onset.chord
+  const spansChange = atEnd.index >= 0 && atEnd.index !== onset.index
+
+  const isTone = (midi, chord) =>
+    !!chord && chordNotes(chord).some((e) => pcOf(e.note) === mod(midi, 12))
+
+  // Dissonant somewhere is the price of admission: a note consonant throughout
+  // is a chord tone, whatever shape its line makes around it.
+  const clashesAtOnset = !isTone(note.midi, onset.chord)
+  const clashesAtEnd = !isTone(note.midi, landsIn)
+  if (!clashesAtOnset && !clashesAtEnd) return null
+
+  const beatsPerBar = ts?.beatsPerBar ?? 4
+  const inBar = mod(note.at, beatsPerBar)
+  const near = (a, b) => Math.abs(a - b) < 1e-6
+  // The downbeat, and the middle of an even bar, are the accented positions.
+  // Metrical strength is what separates an appoggiatura from an escape tone and
+  // a suspension from an accented passing tone, so it cannot be skipped.
+  const accented = near(inBar, 0) || (beatsPerBar % 2 === 0 && near(inBar, beatsPerBar / 2))
+
+  const approach = prev ? note.midi - prev.midi : null
+  const departure = next ? next.midi - note.midi : null
+  const isStep = (d) => d !== null && Math.abs(d) >= 1 && Math.abs(d) <= 2
+  const isLeap = (d) => d !== null && Math.abs(d) >= 3
+
+  // Held from the previous harmony, either as a repeated pitch or as one note
+  // still sounding across the change.
+  const heldOver = (prev && prev.midi === note.midi && chordAtBeat(progression, durations, prev.at).index !== onset.index)
+    || (spansChange && !clashesAtOnset && clashesAtEnd)
+
+  const resolvesDown = departure !== null && departure >= -2 && departure <= -1
+  const resolvesUp = departure !== null && departure >= 1 && departure <= 2
+
+  if (heldOver && resolvesDown) {
+    return {
+      role: 'suspension',
+      label: 'sus',
+      why: 'a suspension — prepared as a consonance in the chord before, held while the harmony changes underneath it, and resolved down by step. Preparation, suspension, resolution.',
+    }
+  }
+  if (heldOver && resolvesUp) {
+    return {
+      role: 'retardation',
+      label: 'ret',
+      why: 'a retardation — a suspension that resolves upward instead of down, which is rarer and sounds like a held breath rather than a sigh.',
+    }
+  }
+
+  // Arrives early: the pitch belongs to the chord that has not started yet.
+  if (next && next.midi === note.midi && !accented && clashesAtOnset) {
+    const after = chordAtBeat(progression, durations, next.at)
+    if (after.index !== onset.index && isTone(note.midi, after.chord)) {
+      return {
+        role: 'anticipation',
+        label: 'ant',
+        why: 'an anticipation — the next chord\'s note arriving before the chord does, on a weak part of the beat.',
+      }
+    }
+  }
+
+  if (isLeap(approach) && isStep(departure) && accented) {
+    return {
+      role: 'appoggiatura',
+      label: 'app',
+      why: 'an appoggiatura — an accented incomplete neighbour, leapt into on a strong beat and resolved by step. It leans on the chord and then gives way.',
+    }
+  }
+  if (isStep(approach) && isLeap(departure) && !accented) {
+    return {
+      role: 'escape',
+      label: 'esc',
+      why: 'an escape tone — stepped into off the beat and then left by a leap in the other direction.',
+    }
+  }
+  if (isStep(approach) && isStep(departure) && Math.sign(approach) === Math.sign(departure)) {
+    return {
+      role: 'passing',
+      label: accented ? 'acc P' : 'P',
+      why: accented
+        ? 'an accented passing tone — passing between two chord tones, but landing on the beat, so it sounds against the chord before moving on.'
+        : 'a passing tone — filling the step between two chord tones, off the beat.',
+    }
+  }
+  if (isStep(approach) && isStep(departure) && prev && next && prev.midi === next.midi) {
+    return {
+      role: 'neighbour',
+      label: note.midi > prev.midi ? 'UN' : 'LN',
+      why: `a ${note.midi > prev.midi ? 'upper' : 'lower'} neighbour — a step away from a chord tone and straight back to it.`,
+    }
+  }
+  if ((isLeap(approach) && isStep(departure)) || (isStep(approach) && isLeap(departure))) {
+    return {
+      role: 'incomplete',
+      label: 'IN',
+      why: 'an incomplete neighbour — approached or left by leap rather than by step on both sides, so it decorates without filling a gap.',
+    }
+  }
+
+  return null
+}
+
 /** Which chord is sounding at a beat, given per-chord durations. */
 export function chordAtBeat(progression, durations, beat) {
   let at = 0

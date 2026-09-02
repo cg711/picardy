@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import { chordSymbol, voiceChord } from '../theory/chords.js'
 import { midiName, mod } from '../theory/notes.js'
 import { timeSignatureOf } from '../theory/rhythm.js'
-import { classifyNote, chordAtBeat, rollRange, normaliseMelody } from '../theory/melody.js'
+import { classifyNote, classifyFigure, chordAtBeat, rollRange, normaliseMelody } from '../theory/melody.js'
 import { playChord } from '../audio/synth.js'
 
 const ROW = 13
@@ -106,6 +106,15 @@ export default function MelodyRoll({
 
   const hovered = hover ? chordAtBeat(progression, durations, hover.beat) : null
   const hoverInfo = hovered?.chord ? classifyNote(hover.midi, hovered.chord, musicKey) : null
+  // If the cursor is over a note that already exists, it has a line either side
+  // of it and so it can be read as a figure. An empty square cannot — there is
+  // nothing yet to approach it or leave it.
+  const hoveredIndex = hover
+    ? notes.findIndex((n) => n.midi === hover.midi && hover.beat >= n.at - 1e-6 && hover.beat < n.at + n.beats - 1e-6)
+    : -1
+  const hoverFigure = hoveredIndex >= 0
+    ? classifyFigure(notes, hoveredIndex, progression, durations, ts)
+    : null
 
   return (
     <div className="melody-roll">
@@ -177,15 +186,23 @@ export default function MelodyRoll({
           {notes.map((note, i) => {
             const under = chordAtBeat(progression, durations, note.at)
             const info = under.chord ? classifyNote(note.midi, under.chord, musicKey) : null
+            // What the note is, and what it is doing. The second is often the
+            // more useful answer and takes the label when there is one: "sus"
+            // says more about a note than "11" does.
+            const figure = classifyFigure(notes, i, progression, durations, ts)
+            const shown = figure?.label ?? info?.label
             return (
-              <g key={`${note.at}-${note.midi}-${i}`} className={`roll-note ${info?.role ?? 'outside'}`}>
+              <g
+                key={`${note.at}-${note.midi}-${i}`}
+                className={`roll-note ${info?.role ?? 'outside'}${figure ? ' figure' : ''}`}
+              >
                 <rect
                   x={xFor(note.at) + 1} y={yFor(note.midi) + 1}
                   width={Math.max(6, note.beats * BEAT - 2)} height={ROW - 2}
                   rx={2}
                 />
-                {note.beats * BEAT > 24 && info?.label && (
-                  <text x={xFor(note.at) + 5} y={yFor(note.midi) + ROW - 4}>{info.label}</text>
+                {note.beats * BEAT > 24 && shown && (
+                  <text x={xFor(note.at) + 5} y={yFor(note.midi) + ROW - 4}>{shown}</text>
                 )}
               </g>
             )
@@ -207,9 +224,9 @@ export default function MelodyRoll({
         {hoverInfo ? (
           <>
             <strong>{midiName(hover.midi)}</strong>
-            <span className="roll-role">{hoverInfo.label || hoverInfo.role}</span>
+            <span className="roll-role">{hoverFigure?.label ?? (hoverInfo.label || hoverInfo.role)}</span>
             <span className="roll-why">
-              over {chordSymbol(hovered.chord)} — {hoverInfo.why}
+              over {chordSymbol(hovered.chord)} — {hoverFigure ? hoverFigure.why : hoverInfo.why}
             </span>
           </>
         ) : (
