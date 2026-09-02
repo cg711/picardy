@@ -132,10 +132,9 @@ export function buildMusicXml(parts, {
   if (!parts?.length || !key) return null
 
   const ts = timeSignatureOf(timeSignature)
-  // Where the bar lines and the ties fall is decided once, in leadsheet.js, and
-  // the staff view reads the same answer. Two renderers each working it out for
-  // themselves would drift, and the drift would only show up when somebody
-  // compared a printed part against the screen.
+  // Bar lines and ties are worked out in leadsheet.js — the arithmetic has all
+  // the edge cases (odd metres, a last bar that does not fill, notes crossing a
+  // bar line) and is far easier to hold to in isolation than tangled up here.
   const measures = layOutMeasures(parts, { timeSignature, melody })
 
   const xml = [

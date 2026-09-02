@@ -57,28 +57,6 @@ song can modulate: a chorus a minor third up from the verse keeps its own roman 
 sections into a song with repeat counts, reorder them, and play the whole thing end to end. The
 instruments follow along and the numerals switch key as each section arrives.
 
-**Notation, where it earns its place.** Two places show engraved music, and neither is a tab of its
-own — a staff you have to navigate to is one you look at instead of working.
-
-Under the piano, the chord you are on is written out on a grand staff. The keyboard shows *which
-keys*; this shows what a reader would call them, which is the one thing a piano diagram physically
-cannot do: it cannot tell you the black key is an A♭ and not a G♯.
-
-On the PDF, ticking *Engrave each section on a staff as well* puts a system under each section's
-chart. Off by default, because the chart above it is what most people print and the staff doubles
-the space a section takes.
-
-VexFlow does the drawing. It is the one part of this app not drawn by hand, deliberately: the
-fretboard, the piano and the melody roll are diagrams built from a handful of primitives with no
-typographic tradition to fall short of, and music engraving has four hundred years of one. It is
-loaded on demand, so it lands in its own chunk and costs nothing to anyone who never ticks the box.
-
-No musical decision is delegated. Where the bar lines fall, which notes tie across them, how a pitch
-is spelled and what the chord above it is called all come from the engine — `layOutMeasures` in
-`src/lib/leadsheet.js` is the same function the MusicXML export uses, extracted from it so the
-printed part and the screen cannot disagree. Accidentals are stated rather than inferred, because
-the app already knows the spelling; that is the whole point of it.
-
 **PDF chart.** One click produces a lead sheet: chords laid out in bars with roman numerals
 underneath, tied continuations bracketed where a chord crosses a bar line, and a legend of
 fingering diagrams for every distinct chord. Choose guitar, piano, both, or symbols only at export
@@ -885,7 +863,7 @@ src/
     ExercisesPage.jsx  the drill page at /exercises
     LessonsPage.jsx    the lesson index and reader at /lessons
   lib/            URL/share encoding, colour tokens, segment + song model,
-                  lead-sheet measure layout shared by the staff and MusicXML,
+                  lead-sheet measure layout (bar lines and ties),
                   ready-made backing tracks (backings.js),
                   PDF export, MIDI writer, chart text import,
                   Web MIDI input (midiInput.js)

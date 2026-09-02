@@ -46,7 +46,6 @@ import ScalePanel from './components/ScalePanel.jsx'
 import ReharmDialog from './components/ReharmDialog.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import ExportPanel from './components/ExportPanel.jsx'
-import ChordStaff from './components/ChordStaff.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, usePathname, linkProps } from './lib/router.js'
@@ -1575,27 +1574,14 @@ export default function App() {
             )}
 
             {instrument === 'piano' && (
-            <div className="piano-with-staff">
-              <Piano
-                chord={activeChord}
-                voicing={pianoVoicing}
-                selection={selection}
-                onToggleNote={toggleNote}
-                scalePcs={showScale && activeScale ? activeScale.pcs : null}
-                guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
-              />
-              {/* The keyboard shows which keys; this shows what a reader would
-                  call them. Worth having side by side precisely where they
-                  differ — a piano cannot show you that the black key is an A♭
-                  and not a G♯. */}
-              <ChordStaff
-                chord={activeChord}
-                voicing={pianoVoicing}
-                musicKey={displayKey}
-                inversion={activeInversion}
-                numeralStyle={numeralStyle}
-              />
-            </div>
+            <Piano
+              chord={activeChord}
+              voicing={pianoVoicing}
+              selection={selection}
+              onToggleNote={toggleNote}
+              scalePcs={showScale && activeScale ? activeScale.pcs : null}
+              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
+            />
             )}
 
             {instrument === 'guitar' && (
@@ -1879,7 +1865,7 @@ export default function App() {
           lefty={lefty}
           hasMelody={songHasMelody}
           onCancel={() => setExporting(null)}
-          onExport={({ title, instrument, includeMelody: withMelody, staffNotation }) => {
+          onExport={({ title, instrument, includeMelody: withMelody }) => {
             // The chart is built from segments, and a bare progression is not
             // one yet — entriesFor returns nothing for that scope, which meant
             // "PDF chart" on the current progression produced a title page and
@@ -1909,8 +1895,6 @@ export default function App() {
               tuningId: shapeTuningKey,
               lefty,
               includeMelody: withMelody,
-              staffNotation,
-              numeralStyle,
             })
             setExporting(null)
           }}

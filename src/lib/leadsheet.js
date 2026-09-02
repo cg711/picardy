@@ -1,13 +1,14 @@
 // Laying a progression and a melody out into measures.
 //
-// Extracted from the MusicXML writer once the staff view needed the same thing.
-// Two renderers each deciding for themselves where a bar line falls, and which
-// notes get tied across it, would eventually disagree — and the disagreement
-// would be invisible until someone compared a printed part with the screen.
+// Split out of the MusicXML writer, and worth keeping separate even though that
+// is once again its only caller: the bar-line and tie arithmetic is the part
+// with edge cases — odd metres, chords that do not fill their last bar, notes
+// that cross a bar line — and it is far easier to hold to that in isolation
+// than tangled up with XML generation.
 //
 // The melody is split at chord changes as well as at bar lines. That costs a tie
 // and buys a guarantee: no harmony ever has to be attached partway through a
-// note, which is what keeps both renderers simple.
+// note.
 
 import { toBeats, timeSignatureOf } from '../theory/rhythm.js'
 
@@ -84,18 +85,16 @@ export function layOutMeasures(parts, { timeSignature = '4/4', melody = [] } = {
 
 /** Note values, longest first, so the closest match is found by scanning. */
 const FIGURES = [
-  [4, 'whole', 'w', 0], [3, 'half', 'h', 1], [2, 'half', 'h', 0], [1.5, 'quarter', 'q', 1],
-  [1, 'quarter', 'q', 0], [0.75, 'eighth', '8', 1], [0.5, 'eighth', '8', 0],
-  [0.375, '16th', '16', 1], [0.25, '16th', '16', 0], [0.125, '32nd', '32', 0],
+  [4, 'whole', 0], [3, 'half', 1], [2, 'half', 0], [1.5, 'quarter', 1],
+  [1, 'quarter', 0], [0.75, 'eighth', 1], [0.5, 'eighth', 0],
+  [0.375, '16th', 1], [0.25, '16th', 0], [0.125, '32nd', 0],
 ]
 
 /**
  * The closest written note value to a length in beats.
  *
  * Lengths here are arbitrary — a chord dragged along a lyric lands anywhere —
- * so there is not always an exact figure and the nearest one is used. `name` is
- * the MusicXML spelling, `code` the VexFlow one, from the same table so the two
- * renderers cannot pick different values for the same slot.
+ * so there is not always an exact figure and the nearest one is used.
  */
 export function figureFor(beats) {
   let best = FIGURES[FIGURES.length - 1]
@@ -104,5 +103,5 @@ export function figureFor(beats) {
     const d = Math.abs(f[0] - beats)
     if (d < gap) { gap = d; best = f }
   }
-  return { type: best[1], code: best[2], dots: best[3] }
+  return { type: best[1], dots: best[2] }
 }

@@ -1915,10 +1915,12 @@ console.log('\n--- lead-sheet layout ---')
   }
   eq('  slots tile every measure with no gap or overlap', broken, 0)
 
-  // The two renderers must choose the same note value for the same slot.
-  eq('  a half note is a half note in both notations',
-    `${figureFor(2).type}/${figureFor(2).code}`, 'half/h')
-  eq('  a dotted quarter carries its dot', `${figureFor(1.5).code}+${figureFor(1.5).dots}`, 'q+1')
+  // Lengths are arbitrary — a chord dragged along a lyric lands anywhere — so
+  // the nearest written value is the one used.
+  eq('  two beats is a half note', figureFor(2).type, 'half')
+  eq('  a dotted quarter carries its dot',
+    `${figureFor(1.5).type}+${figureFor(1.5).dots}`, 'quarter+1')
+  eq('  an odd length rounds to the nearest figure', figureFor(0.9).type, 'quarter')
 }
 
 console.log('\n--- MusicXML ---')
