@@ -11,7 +11,7 @@ export const SITE = {
   /** Used only in the governing-law clause. */
   jurisdiction: 'Minnesota',
   /** Bump this whenever either document changes in substance. */
-  updated: '17 August 2026',
+  updated: '1 September 2026',
 }
 
 const PLACEHOLDER = /\[.+\]/

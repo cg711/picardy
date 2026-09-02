@@ -77,9 +77,10 @@ const PITCH = [
       moves the music rather than just relabelling it.`,
   },
   {
-    title: 'Nothing leaves your browser',
-    body: `There is no account, no backend and no analytics on what you write. Progressions live
-      in the URL and in local storage, which is also why a link is the whole share mechanism.`,
+    title: 'No account, no backend',
+    body: `Nothing you write is stored on a server or tied to an account. Progressions live in the
+      URL and in local storage, which is also why a link is the whole share mechanism. The site
+      does run cookieless page-view analytics; the privacy policy says exactly what that sees.`,
   },
 ]
 
