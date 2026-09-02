@@ -15,7 +15,7 @@ import {
   CUSTOM_TUNING, tuningKey, normaliseTuning,
 } from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
-import { playChord, playProgression, stopPlayback, setVolume, resumeAudio } from './audio/synth.js'
+import { playChord, playProgression, stopPlayback, setVolume, resumeAudio, renderToBuffer, bufferToWav, downloadWav } from './audio/synth.js'
 import { isBand } from './audio/styles.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
 import { buildMusicXml, progressionToParts, downloadMusicXml } from './lib/musicxml.js'
@@ -878,6 +878,39 @@ export default function App() {
     if (text) downloadMusicXml(text, name)
   }
 
+  /**
+   * The same thing, as audio.
+   *
+   * Rendered offline through the app's own synth rather than recorded from the
+   * speakers, so it comes out faster than realtime, silent, and identical to
+   * what playback would have sounded like.
+   */
+  const [rendering, setRendering] = useState(false)
+  const exportAudio = async (scope = { kind: 'song' }) => {
+    if (rendering) return
+    const entries = entriesFor(scope)
+    const fromSong = entries.length > 0
+    const events = fromSong
+      ? songToEvents(entries, segments)
+      : progressionToEvents(progression, inversions, durations)
+    if (!events.length) return
+    const line = fromSong ? flattenMelody(entries, segments) : melody
+    const name = nameFor(scope)
+    setRendering(true)
+    try {
+      const buffer = await renderToBuffer(events, {
+        bpm,
+        timbre,
+        pattern,
+        timeSignature: timeSignatureOf(timeSignature),
+        melody: includeMelody ? line : [],
+      })
+      if (buffer) downloadWav(bufferToWav(buffer), name)
+    } finally {
+      setRendering(false)
+    }
+  }
+
   const loadChart = (parsed, detectedKey) => {
     stopEverything()
     if (detectedKey) setMusicKey(detectedKey)
@@ -1258,6 +1291,8 @@ export default function App() {
                 onExportPdf={(scope) => setExporting(scope)}
                 onExportMidi={exportMidi}
                 onExportMusicXml={exportMusicXml}
+                onExportAudio={exportAudio}
+                rendering={rendering}
               />
             )}
 

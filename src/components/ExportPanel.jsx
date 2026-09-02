@@ -29,6 +29,8 @@ export default function ExportPanel({
   onExportPdf,
   onExportMidi,
   onExportMusicXml,
+  onExportAudio,
+  rendering = false,
 }) {
   const byId = new Map(segments.map((s) => [s.id, s]))
 
@@ -60,6 +62,7 @@ export default function ExportPanel({
         <button className="btn ghost tiny" onClick={() => onExportPdf(scope)}>PDF chart</button>
         <button className="btn ghost tiny" onClick={() => onExportMidi(scope)}>MIDI</button>
         <button className="btn ghost tiny" onClick={() => onExportMusicXml(scope)}>MusicXML</button>
+        <button className="btn ghost tiny" onClick={() => onExportAudio(scope)} disabled={rendering}>{rendering ? "Rendering…" : "WAV"}</button>
       </div>
     </div>
   )

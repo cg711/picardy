@@ -12,33 +12,50 @@ let reverb = null
 // as the pad turns the backbeat to mush.
 let drumBus = null
 
+/**
+ * The whole signal chain, built against whichever context is given.
+ *
+ * Split out from ensureContext so that rendering to a file can put the exact
+ * same graph in front of an OfflineAudioContext. An offline renderer that built
+ * its own chain would be a second synth, and the file would stop sounding like
+ * the app the first time either one was touched.
+ */
+function buildGraph(ac) {
+  const bus = ac.createGain()
+  bus.gain.value = 0.55
+  const comp = ac.createDynamicsCompressor()
+  comp.threshold.value = -18
+  comp.ratio.value = 6
+  bus.connect(comp)
+  comp.connect(ac.destination)
+
+  // Cheap plate-ish reverb from generated noise.
+  const verb = ac.createConvolver()
+  verb.buffer = makeImpulse(ac, 1.7, 2.6)
+  const wet = ac.createGain()
+  wet.gain.value = 0.22
+  verb.connect(wet)
+  wet.connect(comp)
+
+  const drums = ac.createGain()
+  drums.gain.value = 0.9
+  drums.connect(bus)
+  const drumSend = ac.createGain()
+  drumSend.gain.value = 0.06
+  drums.connect(drumSend)
+  drumSend.connect(verb)
+
+  return { master: bus, reverb: verb, drumBus: drums }
+}
+
 function ensureContext() {
   if (ctx) return ctx
   const AC = window.AudioContext || window.webkitAudioContext
   ctx = new AC()
-  master = ctx.createGain()
-  master.gain.value = 0.55
-  const comp = ctx.createDynamicsCompressor()
-  comp.threshold.value = -18
-  comp.ratio.value = 6
-  master.connect(comp)
-  comp.connect(ctx.destination)
-
-  // Cheap plate-ish reverb from generated noise.
-  reverb = ctx.createConvolver()
-  reverb.buffer = makeImpulse(ctx, 1.7, 2.6)
-  const wet = ctx.createGain()
-  wet.gain.value = 0.22
-  reverb.connect(wet)
-  wet.connect(comp)
-
-  drumBus = ctx.createGain()
-  drumBus.gain.value = 0.9
-  drumBus.connect(master)
-  const drumSend = ctx.createGain()
-  drumSend.gain.value = 0.06
-  drumBus.connect(drumSend)
-  drumSend.connect(reverb)
+  const graph = buildGraph(ctx)
+  master = graph.master
+  reverb = graph.reverb
+  drumBus = graph.drumBus
   return ctx
 }
 
@@ -504,4 +521,131 @@ export function playProgression(items, opts = {}) {
 
 export function isAudioReady() {
   return !!ctx && ctx.state === 'running'
+}
+
+/**
+ * Render a progression to an audio buffer, faster than realtime.
+ *
+ * Reuses the live scheduler rather than reimplementing it. The module's context
+ * and graph are swapped for an offline pair, `scheduleNextBar` is run until the
+ * piece is over — no lookahead window, because offline there is no "now" to stay
+ * ahead of — and the originals are put back in a `finally`. Duplicating the
+ * scheduler here would have been safer to read and guaranteed to drift: the file
+ * would stop matching the app the first time either was touched.
+ *
+ * Live playback is stopped first. You cannot listen and render at once anyway,
+ * and `finish()` clears the module transport, which would otherwise cut off
+ * whatever was playing.
+ */
+export async function renderToBuffer(items, opts = {}) {
+  if (!items?.length) return null
+  stopPlayback()
+
+  const o = {
+    bpm: 84,
+    timbre: 'piano',
+    strum: 0.012,
+    pattern: 'block',
+    beatsPerBar: 4,
+    timeSignature: null,
+    sectionStartBeats: [],
+    melody: [],
+    sampleRate: 44100,
+    ...opts,
+    items,
+  }
+
+  const ts = o.timeSignature ?? { beatsPerBar: o.beatsPerBar }
+  const spb = 60 / Math.max(20, o.bpm)
+  const beats = items.reduce((sum, item) => sum + Math.max(0.05, item.beats ?? 4), 0)
+  // A tail for the release envelopes and the reverb, or the last chord is
+  // guillotined at the end of the file.
+  const TAIL = 3
+  const seconds = beats * spb + TAIL
+  const frames = Math.ceil(seconds * o.sampleRate)
+
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext
+  if (!OAC) return null
+  const offline = new OAC(2, frames, o.sampleRate)
+
+  const liveCtx = ctx
+  const liveMaster = master
+  const liveReverb = reverb
+  const liveDrums = drumBus
+  const liveTransport = transport
+
+  try {
+    ctx = offline
+    const graph = buildGraph(offline)
+    master = graph.master
+    reverb = graph.reverb
+    drumBus = graph.drumBus
+
+    const t = { opts: o, beat: 0, anchorBeat: 0, anchorTime: 0, spb, timer: null, done: false }
+    transport = t
+    let guard = 0
+    while (!t.done && guard++ < 4096) scheduleNextBar(t)
+
+    return await offline.startRendering()
+  } finally {
+    ctx = liveCtx
+    master = liveMaster
+    reverb = liveReverb
+    drumBus = liveDrums
+    transport = liveTransport
+  }
+}
+
+/**
+ * An AudioBuffer as a 16-bit PCM WAV.
+ *
+ * Written by hand for the same reason the MIDI file is: it is a 44-byte header
+ * and a loop, and a dependency to produce it would be larger than the code.
+ */
+export function bufferToWav(buffer) {
+  const channels = buffer.numberOfChannels
+  const frames = buffer.length
+  const bytes = 44 + frames * channels * 2
+  const view = new DataView(new ArrayBuffer(bytes))
+
+  const ascii = (offset, text) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i))
+  }
+  ascii(0, 'RIFF')
+  view.setUint32(4, bytes - 8, true)
+  ascii(8, 'WAVE')
+  ascii(12, 'fmt ')
+  view.setUint32(16, 16, true)        // PCM header length
+  view.setUint16(20, 1, true)         // format: PCM
+  view.setUint16(22, channels, true)
+  view.setUint32(24, buffer.sampleRate, true)
+  view.setUint32(28, buffer.sampleRate * channels * 2, true) // byte rate
+  view.setUint16(32, channels * 2, true)                     // block align
+  view.setUint16(34, 16, true)                               // bits per sample
+  ascii(36, 'data')
+  view.setUint32(40, frames * channels * 2, true)
+
+  const data = Array.from({ length: channels }, (_, c) => buffer.getChannelData(c))
+  let at = 44
+  for (let i = 0; i < frames; i++) {
+    for (let c = 0; c < channels; c++) {
+      // Clamped before scaling: a sample over 1.0 would wrap to full negative,
+      // which is the loudest possible click rather than the quietest clip.
+      const s = Math.max(-1, Math.min(1, data[c][i]))
+      view.setInt16(at, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+      at += 2
+    }
+  }
+  return new Blob([view.buffer], { type: 'audio/wav' })
+}
+
+export function downloadWav(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename.endsWith('.wav') ? filename : `${filename}.wav`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

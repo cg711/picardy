@@ -147,6 +147,21 @@ malformed XML, and measures whose durations do not add up. That second one is as
 7/8 and 6/8 as well as 4/4, and for ragged progressions that do not fill their last bar. Notes
 crossing a bar line are split and tied rather than overflowing.
 
+**Audio export.** Renders the track to a WAV in the browser, faster than realtime, through the
+app's own synth — so the file sounds like playback because it *is* playback, run through an
+`OfflineAudioContext` instead of the speakers.
+
+The graph construction was split out of `ensureContext` so the offline render puts the identical
+chain in front of the offline context, and the render drives the live scheduler rather than a copy
+of it: the module's context and graph are swapped, `scheduleNextBar` runs until the piece is over —
+no lookahead window, because offline there is no "now" to stay ahead of — and the originals are
+restored in a `finally`. An offline renderer with its own scheduler would have been easier to read
+and guaranteed to drift out of step with the thing it was supposed to reproduce.
+
+The WAV header is written by hand, like the MIDI file. Samples are clamped before scaling, because a
+value over 1.0 wraps to full negative — the loudest possible click where you wanted the quietest
+clip. A three-second tail is added so the last chord's release and the reverb are not guillotined.
+
 **MIDI export.** A Format 1 `.mid` file — tempo, metre, per-chord durations, voiced chords, and a
 marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
 dependency.
