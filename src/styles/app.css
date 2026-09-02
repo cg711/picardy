@@ -226,7 +226,9 @@ a.brand:hover .tagline { color: var(--accent); }
   padding: 14px 20px 28px; max-width: 900px; font-size: 12px;
   display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
 }
-.foot-links { display: flex; gap: 16px; }
+/* Wrapping, because the number of pages grows: at seven the row was wider than
+   a phone and scrolled the whole document sideways. */
+.foot-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .foot-links a { color: var(--text-dim); text-decoration: none; }
 .foot-links a:hover { color: var(--accent); text-decoration: underline; }
 
@@ -1316,7 +1318,10 @@ a.brand { text-decoration: none; color: inherit; }
 
 /* ---------- landing ---------- */
 
-.home {
+/* The shell every non-app page sits in. `.home` was its only name while the
+   landing page was the only one of them; `.page` is the same thing said in a
+   word that is true of the lessons too. */
+.home, .page {
   max-width: 900px;
   margin: 0 auto;
   padding: 12px 20px 24px;
@@ -2049,4 +2054,108 @@ a.brand { text-decoration: none; color: inherit; }
 @media (max-width: 560px) {
   .lyric-cell { flex: 1 1 78px; }
   .lyric-cell.lead-in { flex: 0 1 64px; }
+}
+
+/* ---- Lessons ------------------------------------------------------------ */
+
+.lessons-hero { padding: 40px 0 0; }
+.lessons-hero h2 {
+  font-size: clamp(30px, 6vw, 46px);
+  line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 16px;
+}
+.lessons-lede {
+  margin: 0; max-width: 62ch;
+  font-size: 15px; line-height: 1.7; color: var(--text-dim);
+}
+
+.lesson-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lesson-card {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 16px 18px; border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  text-decoration: none; color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.lesson-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+/* Tabular figures so the numerals form a straight column down the left. */
+.lesson-card-num {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px; letter-spacing: 0.08em; color: var(--accent); flex: none;
+}
+.lesson-card-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
+.lesson-card-title { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; }
+.lesson-card-blurb { font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.lesson-card-mins { flex: none; white-space: nowrap; }
+
+/* The reading column is narrower than the app's 900px: prose wants ~65
+   characters, and the studio's width would make every line a scan. */
+.lesson-article { max-width: 66ch; display: flex; flex-direction: column; gap: 26px; }
+.lesson-crumb { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lesson-crumb a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+.lesson-crumb a:hover { color: var(--accent); }
+.lesson-head h2 {
+  font-size: clamp(27px, 5.5vw, 40px);
+  line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 12px;
+}
+.lesson-blurb { margin: 0; font-size: 15px; line-height: 1.65; color: var(--text-dim); }
+
+.lesson-section { display: flex; flex-direction: column; gap: 14px; }
+.lesson-section h3 {
+  margin: 0; font-size: 13px; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--accent);
+}
+.lesson-section p { margin: 0; font-size: 15px; line-height: 1.75; color: #ddd6ca; }
+.lesson-points { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+.lesson-points li { font-size: 14px; line-height: 1.6; color: var(--text-dim); }
+
+.lesson-example {
+  margin: 2px 0; padding: 14px 16px 13px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  background: var(--surface-3);
+  display: flex; flex-direction: column; gap: 11px;
+}
+.lesson-example-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.lesson-example-caption { font-size: 13px; font-weight: 600; letter-spacing: -0.005em; }
+/* Twelve chords do not fit a 66ch column, so the row scrolls rather than
+   forcing the article to. */
+.lesson-chords-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 2px; }
+.lesson-chords {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; gap: 6px; min-width: min-content;
+}
+.lesson-chord {
+  flex: none; min-width: 62px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 10px; border-radius: 8px;
+  border: 1px solid var(--border-soft); background: var(--surface-1);
+}
+.lesson-chord-symbol { font-size: 15px; font-weight: 600; }
+.lesson-chord-roman { font-size: 11.5px; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
+
+.lesson-cadence { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.lesson-cadence-badge {
+  flex: none; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--accent); color: var(--accent);
+  font-size: 11px; letter-spacing: 0.03em; white-space: nowrap;
+}
+.lesson-cadence .muted { flex: 1 1 220px; line-height: 1.5; }
+
+.lesson-example-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lesson-example-actions .btn { text-decoration: none; }
+
+.lesson-nav {
+  display: flex; justify-content: space-between; gap: 12px;
+  border-top: 1px solid var(--border-soft); padding-top: 18px;
+}
+.lesson-nav-link {
+  display: flex; flex-direction: column; gap: 3px;
+  text-decoration: none; color: var(--ink); font-size: 14px; max-width: 46%;
+}
+.lesson-nav-link.next { text-align: right; align-items: flex-end; }
+.lesson-nav-link:hover { color: var(--accent); }
+
+@media (max-width: 560px) {
+  .lesson-card { gap: 12px; padding: 14px; }
+  .lesson-card-mins { display: none; }
 }

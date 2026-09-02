@@ -33,6 +33,18 @@ const TOOLS = [
     cta: 'Open a backing track',
   },
   {
+    path: '/lessons',
+    name: 'Lessons',
+    tagline: 'The theory behind the tool, in short articles.',
+    points: [
+      'Roman numerals, function, cadences, ii–V–I, secondary dominants',
+      'Borrowed chords, inversions, the twelve-bar blues, tritone subs',
+      'Every example plays, and opens in the studio with one click',
+      'Examples are built by the engine, so they cannot contradict the app',
+    ],
+    cta: 'Start reading',
+  },
+  {
     path: '/exercises',
     name: 'Exercises',
     tagline: 'Drills that grade themselves, generated fresh every time.',

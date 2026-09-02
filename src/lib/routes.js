@@ -9,11 +9,14 @@
 // wrangler.jsonc sets not_found_handling to "single-page-application", and Vite's
 // dev server does the same by default.
 
+import { LESSONS, lessonById, lessonPath } from '../theory/lessons.js'
+
 export const PAGES = [
   { path: '/', route: 'home', label: 'Home', title: 'Picardy — chord progressions, explained' },
   { path: '/tool', route: 'app', label: 'Studio', title: 'Studio — Picardy' },
   { path: '/backing', route: 'backing', label: 'Backing tracks', title: 'Backing tracks — Picardy' },
   { path: '/exercises', route: 'exercises', label: 'Exercises', title: 'Exercises — Picardy' },
+  { path: '/lessons', route: 'lessons', label: 'Lessons', title: 'Lessons — Picardy' },
   { path: '/privacy', route: 'privacy', label: 'Privacy', title: 'Privacy — Picardy' },
   { path: '/terms', route: 'terms', label: 'Terms', title: 'Terms — Picardy' },
 ]
@@ -22,14 +25,41 @@ export const PAGES = [
 export const TOOL_PATH = '/tool'
 export const BACKING_PATH = '/backing'
 
+const clean = (pathname) => String(pathname ?? '/').replace(/\/+$/, '') || '/'
+
+/**
+ * The one page that takes an argument.
+ *
+ * Lessons are known at build time, so this stays a membership test against a
+ * fixed list rather than a wildcard: an unknown slug is not a lesson, and falls
+ * through to the same "we do not have that" handling as any other bad path.
+ * Returns the slug, or null if this is not a lesson URL.
+ */
+export function lessonSlugFor(pathname) {
+  const rest = clean(pathname).match(/^\/lessons\/([^/]+)$/)
+  if (!rest) return null
+  const slug = decodeURIComponent(rest[1])
+  return LESSONS.some((lesson) => lesson.id === slug) ? slug : null
+}
+
 /** Anything unrecognised lands on the front page rather than a blank tool. */
 export function routeFor(pathname) {
   // Trailing slashes are the same page; '/privacy/' and '/privacy' must not diverge.
-  const clean = String(pathname ?? '/').replace(/\/+$/, '') || '/'
-  return PAGES.find((p) => p.path === clean)?.route ?? 'home'
+  const path = clean(pathname)
+  const exact = PAGES.find((p) => p.path === path)?.route
+  if (exact) return exact
+  // A real lesson gets the reader; a made-up one gets the index, which is more
+  // use than the front page when someone has mistyped a slug they were given.
+  if (lessonSlugFor(path)) return 'lesson'
+  if (/^\/lessons\//.test(path)) return 'lessons'
+  return 'home'
 }
 
-export function pageFor(route) {
+export function pageFor(route, pathname = null) {
+  if (route === 'lesson') {
+    const lesson = lessonById(lessonSlugFor(pathname ?? '') ?? '')
+    if (lesson) return { path: lessonPath(lesson.id), route, label: lesson.title, title: `${lesson.title} — Picardy` }
+  }
   return PAGES.find((p) => p.route === route) ?? PAGES[0]
 }
 

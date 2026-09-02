@@ -47,7 +47,7 @@ import LyricTimeline from './components/LyricTimeline.jsx'
 import ExportPanel from './components/ExportPanel.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
-import { useRoute, linkProps } from './lib/router.js'
+import { useRoute, usePathname, linkProps } from './lib/router.js'
 import { legacyToolPath, pageFor, BACKING_PATH } from './lib/routes.js'
 import Menu from './components/Menu.jsx'
 import SiteFooter from './components/SiteFooter.jsx'
@@ -55,6 +55,7 @@ import LegalPage from './pages/LegalPage.jsx'
 import ExercisesPage from './pages/ExercisesPage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import BackingPage from './pages/BackingPage.jsx'
+import LessonsPage from './pages/LessonsPage.jsx'
 
 // Before anything reads the URL: a shared progression that arrives at '/' is
 // forwarded to the tool, carrying its fragment. Every link ever generated points
@@ -74,6 +75,9 @@ export default function App() {
   // App stays mounted on the legal pages — it just renders a different body. That
   // is what keeps a half-written progression alive while someone reads the terms.
   const route = useRoute()
+  // A lesson's tab title is its own, so the title effect needs the path rather
+  // than just the route every lesson shares.
+  const pathname = usePathname()
   const [musicKey, setMusicKey] = useState(initial?.key ?? makeKey('C', 'major'))
   const [progression, setProgression] = useState(initial?.progression ?? [])
   const [inversions, setInversions] = useState(initial?.inversions ?? [])
@@ -326,7 +330,7 @@ export default function App() {
   // One place sets the tab title, for every route. Per-page effects that each
   // restored "the app's title" on unmount meant a cold load and a navigation
   // could disagree about what the same page is called.
-  useEffect(() => { document.title = pageFor(route).title }, [route])
+  useEffect(() => { document.title = pageFor(route, pathname).title }, [route, pathname])
 
   useEffect(() => setVolume(volume / 100), [volume])
 
@@ -1115,7 +1119,8 @@ export default function App() {
         {route === 'home' ? <HomePage />
           : route === 'backing' ? <BackingPage />
             : route === 'exercises' ? <ExercisesPage />
-              : <LegalPage route={route} />}
+              : route === 'lessons' || route === 'lesson' ? <LessonsPage />
+                : <LegalPage route={route} />}
         <SiteFooter route={route} />
       </div>
     )

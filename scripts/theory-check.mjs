@@ -26,7 +26,8 @@ const { parseChart } = await import(B + 'lib/textimport.js')
 const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
-const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH } = await import(B + 'lib/routes.js')
+const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH, lessonSlugFor } = await import(B + 'lib/routes.js')
+const { LESSONS, buildExample, lessonPath } = await import(B + 'theory/lessons.js')
 const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
 const { parseMidiMessage } = await import(B + 'lib/midiInput.js')
 const { BACKINGS, BACKING_KEYS, buildBacking } = await import(B + 'lib/backings.js')
@@ -1251,6 +1252,88 @@ console.log('\n--- keeping the strip in view ---')
   eq('  something already visible stays put', keepInView({ scrollLeft: 100, clientWidth: 649, left: 200, right: 300 }), null)
   eq('  something off the left scrolls back', keepInView({ scrollLeft: 400, clientWidth: 649, left: 100, right: 224 }), 88)
   eq('  and never past the start', keepInView({ scrollLeft: 40, clientWidth: 649, left: 4, right: 128 }), 0)
+}
+
+// The point of building lesson examples from degrees rather than typing chord
+// names is that the page cannot disagree with the engine. That guarantee is
+// only real if something checks it, so this is that something: every example is
+// compiled and compared against what the lesson claims it will say. A spelling
+// or numeral change that would make an article wrong fails here rather than
+// going out and quietly teaching the wrong thing.
+console.log('\n--- lessons ---')
+{
+  const slugRe = /^[a-z0-9]+(-[a-z0-9]+)*$/
+  const seen = new Set()
+  let examples = 0
+  let claims = 0
+  let badSlug = 0
+  let badStyle = 0
+  let unbuildable = 0
+  let mismatched = 0
+  let shortProse = 0
+  // *emphasis* is rendered; an odd number of asterisks in a paragraph means one
+  // of them is going to show up on the page as an asterisk.
+  let strayEmphasis = 0
+
+  for (const lesson of LESSONS) {
+    if (!slugRe.test(lesson.id) || seen.has(lesson.id)) badSlug++
+    seen.add(lesson.id)
+    // A lesson with no prose is a stub; better to notice here than on the page.
+    const words = lesson.sections
+      .flatMap((s) => s.body ?? [])
+      .join(' ')
+      .split(/\s+/).filter(Boolean).length
+    if (words < 60) shortProse++
+    for (const paragraph of lesson.sections.flatMap((s) => s.body ?? [])) {
+      if ((paragraph.match(/\*/g) ?? []).length % 2) strayEmphasis++
+    }
+
+    for (const section of lesson.sections) {
+      if (!section.example) continue
+      examples++
+      const ex = section.example
+      const built = buildExample(ex)
+      if (!built) { unbuildable++; continue }
+
+      // A style id the audio layer does not know falls back to block chords
+      // silently, so an example would play something other than what it says.
+      if (!STYLES[built.style]) badStyle++
+
+      const want = ex.expect ?? {}
+      const check = (field, got) => {
+        claims++
+        const wanted = want[field]
+        const same = Array.isArray(wanted)
+          ? wanted.length === got.length && wanted.every((v, i) => v === got[i])
+          : wanted === got
+        if (!same) {
+          mismatched++
+          console.log(`FAIL   ${lesson.id} / "${ex.caption}" ${field}: ${JSON.stringify(got)}  (want ${JSON.stringify(wanted)})`)
+        }
+      }
+      check('symbols', built.symbols)
+      check('numerals', built.numerals)
+      check('cadence', built.cadence)
+    }
+  }
+
+  eq('  every lesson has a URL-safe, unique slug', badSlug, 0)
+  eq('  every lesson has real prose in it', shortProse, 0)
+  eq('  no unpaired *emphasis* markers', strayEmphasis, 0)
+  eq('  every example builds from its degrees', unbuildable, 0)
+  eq('  every example names a style the audio layer has', badStyle, 0)
+  eq(`  every claim matches the engine (${claims} across ${examples} examples)`, mismatched, 0)
+
+  // The reader is chosen by slug, so the slugs have to route. A lesson that
+  // cannot be linked to is a lesson nobody will read.
+  const routable = LESSONS.every((l) => routeFor(lessonPath(l.id)) === 'lesson' && lessonSlugFor(lessonPath(l.id)) === l.id)
+  eq('  every lesson routes from its own path', routable, true)
+  eq('  a made-up slug is not a lesson', lessonSlugFor('/lessons/nope'), null)
+  eq('  …and falls back to the index, not the front page', routeFor('/lessons/nope'), 'lessons')
+  eq('  the index itself routes', routeFor('/lessons'), 'lessons')
+  eq('  a trailing slash is the same lesson', lessonSlugFor(`${lessonPath(LESSONS[0].id)}/`), LESSONS[0].id)
+  // The tab title has to come from the path, since every lesson shares a route.
+  eq('  a lesson titles its own tab', pageFor('lesson', lessonPath('cadences')).title, 'Cadences — Picardy')
 }
 
 console.log('\n--- routes ---')

@@ -388,15 +388,53 @@ a minimum ΔE from the accent and from every other tone. Retune those by the num
 ## Pages
 
 `/` is the landing page — what Picardy is, the tools, and links into them. `/tool` is the studio,
-`/backing` the backing-track player, `/exercises` the drills, `/privacy` and `/terms` the legal
+`/backing` the backing-track player, `/exercises` the drills, `/lessons` the written theory,
+`/privacy` and `/terms` the legal
 text. The menu in the
 top bar and the footer are both generated from `PAGES` in `src/lib/routes.js`, so a new page appears
 in both by adding one entry.
+
+`/lessons/<slug>` is the one path that takes an argument. Lessons are known at build time, so
+`routeFor` stays a membership test against a fixed list rather than growing a wildcard — an unknown
+slug is not a lesson and falls back to the index, which is more use than the front page to someone
+who mistyped a link they were given. The router tracks the *pathname* rather than the route it maps
+to, because two lessons are the same route: a router storing the route would see no change between
+`/lessons/cadences` and `/lessons/ii-v-i` and leave the reader on the article they just navigated
+away from.
 
 The tool used to live at `/`, and every progression ever shared is a `/#k=…` link. Moving it would
 have broken all of them, so `legacyToolPath()` forwards a state fragment arriving at the front door
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
+
+## Lessons
+
+Nine short articles at `/lessons`: roman numerals, harmonic function, cadences, ii–V–I, secondary
+dominants, borrowed chords, inversions, the twelve-bar blues, and tritone substitution.
+
+The design constraint is that a lesson must not be able to contradict the tool it teaches. The
+obvious way to write one — typing "try Dm7–G7–Cmaj7" into a paragraph — creates a second source of
+truth that starts lying the day a spelling rule changes. So an example here is stored as scale
+degrees, `[semitonesAboveTonic, genericDegree, qualityId, beats]`, the same vocabulary the roman
+numeral picker and the backing presets use. The chords come from `makeChord`, the symbols from
+`chordSymbol`, the numerals from `romanNumeral` and the cadence name from `cadenceAt`. Nothing on
+the page is written by hand, and *Open in the studio* hands over the real progression rather than a
+description of it.
+
+What is written by hand is `expect`: what the author believes the engine will say. The check suite
+compiles every example and compares — 60 claims across 20 examples — so an engine change that would
+make an article wrong fails the build instead of quietly teaching the wrong thing. It also asserts
+that every example names a style the audio layer actually has, since `styleOf` falls back to block
+chords silently and an example would otherwise play something other than what it claims.
+
+One lesson exists because of a disagreement. Picardy labels the tonic chord of a blues `V7/IV`
+rather than `I7`: a C7 in C major contains a B♭ and does resolve to F, so by common-practice logic
+it really is the dominant of IV, and the engine applies that rule consistently rather than making an
+exception it cannot justify. Blues does not use dominant sevenths that way — there the ♭7 is a
+colour, not a tension. Rather than special-case the lesson away from the engine, which would break
+the whole premise, the blues lesson teaches the discrepancy: analysis is a lens, not a fact, and
+when the engine's reading and your ears disagree about a style it was not built for, your ears are
+reporting the more useful truth.
 
 ## Legal pages
 
@@ -526,6 +564,8 @@ src/
     melody.js     what a melody note is doing against the chord underneath
     exercises.js  question generator — every answer comes from the engine
     intervals.js  naming the distance between two notes
+    lessons.js    the written lessons; examples stored as degrees and compiled,
+                  so a lesson cannot contradict the engine
   components/     React UI (Piano, Fretboard, Suggestions, ChordInput, RomanPicker, …)
   audio/
     synth.js      Web Audio polysynth and the playback scheduler
@@ -542,6 +582,7 @@ src/
     Privacy.jsx   privacy policy — draft, describes the app's actual behaviour
     Terms.jsx     terms of service — draft
     ExercisesPage.jsx  the drill page at /exercises
+    LessonsPage.jsx    the lesson index and reader at /lessons
   lib/            URL/share encoding, colour tokens, segment + song model,
                   ready-made backing tracks (backings.js),
                   PDF export, MIDI writer, chart text import,
