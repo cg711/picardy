@@ -11,7 +11,7 @@ import { optimiseInversions, progressionMovement } from './theory/voicelead.js'
 import { scalesForChord, guideTones, commonTones } from './theory/scales.js'
 import { reharmonise } from './theory/reharm.js'
 import {
-  findVoicings, TUNINGS, voicingLabel, encodeShape, decodeShape, shapeFromFrets,
+  findVoicings, TUNINGS, voicingLabel, encodeShape, decodeShape, shapeFromFrets, suggestCapo,
   CUSTOM_TUNING, tuningKey, normaliseTuning,
 } from './theory/guitar.js'
 import { identifyChord } from './theory/identify.js'
@@ -312,6 +312,18 @@ export default function App() {
     const before = durations.slice(0, focusIndex).reduce((sum, d) => sum + toBeats(d), 0)
     return Math.floor(before / timeSignatureOf(timeSignature).beatsPerBar) + 1
   }, [durations, focusIndex, timeSignature])
+  // Only worth showing when a capo beats playing it as written, or when the
+  // answer is reassuring. A suggestion that gains nothing is noise.
+  const capoAdvice = useMemo(() => {
+    if (instrument !== 'guitar' || progression.length < 2) return null
+    const ranked = suggestCapo(progression, musicKey)
+    const best = ranked[0]
+    if (!best) return null
+    const openHanded = ranked.find((r) => r.fret === 0)
+    if (best.fret !== 0 && best.open <= (openHanded?.open ?? 0)) return openHanded ?? null
+    return best
+  }, [instrument, progression, musicKey])
+
   const reharmOptions = useMemo(
     () => (activeIndex >= 0 && progression[activeIndex] ? reharmonise(progression, activeIndex, musicKey) : { replace: [], insert: [] }),
     [progression, activeIndex, musicKey],
@@ -1614,6 +1626,27 @@ export default function App() {
                   </button>
                 )}
               </div>
+
+              {/* Where to put the capo. Advice rather than a setting: the
+                  fretboard above still shows the sounding chord, because that is
+                  what the chart says and what the rest of the app is talking
+                  about. This says what your hands would do instead. */}
+              {capoAdvice && (
+                <p className="capo-advice">
+                  {capoAdvice.fret === 0 ? (
+                    <>
+                      <strong>No capo needed</strong> — {capoAdvice.open} of {capoAdvice.total} chords
+                      are already open shapes.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Capo {capoAdvice.fret}</strong> and play in {keyName(capoAdvice.key)}:{' '}
+                      <span className="capo-shapes">{capoAdvice.chords.map(chordSymbol).join(' · ')}</span>
+                      <span className="muted small"> — {capoAdvice.open} of {capoAdvice.total} open</span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             <Fretboard

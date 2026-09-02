@@ -9,7 +9,7 @@ const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bas
 const { makeKey, romanNumeral, nashvilleNumber, detectKey, detectKeyAreas, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
 const { prettyName, noteName, parseNote, pcOf: pcOfNote } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
-const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
+const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning, suggestCapo } = await import(B + 'theory/guitar.js')
 const { identifyChord } = await import(B + 'theory/identify.js')
 const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
 const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete, TIME_SIGNATURES, timeSignatureOf } = await import(B + 'theory/rhythm.js')
@@ -1747,6 +1747,42 @@ console.log('\n--- modulation ---')
 // loop is the opposite one: a topic that stops asking about something you have
 // got good at.
 // The same reading, written the way session players read it.
+// A capo is a transposition you perform rather than one you write, so the
+// question is not what one does but which fret makes a song playable with
+// shapes you already have.
+console.log('\n--- capo ---')
+{
+  const best = (chart, tonic, mode = 'major') => {
+    const key = makeKey(tonic, mode)
+    const top = suggestCapo(parseChart(chart).chords, key)[0]
+    return top && { fret: top.fret, playIn: keyName(top.key), open: top.open, total: top.total, shapes: top.chords.map(chordSymbol).join(' ') }
+  }
+
+  // The answers a guitarist would give.
+  const eb = best('| Eb | Cm | Ab | Bb |', 'Eb')
+  eq('  E♭ major goes to capo 3', eb.fret, 3)
+  eq('  …played in C major', eb.playIn, 'C major')
+  eq('  …with everything open', `${eb.open}/${eb.total}`, '4/4')
+  eq('  …and the shapes are the ones you know', eb.shapes, 'C Am F G')
+
+  eq('  B major goes to capo 4, in G', `${best('| B | G#m | E | F# |', 'B').fret} ${best('| B | G#m | E | F# |', 'B').playIn}`, '4 G major')
+  eq('  D♭ major goes to capo 1, in C', `${best('| Db | Bbm | Gb | Ab |', 'Db').fret} ${best('| Db | Bbm | Gb | Ab |', 'Db').playIn}`, '1 C major')
+
+  // A capo you do not need is a capo you should not use: capo 5 also gives four
+  // open shapes for C major, and must not win.
+  const c = best('| C | Am | F | G |', 'C')
+  eq('  a key that is already open stays at capo 0', c.fret, 0)
+  eq('  …even though a higher fret ties on openness', c.open, 4)
+
+  // The chords handed back are what the hands play, so they have to be a real
+  // transposition of the music rather than relabelled.
+  const f = suggestCapo(parseChart('| F | Dm | Bb | C |').chords, makeKey('F', 'major'))
+    .find((r) => r.fret === 5)
+  eq('  the shapes are the progression transposed down by the capo', f.chords.map(chordSymbol).join(' '), 'C Am F G')
+
+  eq('  nothing to advise on returns nothing', suggestCapo([], makeKey('C', 'major')).length, 0)
+}
+
 console.log('\n--- Nashville numbers ---')
 {
   const C = makeKey('C', 'major')

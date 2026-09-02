@@ -2265,3 +2265,12 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .numeral-style button.on { background: var(--surface-2); color: var(--accent); }
 .numeral-style button:hover { color: var(--ink); }
+
+/* Where to put the capo. Advice, not a control — the fretboard above still
+   shows the sounding chord. */
+.capo-advice {
+  margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--text-dim);
+  flex-basis: 100%;
+}
+.capo-advice strong { color: var(--accent); font-weight: 600; }
+.capo-shapes { color: var(--ink); }

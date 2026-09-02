@@ -85,6 +85,18 @@ approach diminished chords.
 movement, using dynamic programming over every inversion of every chord. Typically cuts movement
 by 75–80%. Slash chords keep the bass you gave them.
 
+**Where to put the capo.** A capo is a transposition you *perform* rather than one you write: the
+chart still says E♭ and your hands still play C. So the useful question is not what a capo does but
+which fret makes a song playable with shapes you already have, and that is a search.
+
+`suggestCapo` scores every fret by how many of the progression's chords become open shapes when
+fingered there, and hands back the chords your hands would actually play. E♭ major comes out as
+capo 3 in C — C, Am, F, G — which is what a guitarist would tell you. B major goes to capo 4 in G,
+D♭ to capo 1 in C. Fret 0 wins ties, because a capo you do not need is a capo you should not use.
+
+It is advice, not a setting: the fretboard keeps showing the sounding chord, because that is what
+the chart says and what the rest of the app is talking about.
+
 **Transpose.** Move the music, not just the label. Spelling carries the *generic
 interval* across from the source key rather than being re-derived from the pitch, so B♭ in C
 becomes C in D — the lowered 7th in both — instead of B♯, and repeated transposition doesn't drift

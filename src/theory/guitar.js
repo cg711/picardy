@@ -4,6 +4,7 @@
 // combination of open/fretted/muted strings inside a four-fret window is tested
 // against the chord's pitch classes, then filtered for playability and ranked.
 
+import { transposeChord, transposeKey } from './transpose.js'
 import { mod, pcOf, midiToPc } from './notes.js'
 import { QUALITIES, chordNotes } from './chords.js'
 
@@ -408,4 +409,61 @@ export function shapeFromFrets(frets, tuning) {
     barre,
     score: 0,
   }
+}
+
+// ---- Capo ------------------------------------------------------------------
+//
+// A capo is a transposition you perform rather than one you write: the chart
+// still says F, and your hands still play D. So the question a guitarist
+// actually asks is not "what does a capo do" but "which fret lets me play this
+// song with shapes I already know", which is a search rather than a setting.
+
+/**
+ * The shapes worth having. Open position on a six-string in standard tuning —
+ * the chords a beginner has, and the ones an experienced player reaches for when
+ * they want ringing open strings rather than a barre.
+ *
+ * Keyed by pitch class and quality family, because the shape is the same whether
+ * it is spelled F♯ or G♭.
+ */
+const OPEN_SHAPES = [
+  [0, 'major'], [2, 'major'], [4, 'major'], [5, 'major'], [7, 'major'], [9, 'major'],
+  [2, 'minor'], [4, 'minor'], [9, 'minor'],
+  [0, 'dom'], [2, 'dom'], [4, 'dom'], [7, 'dom'], [9, 'dom'], [11, 'dom'],
+  [0, 'maj7'], [5, 'maj7'], [2, 'minor7'], [4, 'minor7'], [9, 'minor7'],
+]
+
+/** Is this chord an open shape, once fingered at the given capo? */
+function isOpenShape(pc, family, qualityId) {
+  const kind = qualityId === 'maj7' ? 'maj7'
+    : qualityId === 'm7' ? 'minor7'
+      : family
+  return OPEN_SHAPES.some(([p, k]) => p === pc && k === kind)
+}
+
+/**
+ * Where to put the capo, and what you would then be playing.
+ *
+ * Scores each fret by how many of the progression's chords become open shapes
+ * when fingered there. Fret 0 is included and wins ties, because a capo you do
+ * not need is a capo you should not use.
+ *
+ * @returns [{ fret, chords, open, total }] ranked, best first
+ */
+export function suggestCapo(progression, key, { maxFret = 7 } = {}) {
+  if (!progression?.length || !key) return []
+  const out = []
+  for (let fret = 0; fret <= maxFret; fret++) {
+    // What the hands play: the music written down a semitone at a time.
+    const shapeKey = transposeKey(key, -fret)
+    const chords = progression.map((chord) => transposeChord(chord, key, shapeKey))
+    const open = chords.filter((chord) => {
+      const q = QUALITIES[chord.qualityId]
+      return chord && isOpenShape(mod(pcOf(chord.root), 12), q?.family, chord.qualityId)
+    }).length
+    out.push({ fret, key: shapeKey, chords, open, total: chords.length })
+  }
+  // Most open shapes wins; the lowest fret breaks a tie, so an equally good
+  // capo 5 never beats playing it open.
+  return out.sort((a, b) => b.open - a.open || a.fret - b.fret)
 }
