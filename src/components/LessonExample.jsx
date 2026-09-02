@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { buildExample } from '../theory/lessons.js'
+import { buildExample, exampleItems } from '../theory/lessons.js'
 import { keyName } from '../theory/keys.js'
 import { timeSignatureOf } from '../theory/rhythm.js'
 import { playProgression, stopPlayback, resumeAudio } from '../audio/synth.js'
@@ -37,7 +37,7 @@ export default function LessonExample({ example }) {
     resumeAudio()
     setPlaying(true)
     playProgression(
-      built.progression.map((chord, i) => ({ chord, beats: built.durations[i] })),
+      exampleItems(built),
       {
         bpm: built.bpm,
         pattern: built.style,

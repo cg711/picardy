@@ -16,7 +16,7 @@
 // change that would make a lesson wrong cannot land quietly.
 
 import { makeKey, romanNumeral, spellDegree } from './keys.js'
-import { makeChord, chordSymbol } from './chords.js'
+import { makeChord, chordSymbol, voiceChord } from './chords.js'
 import { cadenceAt } from './analyze.js'
 
 /**
@@ -1095,6 +1095,24 @@ LESSONS.push(
     ],
   },
 )
+
+/**
+ * A built example as the playback scheduler wants it.
+ *
+ * The scheduler takes voiced pitches, not chords: `{ midis, beats }`. Passing it
+ * `{ chord, beats }` does not fail loudly — a band style still schedules drums
+ * off the same items and sounds like it is working, while the chords are silent
+ * and a chord-only style throws inside renderPattern. That is exactly how this
+ * shipped broken, so the conversion lives here where the check suite can hold
+ * every example to it rather than in the component where nothing could.
+ */
+export function exampleItems(built) {
+  if (!built) return []
+  return built.progression.map((chord, i) => ({
+    midis: voiceChord(chord, { inversion: built.inversions[i] ?? 0, bottom: 48 }),
+    beats: built.durations[i],
+  }))
+}
 
 export const lessonById = (id) => LESSONS.find((lesson) => lesson.id === id) ?? null
 

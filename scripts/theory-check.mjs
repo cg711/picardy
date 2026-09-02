@@ -27,7 +27,7 @@ const { buildMidi, songToEvents } = await import(B + 'lib/midi.js')
 const { encodeShape, decodeShape, shapeFromFrets } = await import(B + 'theory/guitar.js')
 const { HUES, BRAND_HUE, makeTheme, contrastRatio, deltaE } = await import(B + 'brand/theme.js')
 const { PAGES, routeFor, pageFor, legacyToolPath, TOOL_PATH, lessonSlugFor } = await import(B + 'lib/routes.js')
-const { LESSONS, buildExample, lessonPath } = await import(B + 'theory/lessons.js')
+const { LESSONS, buildExample, exampleItems, allExamples, lessonPath } = await import(B + 'theory/lessons.js')
 const { keepInView, isFullyVisible } = await import(B + 'lib/scroll.js')
 const { parseMidiMessage } = await import(B + 'lib/midiInput.js')
 const { BACKINGS, BACKING_KEYS, buildBacking } = await import(B + 'lib/backings.js')
@@ -1382,6 +1382,20 @@ console.log('\n--- lessons ---')
       check('cadence', built.cadence)
     }
   }
+
+  // Every example has to be playable, and "playable" means the shape the
+  // scheduler actually reads: voiced pitches, not chords. Passing it chords
+  // fails silently — a band style still schedules drums off the same items and
+  // sounds like it is working, while the chords are mute — which is how the
+  // lessons shipped with playback that had never worked. Asserted here because
+  // the component could not assert it.
+  let unplayable = 0
+  for (const { example } of allExamples()) {
+    const items = exampleItems(buildExample(example))
+    if (!items.length) { unplayable++; continue }
+    if (items.some((it) => !Array.isArray(it.midis) || !it.midis.length || !(it.beats > 0))) unplayable++
+  }
+  eq('  every example is playable by the scheduler', unplayable, 0)
 
   eq('  every lesson has a URL-safe, unique slug', badSlug, 0)
   eq('  every lesson has real prose in it', shortProse, 0)
