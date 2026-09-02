@@ -887,6 +887,16 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   padding: 1px 5px; border-radius: 999px; white-space: nowrap;
 }
 
+/* The functional reading of a chord whose spelling says otherwise — currently
+   only the cadential 6/4. Outlined rather than filled, so it reads as a second
+   opinion about the chord above it and not as another badge. */
+.fn-readas {
+  margin-top: 3px; font-size: 9px; letter-spacing: 0.04em;
+  color: var(--fn-ink, var(--accent));
+  border: 1px solid currentColor; border-radius: 999px;
+  padding: 0 5px; white-space: nowrap;
+}
+
 .fn-motion {
   flex: 0 0 auto; align-self: center;
   font-size: 9.5px; color: var(--text-dim); white-space: nowrap;

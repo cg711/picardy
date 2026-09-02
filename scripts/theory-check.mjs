@@ -705,6 +705,72 @@ console.log('\n--- analysis ---')
   }
 }
 
+// The one chord whose spelling and whose function disagree. harmonicFunction
+// sees a tonic triad and says tonic, which is right about the notes and wrong
+// about the music; the figure is only visible with the next chord and the
+// inversions in hand.
+console.log('\n--- cadential 6/4 ---')
+{
+  const C = makeKey('C', 'major')
+  const Am = makeKey('A', 'minor')
+  const chords = (chart) => parseChart(chart).chords
+  const read = (chart, key, invs) => analyseProgression(chords(chart), key, invs)
+
+  // I 6/4 - V - I in C: the first chord spells C major and functions as V.
+  const cad = read('| C | G | C |', C, [2, 0, 0])
+  eq('  the 6/4 is counted as dominant, not tonic', cad.chords[0].fn, 'D')
+  eq('  …and is labelled', cad.chords[0].sixFour, 'cadential 6/4')
+  eq('  …and reads as V 6/4', cad.chords[0].readAs, 'V 6/4')
+  eq('  …and the numeral still says what is spelled', cad.chords[0].roman, 'I 6/4')
+  eq('  …and it is explained', cad.observations.some((o) => o.kind === 'six-four'), true)
+  // harmonicFunction on its own is unchanged: it sees one chord and no context.
+  eq('  the per-chord function is left alone', harmonicFunction(chords('| C |')[0], C), 'T')
+
+  // In minor too.
+  const min = read('| Am | E | Am |', Am, [2, 0, 0])
+  eq('  minor: i 6/4 before V is dominant', min.chords[0].fn, 'D')
+
+  // Everything that must NOT match.
+  eq('  root position is a real tonic', read('| C | G |', C, [0, 0]).chords[0].fn, 'T')
+  eq('  first inversion is a real tonic', read('| C | G |', C, [1, 0]).chords[0].fn, 'T')
+  eq('  a 6/4 that does not go to V is a real tonic', read('| C | F |', C, [2, 0]).chords[0].fn, 'T')
+  eq('  a 6/4 over a V that is itself inverted does not count', read('| C | G |', C, [2, 1]).chords[0].fn, 'T')
+  eq('  a IV 6/4 is not this figure', read('| F | G |', C, [2, 0]).chords[0].fn, 'PD')
+  eq('  a seventh chord is not this figure', read('| Cmaj7 | G |', C, [2, 0]).chords[0].sixFour, null)
+  eq('  the last chord has nothing to resolve to', read('| G | C |', C, [0, 2]).chords[1].sixFour, null)
+  // No inversions at all — an import with no voicing gets the old reading
+  // rather than a guess.
+  eq('  without inversions nothing is claimed', read('| C | G |', C, null).chords[0].sixFour, null)
+
+  // Figured bass in the numerals is what makes "6/4" sayable at all, and the
+  // chips have always shown it — this panel used to say "I" beside a chip
+  // reading "I 6/4".
+  // Picardy keeps the quality suffix beside the figures — "V7 6/5" where most
+  // textbooks let the figures imply the seventh and write "V6/5". Redundant
+  // rather than wrong, pre-dates this work, and changing it would move every
+  // inverted seventh in the app; left alone deliberately.
+  eq('  numerals carry figured bass when inversions are known', read('| G7 | C |', C, [1, 0]).chords[0].roman, 'V7 6/5')
+  // ...which puts a slash in numerals that never had one. An applied chord's
+  // slash is followed by a roman numeral, a figured bass's by a digit; testing
+  // for the slash alone now reports every inverted dominant as applied.
+  eq('  an inverted V7 is not an applied chord', read('| G7 | C |', C, [1, 0]).chords[0].applied, false)
+  eq('  …and no tonicisation is claimed', read('| G7 | C |', C, [1, 0]).observations.some((o) => o.kind === 'tonicisation'), false)
+  eq('  a real applied chord still is one', read('| C | A7 | Dm |', C, [0, 0, 0]).chords[1].applied, true)
+
+  // The rest of the panel has to agree with the new reading. A progression
+  // opening on a cadential 6/4 does not open on the tonic, whatever the numeral
+  // spells.
+  const opens = read('| C | G | C |', C, [2, 0, 0]).observations.find((o) => o.kind === 'shape')
+  eq('  a 6/4 opening is not reported as establishing the key', /opens on the tonic/.test(opens.text), false)
+  eq('  …it is reported as opening on the dominant', /starts on the dominant/.test(opens.text), true)
+  eq('  a real tonic opening still is one', /opens on the tonic/.test(read('| C | G |', C, [0, 0]).observations.find((o) => o.kind === 'shape').text), true)
+
+  // Two of the nine cadence labels start with a vowel.
+  const vowel = read('| C | F | G | C |', C, [0, 0, 0, 0]).observations.find((o) => o.kind === 'cadence')
+  eq('  "an authentic cadence", not "a authentic cadence"', /Ends on an authentic/.test(vowel.text), true)
+  eq('  …and consonants keep "a"', /Ends on a perfect/.test(read('| Dm7 G7 | Cmaj7 |', C, null).observations.find((o) => o.kind === 'cadence').text), true)
+}
+
 console.log('\n--- exercises ---')
 {
   // Sweeping seeds rather than checking one question: the failures that matter

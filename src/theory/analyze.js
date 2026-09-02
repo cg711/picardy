@@ -1,7 +1,7 @@
 // Reading a progression back: what the chords are doing, and where.
 
 import { mod, pcOf, prettyName } from './notes.js'
-import { QUALITIES, chordSymbol, chordNotes } from './chords.js'
+import { QUALITIES, chordSymbol, chordNotes, inversionCount } from './chords.js'
 import { romanNumeral, harmonicFunction, isDiatonic, detectKey, keyName, scalePcs } from './keys.js'
 
 /**
@@ -64,9 +64,67 @@ const CADENCES = [
 /** Every cadence this engine can name — the pool the exercises draw wrong answers from. */
 export const CADENCE_LABELS = CADENCES.map((c) => c.label)
 
+/**
+ * Is this numeral an applied chord?
+ *
+ * Both notations use a slash and they mean opposite things: an applied chord's
+ * slash is followed by a roman numeral (V7/ii — a dominant borrowed to point at
+ * the supertonic), a figured bass's by a digit (V 6/5 — a dominant seventh in
+ * first inversion). Testing for the slash alone was safe only while these
+ * numerals carried no figures; it is not any more.
+ */
+const isApplied = (roman) => /\/[ivIV]/.test(roman)
+
 const degreeOf = (chord, key) => mod(pcOf(chord.root) - pcOf(key.tonic), 12)
 const isDominant = (chord) => QUALITIES[chord.qualityId]?.family === 'dom'
 const isMinorish = (chord) => ['minor', 'dim'].includes(QUALITIES[chord.qualityId]?.family)
+
+/**
+ * The cadential 6/4: a tonic triad over the dominant in the bass, moving to V.
+ *
+ * This one needs its own detector because it is the case where the vertical
+ * reading and the functional reading disagree. Spelled out, the chord is a
+ * tonic triad. Heard, it is an ornamented dominant — the 6th and 4th above a
+ * stationary bass are dissonances that fall to the 5th and 3rd, and the bass
+ * never moves. Aldwell & Schachter give it a whole unit and notate it under V;
+ * Picardy's own suggestion engine already describes it that way, while
+ * harmonicFunction — which sees one chord and no context — called it a tonic.
+ *
+ * Deliberately narrow. A 6/4 can also be passing or a pedal, and those are
+ * different chords doing different jobs, so this matches only the cadential
+ * figure: tonic triad, second inversion, resolving to a root-position V on the
+ * same bass note. Anything looser would start relabelling chords that are
+ * genuinely tonic.
+ *
+ * Needs inversions, so it returns null when the caller has none — an import
+ * with no voicing information gets the old reading rather than a guess.
+ */
+export function cadentialSixFour(progression, index, key, inversions) {
+  if (!key || !inversions) return null
+  const chord = progression[index]
+  const next = progression[index + 1]
+  if (!chord || !next) return null
+
+  // A triad built on the tonic. Sevenths and sus chords are not this figure.
+  const family = QUALITIES[chord.qualityId]?.family
+  if (family !== 'major' && family !== 'minor') return null
+  if (inversionCount(chord) !== 3) return null
+  if (degreeOf(chord, key) !== 0) return null
+
+  // Second inversion is what puts 5̂ in the bass.
+  if (mod(inversions[index] ?? 0, 3) !== 2) return null
+
+  // Resolving to a dominant that holds that same bass note.
+  if (degreeOf(next, key) !== 7) return null
+  if ((inversions[index + 1] ?? 0) !== 0) return null
+
+  return {
+    id: 'cadential64',
+    label: 'cadential 6/4',
+    readAs: 'V 6/4',
+    why: 'The tonic triad over the dominant in the bass — heard as an ornamented V, not a real tonic. The 6th and 4th above the held bass fall to the 5th and 3rd.',
+  }
+}
 
 /** The cadence formed by the last two chords, if any. */
 export function cadenceAt(progression, index, key) {
@@ -84,7 +142,7 @@ export function cadenceAt(progression, index, key) {
  *
  * @returns { key, chords: [...], observations: [...] }
  */
-export function analyseProgression(progression, keyOverride = null) {
+export function analyseProgression(progression, keyOverride = null, inversions = null) {
   if (!progression.length) return { key: null, chords: [], observations: [] }
   const key = keyOverride ?? detectKey(progression)
   const scale = new Set(scalePcs(key))
@@ -97,15 +155,24 @@ export function analyseProgression(progression, keyOverride = null) {
     const outside = chordNotes(chord)
       .filter((e) => !scale.has(pcOf(e.note)))
       .map((e) => prettyName(e.note))
-    const roman = romanNumeral(chord, key)
+    // With inversions in hand the numeral carries its figured bass, which is
+    // what the progression chips have always shown. Without them this panel
+    // said "I" while the chip beside it said "I 6/4".
+    const roman = romanNumeral(chord, key, inversions?.[i] ?? 0)
+    const sixFour = cadentialSixFour(progression, i, key, inversions)
     return {
       index: i,
       symbol: chordSymbol(chord),
       roman,
-      fn: harmonicFunction(chord, key),
+      // The one place a chord's function depends on what follows it. Everywhere
+      // else harmonicFunction is right; here it is looking at a tonic triad and
+      // cannot see the dominant holding underneath it.
+      fn: sixFour ? 'D' : harmonicFunction(chord, key),
+      sixFour: sixFour ? sixFour.label : null,
+      readAs: sixFour ? sixFour.readAs : null,
       diatonic,
       outside: [...new Set(outside)],
-      applied: roman.includes('/') && !roman.includes('♭') && /^(V|vii)/.test(roman),
+      applied: isApplied(roman) && !roman.includes('♭') && /^(V|vii)/.test(roman),
     }
   })
 
@@ -115,9 +182,19 @@ export function analyseProgression(progression, keyOverride = null) {
   // --- cadence at the end -----------------------------------------------------
   const ending = cadenceAt(progression, progression.length - 1, key)
   if (ending) {
-    note('cadence', `Ends on a ${ending.label}: ${chords[chords.length - 2].roman} to ${chords[chords.length - 1].roman}. ${ending.why}`)
+    // "a authentic cadence" — two of the nine labels start with a vowel.
+    const article = /^[aeiou]/i.test(ending.label) ? 'an' : 'a'
+    note('cadence', `Ends on ${article} ${ending.label}: ${chords[chords.length - 2].roman} to ${chords[chords.length - 1].roman}. ${ending.why}`)
   } else if (progression.length > 1) {
     note('cadence', `The last move, ${chords[chords.length - 2].roman} to ${chords[chords.length - 1].roman}, is not one of the standard cadences — the phrase stops rather than closes.`)
+  }
+
+  // --- cadential 6/4 -----------------------------------------------------------
+  // Reported wherever it appears, not only at the end: it is the standard way
+  // of arriving at a dominant and it turns up mid-phrase as often as at a close.
+  for (const c of chords.filter((c) => c.sixFour)) {
+    const next = chords[c.index + 1]
+    note('six-four', `${c.symbol} at ${c.roman} is a ${c.sixFour} — read it as ${c.readAs}, an ornamented ${next.roman}, rather than as a tonic. The bass is already on the dominant and stays there; the 6th and 4th above it are dissonances that fall to the 5th and 3rd.`)
   }
 
   // --- ii-V pairs --------------------------------------------------------------
@@ -135,7 +212,7 @@ export function analyseProgression(progression, keyOverride = null) {
   }
 
   // --- tonicisation ------------------------------------------------------------
-  const applied = chords.filter((c) => /^(V|vii).*\//.test(c.roman))
+  const applied = chords.filter((c) => /^(V|vii)/.test(c.roman) && isApplied(c.roman))
   if (applied.length) {
     note('tonicisation', applied.length === 1
       ? `${applied[0].symbol} is an applied chord (${applied[0].roman}) — it borrows a dominant to point at a chord that is not the tonic.`
@@ -168,10 +245,15 @@ export function analyseProgression(progression, keyOverride = null) {
   // Compare the numeral itself, not the quality suffix: "Imaj7" still opens on
   // the tonic.
   const numeralOf = (roman) => (roman.match(/^[♭♯]*[IiVv]+/) ?? [''])[0]
-  if (['I', 'i'].includes(numeralOf(chords[0].roman))) {
+  // A cadential 6/4 spells the tonic but is not one, so a progression opening on
+  // it does not establish the key — it opens on the dominant, like everything
+  // else in this file now reads it.
+  if (!chords[0].sixFour && ['I', 'i'].includes(numeralOf(chords[0].roman))) {
     note('shape', 'It opens on the tonic, so the key is established immediately.')
   } else {
-    note('shape', `It opens on ${chords[0].roman} rather than the tonic, which delays settling into the key.`)
+    note('shape', chords[0].sixFour
+      ? `It opens on ${chords[0].roman}, which is a ${chords[0].sixFour} rather than a tonic — the phrase starts on the dominant.`
+      : `It opens on ${chords[0].roman} rather than the tonic, which delays settling into the key.`)
   }
 
   const allDiatonic = chords.every((c) => c.diatonic)

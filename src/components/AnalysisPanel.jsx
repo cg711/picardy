@@ -21,6 +21,7 @@ const sameKey = (a, b) =>
 export default function AnalysisPanel({
   progression,
   musicKey,
+  inversions,
   activeIndex,
   playingIndex,
   onSelect,
@@ -34,8 +35,8 @@ export default function AnalysisPanel({
   // agree with the ones on the chips. What the chords *imply* is reported
   // separately below rather than silently overriding the setting.
   const analysis = useMemo(
-    () => analyseProgression(progression, musicKey),
-    [progression, musicKey],
+    () => analyseProgression(progression, musicKey, inversions),
+    [progression, musicKey, inversions],
   )
 
   const detected = useMemo(
@@ -139,10 +140,14 @@ export default function AnalysisPanel({
                 role="listitem"
                 className={`fn-cell fn-${c.fn}${i === focused ? ' on' : ''}${c.diatonic ? '' : ' chromatic'}`}
                 onClick={() => onSelect(i)}
-                title={`${c.symbol} — ${FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
+                title={`${c.symbol} — ${c.sixFour ? `${c.sixFour}, read as ${c.readAs}` : FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
               >
+                {/* A cadential 6/4 spells a tonic and works as a dominant, so
+                    the cell shows both readings rather than picking one: the
+                    literal numeral, and what it is doing underneath. */}
                 <span className="fn-roman">{c.roman}</span>
                 <span className="fn-sym">{c.symbol}</span>
+                {c.readAs && <span className="fn-readas">{c.readAs}</span>}
                 {cadences[i] && (
                   <span className="fn-cadence" title={cadences[i].label}>
                     {cadences[i].label.replace(/ cadence$/, '')}

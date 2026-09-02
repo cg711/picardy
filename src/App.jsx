@@ -1602,6 +1602,7 @@ export default function App() {
           <AnalysisPanel
             progression={progression}
             musicKey={musicKey}
+            inversions={inversions}
             activeIndex={activeIndex}
             playingIndex={playingIndex}
             onSelect={setActiveIndex}

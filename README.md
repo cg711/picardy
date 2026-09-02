@@ -407,6 +407,33 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## The cadential 6/4
+
+The one chord where the vertical reading and the functional reading disagree, and the only place
+in the engine where a chord's function depends on what follows it.
+
+Spelled out, a tonic triad in second inversion is a tonic triad — which is what `harmonicFunction`
+said, because it sees one chord and no context. Heard, it is an ornamented dominant: the bass is
+already on 5̂ and stays there, and the 6th and 4th above it are dissonances that fall to the 5th and
+3rd. Aldwell & Schachter give it a full unit and notate it under V. Picardy's own suggestion engine
+had described it that way since it was written, so the app was shipping both readings at once —
+the suggestion panel calling it an ornamented V while the analysis panel coloured it as a tonic.
+
+`cadentialSixFour()` matches deliberately narrowly: a tonic triad, second inversion, resolving to a
+root-position V on the same bass note. A 6/4 can also be passing or a pedal, and those are different
+chords doing different jobs; anything looser starts relabelling chords that really are tonic. It
+needs inversions, so it returns null when the caller has none — an import with no voicing
+information gets the old reading rather than a guess. `harmonicFunction` itself is untouched and
+still pure; the override lives in `analyseProgression`, which is the only place with the context to
+justify it.
+
+Two things fell out of threading inversions into the analysis. The numerals there now carry their
+figured bass, which the progression chips have always shown — the panel used to say `I` beside a
+chip reading `I 6/4`. And that put a slash into numerals that never had one, which broke the test
+for applied chords: an applied chord's slash is followed by a roman numeral (`V7/ii`), a figured
+bass's by a digit (`V7 6/5`), and testing for the slash alone reported every inverted dominant as a
+tonicisation. Both are asserted.
+
 ## Lessons
 
 Nine short articles at `/lessons`: roman numerals, harmonic function, cadences, ii–V–I, secondary
@@ -558,7 +585,8 @@ src/
     reharm.js     in-place substitutions and approach chords
     transpose.js  transposition with sane spelling
     voicelead.js  inversion search that minimises voice movement
-    analyze.js    cadence detection and prose analysis of a progression
+    analyze.js    cadence detection, the cadential 6/4, and prose analysis of a
+                  progression
     guitar.js     fretboard voicing search and playability filtering
     identify.js   reverse lookup — notes to chord symbol
     melody.js     what a melody note is doing against the chord underneath
