@@ -57,23 +57,27 @@ song can modulate: a chorus a minor third up from the verse keeps its own roman 
 sections into a song with repeat counts, reorder them, and play the whole thing end to end. The
 instruments follow along and the numerals switch key as each section arrives.
 
-**The staff.** The progression engraved, with the melody on it, chord symbols above and numerals
-below. The one part of this app that is not drawn by hand, deliberately: the fretboard, the piano
-and the melody roll are diagrams with a handful of primitives and no typographic tradition to fall
-short of, and music engraving has four hundred years of one. A hand-rolled clef, beam and accidental
-stack announces itself immediately as not quite right.
+**Notation, where it earns its place.** Two places show engraved music, and neither is a tab of its
+own — a staff you have to navigate to is one you look at instead of working.
 
-VexFlow does the drawing, loaded on demand exactly as jsPDF is, so it lands in its own chunk and
-the studio stays as light as it was for everyone who never opens the tab. What is *not* delegated is
-any musical decision. Where the bar lines fall, which notes tie across them, how a pitch is spelled
-and what the chord above it is called all come from the engine — `layOutMeasures` in
-`src/lib/leadsheet.js`, the same function the MusicXML export uses, extracted from it precisely so
-the printed part and the screen cannot disagree. VexFlow is asked only to draw what it is given, and
-accidentals are stated explicitly rather than inferred, because the app already knows.
+Under the piano, the chord you are on is written out on a grand staff. The keyboard shows *which
+keys*; this shows what a reader would call them, which is the one thing a piano diagram physically
+cannot do: it cannot tell you the black key is an A♭ and not a G♯.
 
-Bars are fitted to the panel and wrapped rather than scrolled: a staff you have to drag sideways is
-one you cannot read while playing. A `ResizeObserver` re-engraves when the width changes, since how
-many bars fit on a line is a layout decision and not a fixed one.
+On the PDF, ticking *Engrave each section on a staff as well* puts a system under each section's
+chart. Off by default, because the chart above it is what most people print and the staff doubles
+the space a section takes.
+
+VexFlow does the drawing. It is the one part of this app not drawn by hand, deliberately: the
+fretboard, the piano and the melody roll are diagrams built from a handful of primitives with no
+typographic tradition to fall short of, and music engraving has four hundred years of one. It is
+loaded on demand, so it lands in its own chunk and costs nothing to anyone who never ticks the box.
+
+No musical decision is delegated. Where the bar lines fall, which notes tie across them, how a pitch
+is spelled and what the chord above it is called all come from the engine — `layOutMeasures` in
+`src/lib/leadsheet.js` is the same function the MusicXML export uses, extracted from it so the
+printed part and the screen cannot disagree. Accidentals are stated rather than inferred, because
+the app already knows the spelling; that is the whole point of it.
 
 **PDF chart.** One click produces a lead sheet: chords laid out in bars with roman numerals
 underneath, tied continuations bracketed where a chord crosses a bar line, and a legend of

@@ -11,6 +11,7 @@ import { findVoicings, TUNINGS, decodeShape, shapeFromFrets } from '../theory/gu
 import { groupIntoBars, timeSignatureOf } from '../theory/rhythm.js'
 import { readSegment } from './song.js'
 import { lineFragments, layoutLine } from './lyrics.js'
+import { drawStaffToCanvas } from './staff.js'
 
 const PAGE = { w: 210, h: 297 } // A4 portrait, millimetres
 const MARGIN = 15
@@ -40,8 +41,11 @@ const ascii = (s) =>
  * dompurify into the main bundle — neither of which this chart needs, since
  * everything here is drawn with vector primitives.
  */
-export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, tuningId = 'standard', lefty = false, includeMelody = false }) {
+export async function buildChart({ song, segments, title = 'Untitled', bpm = 84, instrument = 'guitar', tuning = TUNINGS.standard.strings, tuningId = 'standard', lefty = false, includeMelody = false, staffNotation = false, numeralStyle = 'roman' }) {
   const { jsPDF } = await import('jspdf')
+  // VexFlow is only fetched when the box is ticked, so a chart without notation
+  // costs nothing extra to produce.
+  const engraver = staffNotation ? await import('vexflow') : null
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   let y = MARGIN
 
@@ -117,6 +121,11 @@ export async function buildChart({ song, segments, title = 'Untitled', bpm = 84,
       ? drawLyricLines(doc, live, y, variants)
       : drawBars(doc, bars, live.key, y, live.timeSignature, variants, includeMelody ? (live.melody ?? []) : [])
     y += 7
+
+    // The same section engraved, under the chart it belongs to.
+    if (engraver) {
+      y = drawStaffImage(doc, engraver, live, y, { includeMelody, numeralStyle })
+    }
   }
 
   // The mark, then the wordmark — the same P/notehead the app shows, drawn at
@@ -554,3 +563,49 @@ function drawPianoDiagram(doc, chord, x, y, w) {
 }
 
 export { ascii }
+
+/**
+ * A section engraved, placed under its chart.
+ *
+ * Rendered to an offscreen canvas and dropped in as an image, because jsPDF
+ * takes a raster without a plugin and VexFlow draws to canvas natively. At
+ * twice the pixel density so it does not go soft on paper — the rest of this
+ * file is vector and stays sharp at any zoom, and this one block should not be
+ * the reason someone notices the difference.
+ *
+ * Returns the new y. A failure here costs the notation but not the export — a
+ * chart without a staff is still a chart. It is reported rather than swallowed,
+ * though: silently dropping the one thing someone ticked a box for is how a
+ * feature looks like it works and does not.
+ */
+function drawStaffImage(doc, VF, live, y, { includeMelody, numeralStyle }) {
+  try {
+    const canvas = document.createElement('canvas')
+    const drawn = drawStaffToCanvas(VF, canvas, {
+      progression: live.progression,
+      inversions: live.inversions,
+      durations: live.durations,
+      timeSignature: live.timeSignature,
+      musicKey: live.key,
+      melody: includeMelody ? (live.melody ?? []) : [],
+      numeralStyle,
+      barsPerLine: barsPerRow(live.timeSignature),
+      staveWidth: 240,
+      scale: 2,
+    })
+    if (!drawn) return y
+
+    // Fit the drawing to the text column and keep its aspect ratio.
+    const w = CONTENT_W
+    const h = (drawn.height / drawn.width) * w
+    if (y + h > PAGE.h - MARGIN) {
+      doc.addPage()
+      y = MARGIN
+    }
+    doc.addImage(canvas.toDataURL('image/png'), 'PNG', MARGIN, y, w, h)
+    return y + h + 5
+  } catch (e) {
+    console.warn('Picardy: could not engrave a staff for this section —', e)
+    return y
+  }
+}

@@ -46,7 +46,7 @@ import ScalePanel from './components/ScalePanel.jsx'
 import ReharmDialog from './components/ReharmDialog.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import ExportPanel from './components/ExportPanel.jsx'
-import StaffView from './components/StaffView.jsx'
+import ChordStaff from './components/ChordStaff.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, usePathname, linkProps } from './lib/router.js'
@@ -1281,7 +1281,6 @@ export default function App() {
                 ['chips', 'Chords'],
                 ['melody', 'Melody'],
                 ['lyrics', 'Lyrics & timing'],
-                ['staff', 'Staff'],
                 ['sections', 'Song structure'],
                 ['export', 'Export'],
               ].map(([id, label]) => (
@@ -1294,18 +1293,6 @@ export default function App() {
                 </button>
               ))}
             </div>
-
-            {editorView === 'staff' && (
-              <StaffView
-                progression={progression}
-                inversions={inversions}
-                durations={durations}
-                timeSignature={timeSignature}
-                musicKey={musicKey}
-                melody={melody}
-                numeralStyle={numeralStyle}
-              />
-            )}
 
             {editorView === 'export' && (
               <ExportPanel
@@ -1588,14 +1575,27 @@ export default function App() {
             )}
 
             {instrument === 'piano' && (
-            <Piano
-              chord={activeChord}
-              voicing={pianoVoicing}
-              selection={selection}
-              onToggleNote={toggleNote}
-              scalePcs={showScale && activeScale ? activeScale.pcs : null}
-              guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
-            />
+            <div className="piano-with-staff">
+              <Piano
+                chord={activeChord}
+                voicing={pianoVoicing}
+                selection={selection}
+                onToggleNote={toggleNote}
+                scalePcs={showScale && activeScale ? activeScale.pcs : null}
+                guideTonePcs={showScale && activeChord ? guideTones(activeChord).map((e) => pcOf(e.note)) : null}
+              />
+              {/* The keyboard shows which keys; this shows what a reader would
+                  call them. Worth having side by side precisely where they
+                  differ — a piano cannot show you that the black key is an A♭
+                  and not a G♯. */}
+              <ChordStaff
+                chord={activeChord}
+                voicing={pianoVoicing}
+                musicKey={displayKey}
+                inversion={activeInversion}
+                numeralStyle={numeralStyle}
+              />
+            </div>
             )}
 
             {instrument === 'guitar' && (
@@ -1879,14 +1879,29 @@ export default function App() {
           lefty={lefty}
           hasMelody={songHasMelody}
           onCancel={() => setExporting(null)}
-          onExport={({ title, instrument, includeMelody: withMelody }) => {
-            const entries = entriesFor(exporting)
+          onExport={({ title, instrument, includeMelody: withMelody, staffNotation }) => {
+            // The chart is built from segments, and a bare progression is not
+            // one yet — entriesFor returns nothing for that scope, which meant
+            // "PDF chart" on the current progression produced a title page and
+            // an empty sheet. The other three exports each fall back to the
+            // editor's own state; this one had no fallback at all. Wrapping it
+            // in a throwaway segment gives the chart something to read without
+            // adding it to the saved list.
+            const scoped = exporting?.kind === 'progression'
+            const temporary = scoped
+              ? makeSegment({
+                name: title, key: musicKey, progression, inversions, durations,
+                timeSignature, shapes, lines, leadIns, lyrics, melody,
+              })
+              : null
+            const entries = scoped ? [{ segmentId: temporary.id, repeats: 1 }] : entriesFor(exporting)
+            const forChart = scoped ? [temporary] : segments
             // A section keeps its own name on the chart; the whole song takes
             // the title, and typing one here is also how you rename the song.
             if (exporting?.kind !== 'section') setSongTitle(title)
             exportChart({
               song: entries,
-              segments,
+              segments: forChart,
               title,
               bpm,
               instrument,
@@ -1894,6 +1909,8 @@ export default function App() {
               tuningId: shapeTuningKey,
               lefty,
               includeMelody: withMelody,
+              staffNotation,
+              numeralStyle,
             })
             setExporting(null)
           }}

@@ -4,10 +4,11 @@ export default function ExportDialog({ defaultTitle, lefty, hasMelody, onCancel,
   const [title, setTitle] = useState(defaultTitle)
   const [instrument, setInstrument] = useState('guitar')
   const [includeMelody, setIncludeMelody] = useState(true)
+  const [staffNotation, setStaffNotation] = useState(false)
 
   const submit = (e) => {
     e.preventDefault()
-    onExport({ title: title.trim() || 'Untitled', instrument, includeMelody: hasMelody && includeMelody })
+    onExport({ title: title.trim() || 'Untitled', instrument, includeMelody: hasMelody && includeMelody, staffNotation })
   }
 
   return (
@@ -59,6 +60,20 @@ export default function ExportDialog({ defaultTitle, lefty, hasMelody, onCancel,
             <span>Include the melody, as a contour under each line</span>
           </label>
         )}
+
+        {/* Off by default: the chart above is what most people print, and the
+            staff doubles the space each section takes. */}
+        <label className="check field">
+          <input
+            type="checkbox"
+            checked={staffNotation}
+            onChange={(e) => setStaffNotation(e.target.checked)}
+          />
+          <span>
+            Engrave each section on a staff as well
+            <span className="muted small"> — adds notation under each chart</span>
+          </span>
+        </label>
 
         <div className="modal-actions">
           <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>

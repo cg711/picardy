@@ -2284,3 +2284,15 @@ a.brand { text-decoration: none; color: inherit; }
 .staff-host svg path, .staff-host svg rect { fill: var(--ink); stroke: var(--ink); }
 .staff-host svg text { fill: var(--ink); }
 .staff-error { color: var(--danger); }
+
+/* The keyboard and the same chord written down, side by side where there is
+   room and stacked where there is not. */
+.piano-with-staff { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.piano-with-staff > :first-child { flex: 1 1 340px; min-width: 0; }
+.chord-staff { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; }
+.chord-staff svg path, .chord-staff svg rect { fill: var(--ink); stroke: var(--ink); }
+.chord-staff svg text { fill: var(--ink); }
+
+@media (max-width: 760px) {
+  .chord-staff { display: none; }
+}
