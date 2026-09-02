@@ -96,6 +96,20 @@ choice a real chart makes.
 section, splitting shared bars. Then it reads the progression back: names the cadence, finds
 complete ii–V–Is, flags applied chords and borrowed colour, and describes the root motion.
 
+**Time attack.** Sixty seconds, as many right answers as you can, best score kept per topic. A
+wrong answer costs three seconds, which is what makes the mode worth playing: without a penalty the
+winning strategy is to hammer the number keys, since four options is a 25% hit rate and at half a
+second a question that beats answering carefully. Costing time makes guessing lose to thinking
+without needing a rule about how fast you are allowed to press.
+
+Answering auto-advances after half a second rather than waiting for `Enter` — in a timed
+mode, making someone press a key to continue charges them for reading the explanation.
+
+The clock is derived from a timestamp rather than counted down, and the wall clock — not the last
+tick — decides whether a run is over. Browsers throttle timers in a hidden tab, so the interval
+stops being a clock the moment you switch away: in testing it froze at 0.2s and the run never
+ended, which would also have meant backgrounding the tab bought unlimited answering time.
+
 **MIDI export.** A Format 1 `.mid` file — tempo, metre, per-chord durations, voiced chords, and a
 marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
 dependency.

@@ -2208,3 +2208,51 @@ a.brand { text-decoration: none; color: inherit; }
 .vl-report { display: flex; flex-direction: column; gap: 8px; }
 .vl-report p { margin: 0; line-height: 1.55; }
 .obs-voiceleading strong { color: var(--accent); font-weight: 600; }
+
+/* ---- Time attack -------------------------------------------------------- */
+
+.ex-blurb-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+}
+.ex-blurb-row .ex-blurb { margin: 0; }
+.ex-attack-start { flex: none; white-space: nowrap; }
+
+.ex-attack {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid var(--accent); background: var(--surface-3);
+}
+.ex-attack.over { opacity: 0.7; border-color: var(--border); }
+.ex-attack-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* Tabular figures so the tenths do not shove the rest of the row about as the
+   clock runs down. */
+.ex-attack-clock {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; color: var(--accent); min-width: 4ch;
+}
+.ex-attack.urgent .ex-attack-clock { color: var(--danger); }
+.ex-attack-tally { flex: 1; font-size: 13px; color: var(--text-dim); }
+.ex-attack-tally b { color: var(--ink); font-size: 15px; }
+
+.ex-attack-bar { height: 4px; border-radius: 999px; background: var(--surface-1); overflow: hidden; }
+.ex-attack-bar > span {
+  display: block; height: 100%; background: var(--accent);
+  /* No transition: a wrong answer takes three seconds off, and the bar should
+     jump so you see it happen rather than glide and hide it. */
+}
+.ex-attack.urgent .ex-attack-bar > span { background: var(--danger); }
+
+.ex-result-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.ex-result-score { margin: 0; font-size: 15px; }
+.ex-result-score b { font-size: 30px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ex-result-body p { margin: 0; }
+.ex-result-best {
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent);
+  padding: 2px 8px; border-radius: 999px;
+}
+
+@media (max-width: 560px) {
+  .ex-attack-start { width: 100%; }
+}
