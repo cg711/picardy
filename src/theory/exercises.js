@@ -799,10 +799,50 @@ export const TYPE_LABELS = {
  * retries — bounded, because an unbounded retry loop is how a bad builder turns
  * into a hung tab rather than a visible bug.
  */
-export function makeQuestion(levelId, rng = Math.random, { type = null } = {}) {
+/**
+ * Pick a question type, leaning on the ones you get wrong.
+ *
+ * The app has been recording per-type accuracy since the drills shipped and
+ * showing it back in "How you are doing" — but choosing uniformly at random
+ * anyway, so the one thing it knew about you changed nothing about what it
+ * asked. This closes that loop.
+ *
+ * A type at 100% still comes up: `MIN_SHARE` keeps every type in the draw, so a
+ * topic cannot quietly stop testing something you have learned, and a single
+ * unlucky run cannot swamp the mix. Below four attempts a type is treated as
+ * unknown rather than weak, because two wrong answers out of two is not
+ * evidence of anything.
+ */
+const MIN_SHARE = 0.35
+const ENOUGH_TO_JUDGE = 4
+
+export function weightedTypes(types, byType = {}) {
+  return types.map((type) => {
+    const seen = byType[type]
+    if (!seen || seen.asked < ENOUGH_TO_JUDGE) return { type, weight: 1 }
+    const accuracy = seen.right / seen.asked
+    // 100% correct → MIN_SHARE, 0% → 1. Linear between, which is enough
+    // shaping without needing a curve nobody can reason about.
+    return { type, weight: MIN_SHARE + (1 - MIN_SHARE) * (1 - accuracy) }
+  })
+}
+
+function pickWeighted(weights, rng) {
+  const total = weights.reduce((sum, w) => sum + w.weight, 0)
+  if (!(total > 0)) return weights[0]?.type
+  let roll = rng() * total
+  for (const w of weights) {
+    roll -= w.weight
+    if (roll <= 0) return w.type
+  }
+  return weights[weights.length - 1].type
+}
+
+export function makeQuestion(levelId, rng = Math.random, { type = null, byType = null } = {}) {
   const level = levelById(levelId)
   for (let attempt = 0; attempt < 40; attempt++) {
-    const chosen = type ?? pick(level.types, rng)
+    const chosen = type
+      ?? (byType ? pickWeighted(weightedTypes(level.types, byType), rng) : pick(level.types, rng))
     const q = BUILDERS[chosen]?.(level.id, rng)
     if (!q) continue
 

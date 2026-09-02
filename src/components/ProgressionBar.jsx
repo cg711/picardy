@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { chordSymbol, chordNotes, inversionLabel, bassOf } from '../theory/chords.js'
 import { prettyName } from '../theory/notes.js'
-import { romanNumeral } from '../theory/keys.js'
+import { numeralFor } from '../theory/keys.js'
 import { analyzeChord } from '../theory/suggest.js'
 import { DURATIONS, durationOf, toBeats, describeLength, barsAreComplete, timeSignatureOf, presetFor } from '../theory/rhythm.js'
 import { keepInView } from '../lib/scroll.js'
@@ -12,6 +12,7 @@ export default function ProgressionBar({
   durations,
   timeSignature,
   musicKey,
+  numeralStyle = 'roman',
   activeIndex,
   playingIndex,
   onSelect,
@@ -169,7 +170,7 @@ export default function ProgressionBar({
             >
               {barOf[i].startsBar && <span className="bar-num">bar {barOf[i].bar}</span>}
               <div className="chip-top">
-                <span className="chip-roman">{romanNumeral(chord, musicKey, inv)}</span>
+                <span className="chip-roman">{numeralFor(chord, musicKey, inv, numeralStyle)}</span>
                 {String(shapes[i] ?? '').startsWith(`${tuningId}:`) && (
                   <span className="pinned-shape" title="A guitar shape is pinned to this chord">▦</span>
                 )}

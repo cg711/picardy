@@ -135,6 +135,10 @@ export default function App() {
   // preset and back does not lose what you built.
   const [customStrings, setCustomStrings] = useState(() => normaliseTuning(loadPrefs().customStrings ?? TUNINGS.standard.strings))
   const [lefty, setLefty] = useState(() => !!loadPrefs().lefty)
+  // Roman or Nashville. A reading preference, so it changes the chart and the
+  // analysis — the surfaces you read while working — and leaves the chord
+  // pickers alone, where a numeral is a label you are choosing from.
+  const [numeralStyle, setNumeralStyle] = useState(() => loadPrefs().numeralStyle ?? 'roman')
   const [showAllTones, setShowAllTones] = useState(true)
   const [voicingPick, setVoicingPick] = useState(null)
   const [showAllShapes, setShowAllShapes] = useState(false)
@@ -1205,6 +1209,8 @@ export default function App() {
                 canDetect={progression.length > 1}
                 onTranspose={transpose}
                 canTranspose={progression.length > 0}
+                numeralStyle={numeralStyle}
+                onNumeralStyle={(v) => { setNumeralStyle(v); savePref('numeralStyle', v) }}
                 onDetect={() => {
                   const k = detectKey(progression)
                   if (k) setMusicKey(k)
@@ -1356,6 +1362,7 @@ export default function App() {
               onAddAt={openAddChord}
               inversions={inversions}
               musicKey={musicKey}
+              numeralStyle={numeralStyle}
               activeIndex={activeIndex}
               playingIndex={playingIndex}
               onSelect={selectChord}
@@ -1642,6 +1649,7 @@ export default function App() {
             progression={progression}
             musicKey={musicKey}
             inversions={inversions}
+            numeralStyle={numeralStyle}
             activeIndex={activeIndex}
             playingIndex={playingIndex}
             onSelect={setActiveIndex}

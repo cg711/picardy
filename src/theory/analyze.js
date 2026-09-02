@@ -2,7 +2,7 @@
 
 import { mod, pcOf, prettyName } from './notes.js'
 import { QUALITIES, chordSymbol, chordNotes, inversionCount, bassOf } from './chords.js'
-import { romanNumeral, harmonicFunction, isDiatonic, detectKey, detectKeyAreas, keyName, scalePcs } from './keys.js'
+import { romanNumeral, numeralFor, harmonicFunction, isDiatonic, detectKey, detectKeyAreas, keyName, scalePcs } from './keys.js'
 
 /**
  * Named cadence patterns, tested against the last chords of a phrase.
@@ -343,7 +343,7 @@ export function cadenceAt(progression, index, key) {
  *
  * @returns { key, chords: [...], observations: [...] }
  */
-export function analyseProgression(progression, keyOverride = null, inversions = null) {
+export function analyseProgression(progression, keyOverride = null, inversions = null, { numerals = 'roman' } = {}) {
   if (!progression.length) return { key: null, chords: [], observations: [], areas: [] }
   const key = keyOverride ?? detectKey(progression)
 
@@ -386,7 +386,7 @@ export function analyseProgression(progression, keyOverride = null, inversions =
     // With inversions in hand the numeral carries its figured bass, which is
     // what the progression chips have always shown. Without them this panel
     // said "I" while the chip beside it said "I 6/4".
-    const roman = romanNumeral(chord, localKey, inversions?.[i] ?? 0)
+    const roman = numeralFor(chord, localKey, inversions?.[i] ?? 0, numerals)
     const sixFour = cadentialSixFour(progression, i, localKey, inversions)
     // A cadential 6/4 is already being read as something other than what it
     // spells, and calling it a passing chord as well would be two answers to

@@ -165,6 +165,62 @@ export function romanNumeral(chord, key, inversion = 0) {
   return prefix + numeral + romanSuffix(chord) + figured
 }
 
+/**
+ * The Nashville number system: the same reading, written the way session
+ * players read it.
+ *
+ * Arabic numerals rather than roman, and quality written as a suffix rather
+ * than carried by the case — a minor chord is `6m`, not `vi`, because a chart
+ * scribbled on the back of an envelope cannot rely on anyone noticing case.
+ * Derived from romanNumeral rather than computed again, so the two readings
+ * cannot disagree about what a chord is; only about how to write it down.
+ */
+const ROMAN_TO_NUMBER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7 }
+
+/** The numeral in whichever notation the reader has asked for. */
+export function numeralFor(chord, key, inversion = 0, style = 'roman') {
+  return style === 'nashville'
+    ? nashvilleNumber(chord, key, inversion)
+    : romanNumeral(chord, key, inversion)
+}
+
+export function nashvilleNumber(chord, key, inversion = 0) {
+  const roman = romanNumeral(chord, key, inversion)
+  if (!roman) return ''
+  // Applied chords keep their slash, and each side is converted on its own.
+  if (/\/[ivIV]/.test(roman)) {
+    const [before, after] = roman.split(/\/(?=[ivIV])/)
+    return `${toNashville(before)}/${toNashville(after)}`
+  }
+  return toNashville(roman)
+}
+
+const SUPERSCRIPT = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }
+const raise = (s) => s.replace(/\d/g, (d) => SUPERSCRIPT[d])
+
+function toNashville(roman) {
+  const m = roman.match(/^([♭♯]*)([IiVv]+)(.*)$/)
+  if (!m) return roman
+  const [, accidental, numeral, rest] = m
+  const degree = ROMAN_TO_NUMBER[numeral.toUpperCase()]
+  if (!degree) return roman
+  const minor = numeral === numeral.toLowerCase()
+  // The case has to become a letter, or it is lost. A diminished or
+  // half-diminished chord already carries its own mark and does not also need
+  // an "m" — ° and ø say minor third louder than the case did.
+  const quality = minor && !/^[°ø]/.test(rest) ? 'm' : ''
+
+  // The extension is raised, which is not decoration: written flat, a dominant
+  // seventh on the fifth degree comes out "57" and reads as fifty-seven. Full
+  // size means degree, raised means extension. Figured bass — which arrives
+  // after a space — is left alone, because those digits are intervals above the
+  // bass and belong at full size.
+  const space = rest.indexOf(' ')
+  const suffix = space >= 0 ? rest.slice(0, space) : rest
+  const figured = space >= 0 ? rest.slice(space) : ''
+  return `${accidental}${degree}${quality}${raise(suffix)}${figured}`
+}
+
 function romanSuffix(chord) {
   const map = {
     maj: '',

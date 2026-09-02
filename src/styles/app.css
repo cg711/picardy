@@ -2256,3 +2256,12 @@ a.brand { text-decoration: none; color: inherit; }
 @media (max-width: 560px) {
   .ex-attack-start { width: 100%; }
 }
+
+/* Roman or Nashville, beside the key the numerals are read against. */
+.numeral-style { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.numeral-style button {
+  font: inherit; font-size: 12px; padding: 5px 10px; background: none;
+  border: 0; color: var(--text-dim); cursor: pointer; white-space: nowrap;
+}
+.numeral-style button.on { background: var(--surface-2); color: var(--accent); }
+.numeral-style button:hover { color: var(--ink); }

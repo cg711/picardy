@@ -23,6 +23,7 @@ export default function AnalysisPanel({
   progression,
   musicKey,
   inversions,
+  numeralStyle = 'roman',
   activeIndex,
   playingIndex,
   onSelect,
@@ -36,8 +37,8 @@ export default function AnalysisPanel({
   // agree with the ones on the chips. What the chords *imply* is reported
   // separately below rather than silently overriding the setting.
   const analysis = useMemo(
-    () => analyseProgression(progression, musicKey, inversions),
-    [progression, musicKey, inversions],
+    () => analyseProgression(progression, musicKey, inversions, { numerals: numeralStyle }),
+    [progression, musicKey, inversions, numeralStyle],
   )
 
   const detected = useMemo(

@@ -128,7 +128,10 @@ export default function ExercisesPage() {
     stopPlayback()
     setChosen(null)
     setPicked(null)
-    setQuestion(makeQuestion(id))
+    // Read the tally straight from storage rather than from `progress`: the
+    // answer that has just been recorded is still in flight in React state, and
+    // the next question should be chosen knowing about it.
+    setQuestion(makeQuestion(id, Math.random, { byType: (readProgress()[id] ?? blankLevel()).byType }))
   }, [levelId])
 
   const chooseLevel = (id) => {

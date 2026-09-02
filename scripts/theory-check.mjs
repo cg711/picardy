@@ -6,7 +6,7 @@
 
 const B = '../src/'
 const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort, QUALITIES } = await import(B + 'theory/chords.js')
-const { makeKey, romanNumeral, detectKey, detectKeyAreas, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
+const { makeKey, romanNumeral, nashvilleNumber, detectKey, detectKeyAreas, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
 const { prettyName, noteName, parseNote, pcOf: pcOfNote } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
@@ -19,7 +19,7 @@ const { optimiseInversions, progressionMovement, voiceLeadingFaults } = await im
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression, cadenceAt, contrapuntalRole, findSequence, fiveSixMove } = await import(B + 'theory/analyze.js')
-const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
+const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor, weightedTypes } = await import(B + 'theory/exercises.js')
 const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
 const { classifyNote, classifyFigure, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
 const { parseChart } = await import(B + 'lib/textimport.js')
@@ -1742,6 +1742,91 @@ console.log('\n--- modulation ---')
 // are the same bytes. MusicXML carries step, alter and octave, so the checks
 // here are about the two things an importer actually rejects — measures whose
 // durations do not add up, and malformed XML.
+// The drills recorded per-type accuracy from the start and showed it back, then
+// chose the next question uniformly at random anyway. The risk in closing that
+// loop is the opposite one: a topic that stops asking about something you have
+// got good at.
+// The same reading, written the way session players read it.
+console.log('\n--- Nashville numbers ---')
+{
+  const C = makeKey('C', 'major')
+  const Cm = makeKey('C', 'minor')
+  const n = (sym, key = C, inv = 0) => nashvilleNumber(parseChord(sym), key, inv)
+
+  eq('  a major triad is a bare number', n('C'), '1')
+  eq('  a minor triad carries an m, since case cannot survive a scribbled chart', n('Dm'), '2m')
+  eq('  a diminished chord already says minor and does not need one too', n('Bdim'), '7°')
+  eq('  nor does a half-diminished', n('Bm7b5'), '7ø⁷')
+
+  // The reason the extension is raised at all: flat, this reads fifty-seven.
+  eq('  a dominant seventh raises its extension', n('G7'), '5⁷')
+  eq('  …so a flat seven degree stays full size and is not confused with it', n('Bb'), '♭7')
+  eq('  a major seventh too', n('Cmaj7'), '1maj⁷')
+
+  // Figured bass is intervals above the bass, so those digits stay full size.
+  eq('  figured bass is left alone', n('G7', C, 1), '5⁷ 6/5')
+
+  // Applied chords convert on both sides of the slash.
+  eq('  an applied dominant keeps its slash', n('A7'), '5⁷/2m')
+  eq('  …including one aimed at the dominant', n('D7'), '5⁷/5')
+
+  eq('  minor keys work the same way', n('Cm', Cm), '1m')
+  eq('  a borrowed flat six', n('Ab', C), '♭6')
+  // Anything the roman numeral does not express as a degree is left as it is.
+  eq('  an augmented sixth is not a scale degree and passes through', n('Abger6', Cm), 'Ger+6')
+
+  // The two readings must never disagree about what a chord is, only about how
+  // to write it — which is why one is derived from the other.
+  let mismatched = 0
+  for (const sym of ['C', 'Dm', 'Em', 'F', 'G7', 'Am', 'Bdim', 'A7', 'Bb', 'Db', 'Cmaj7']) {
+    const chord = parseChord(sym)
+    const roman = romanNumeral(chord, C)
+    const nash = nashvilleNumber(chord, C)
+    const romanDegree = (roman.match(/^([♭♯]*)([IiVv]+)/) ?? [])[2]
+    const nashDegree = (nash.match(/^([♭♯]*)(\d)/) ?? [])[2]
+    if (romanDegree && String({ I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7 }[romanDegree.toUpperCase()]) !== nashDegree) mismatched++
+  }
+  eq('  every degree matches the roman numeral it came from', mismatched, 0)
+}
+
+console.log('\n--- weighted question choice ---')
+{
+  const types = ['a', 'b', 'c']
+  const share = (byType, draws = 6000) => {
+    const w = weightedTypes(types, byType)
+    const counts = Object.fromEntries(types.map((t) => [t, 0]))
+    // A deterministic sweep rather than random draws: the weights are what is
+    // under test, not the RNG.
+    const total = w.reduce((s, x) => s + x.weight, 0)
+    for (const x of w) counts[x.type] = x.weight / total
+    return counts
+  }
+
+  eq('  with no history every type is equally likely',
+    JSON.stringify(weightedTypes(types, {}).map((w) => w.weight)), '[1,1,1]')
+  eq('  a type answered twice is not yet judged',
+    weightedTypes(types, { a: { asked: 2, right: 0 } })[0].weight, 1)
+
+  const weak = share({ a: { asked: 10, right: 1 }, b: { asked: 10, right: 9 }, c: { asked: 10, right: 10 } })
+  eq('  the weakest type is asked most', weak.a > weak.b && weak.b > weak.c, true)
+  eq('  …and a perfect type is still asked', weak.c > 0.1, true)
+  // The guard that matters: mastery must not silence a topic.
+  const mastered = weightedTypes(types, Object.fromEntries(types.map((t) => [t, { asked: 50, right: 50 }])))
+  eq('  when everything is mastered the mix is even again',
+    JSON.stringify(mastered.map((w) => +w.weight.toFixed(3))), '[0.35,0.35,0.35]')
+
+  // And it must still produce real questions for every level.
+  let built = 0
+  for (const level of EX_LEVELS) {
+    const byType = Object.fromEntries(level.types.map((t, i) => [t, { asked: 10, right: i === 0 ? 0 : 10 }]))
+    for (let seed = 0; seed < 60; seed++) {
+      const q = makeQuestion(level.id, makeRng(seed), { byType })
+      if (q?.options?.length || q?.input === 'instrument') built++
+    }
+  }
+  eq('  weighted draws still build a question every time', built, EX_LEVELS.length * 60)
+}
+
 console.log('\n--- MusicXML ---')
 {
   const C = makeKey('C', 'major')

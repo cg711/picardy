@@ -110,6 +110,25 @@ tick — decides whether a run is over. Browsers throttle timers in a hidden tab
 stops being a clock the moment you switch away: in testing it froze at 0.2s and the run never
 ended, which would also have meant backgrounding the tab bought unlimited answering time.
 
+**Drills that follow your weak spots.** The exercises recorded per-type accuracy from the day they
+shipped and showed it back in "How you are doing" — then chose the next question uniformly at
+random anyway, so the one thing the app knew about you changed nothing about what it asked.
+`weightedTypes` closes that loop. A type you get wrong comes up nearly three times as often as one
+you have mastered, and a type is treated as unknown rather than weak until it has been asked four
+times, because two wrong out of two is not evidence. Mastery never silences a topic: every type
+keeps a floor share, so a drill cannot quietly stop testing something you learned last week.
+
+**Nashville numbers.** The same reading, written the way session players read it: arabic numerals,
+and quality as a suffix rather than carried by the case, because a chart scribbled on the back of an
+envelope cannot rely on anyone noticing that `vi` is lower case. Derived from `romanNumeral` rather
+than computed again, so the two notations can never disagree about what a chord *is* — only about
+how to write it.
+
+The extension is raised, which is not decoration: written flat, a dominant seventh on the fifth
+degree comes out `57` and reads as fifty-seven. Full size means degree, raised means extension, so
+`♭7` and `5⁷` stay distinct, and figured bass keeps its full-size digits because those are intervals
+above the bass. The toggle sits beside the key, since a numeral only means anything relative to one.
+
 **MusicXML export.** The format that keeps the spelling. MIDI cannot: a German sixth and a ♭VI7 are
 the same bytes in a `.mid`, and `C7♯9`'s D♯ arrives as an E♭. MusicXML carries step, alter and
 octave separately — the same shape the chord model has used all along — so a chart opened in
