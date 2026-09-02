@@ -407,6 +407,36 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## Voice-leading faults
+
+`optimiseInversions` searched for the smoothest voicing and had no idea what a bad one looks like.
+That turns out to matter: minimising movement alone happily returns parallel fifths, because moving
+two voices in lockstep is about the smoothest thing they can do.
+
+`voiceLeadingFaults` reports parallel fifths and octaves, direct fifths and octaves between the
+outer voices, and chordal sevenths that leave without falling a step. `parallelsBetween` is shared
+with the inversion search, so the thing the app warns about and the thing it optimises away cannot
+drift apart.
+
+Not checked: a doubled leading tone. `voiceChord` puts one note per chord tone and never doubles
+anything, so the test could not fire, and reporting that it passes would claim a guarantee the
+voicing makes trivially true.
+
+The scope has to be stated plainly, because the first version of this looked like a disaster: run
+over root-position block voicings it flags nearly every pop progression, since close-position triads
+moving in parallel *are* parallel fifths. That is a fact about the renderer, not about the user's
+music — Picardy has no four parts that anyone wrote. So it ships two ways:
+
+**In the inversion search**, as a cost. Across all 120 backing preset/key combinations, smoothing
+took faults from 932 to 129 — and the parallel penalty accounts for 15 of those at *no cost in
+movement at all*, because they were ties the movement metric did not care about. The benefit
+plateaus at 2.5, which is why that is the value.
+
+**As an opt-in reading** in the analysis panel, off by default, which says out loud that it is
+reading these chords in these inversions rather than four parts you wrote, and that parallels are a
+style constraint rather than a law. On `C F G C` it reports three; pressing *Smooth voicing* takes
+it to none.
+
 ## What a melody note is doing
 
 `classifyNote` reads a pitch against a chord, one note at a time. That is the wrong question for

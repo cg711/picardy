@@ -2201,3 +2201,10 @@ a.brand { text-decoration: none; color: inherit; }
   .lesson-card { gap: 12px; padding: 14px; }
   .lesson-card-mins { display: none; }
 }
+
+/* The voice-leading reading: a separate question, so it sits apart from the
+   observations rather than joining them. */
+.vl-block { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.vl-report { display: flex; flex-direction: column; gap: 8px; }
+.vl-report p { margin: 0; line-height: 1.55; }
+.obs-voiceleading strong { color: var(--accent); font-weight: 600; }

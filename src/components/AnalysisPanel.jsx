@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { analyseProgression, cadenceAt } from '../theory/analyze.js'
 import { detectKey, keyName } from '../theory/keys.js'
+import { voiceLeadingFaults } from '../theory/voicelead.js'
 import { pcOf } from '../theory/notes.js'
 
 /**
@@ -66,6 +67,18 @@ export default function AnalysisPanel({
         i === 0 ? null : MOTION[(((pcOf(chord.root) - pcOf(progression[i - 1].root)) % 12) + 12) % 12],
       ),
     [progression],
+  )
+
+  // Off by default, and a separate reading rather than part of the analysis.
+  // Picardy has no four parts that a user writes — a fault here is a property of
+  // how the app voices these chords — and most of its users are writing pop and
+  // jazz, where parallel fifths are a texture rather than a mistake.
+  //
+  // Declared above the early return below: hooks cannot sit behind a condition.
+  const [showVoiceLeading, setShowVoiceLeading] = useState(false)
+  const faults = useMemo(
+    () => (showVoiceLeading ? voiceLeadingFaults(progression, inversions, musicKey) : []),
+    [showVoiceLeading, progression, inversions, musicKey],
   )
 
   if (!progression.length) {
@@ -197,6 +210,44 @@ export default function AnalysisPanel({
               <li key={i} className={`obs obs-${o.kind}`}>{o.text}</li>
             ))}
           </ul>
+        )}
+
+        {/* A separate reading, off by default. It answers a different question
+            from the rest of the panel — not "what is this music" but "how do
+            these particular voicings move" — and the answer is only interesting
+            if you are writing in a style that cares. */}
+        {progression.length > 1 && (
+          <div className="vl-block">
+            <button
+              type="button"
+              className={`btn ghost tiny${showVoiceLeading ? ' on' : ''}`}
+              aria-pressed={showVoiceLeading}
+              onClick={() => setShowVoiceLeading((v) => !v)}
+            >
+              Voice leading
+            </button>
+            {showVoiceLeading && (
+              <div className="vl-report">
+                <p className="muted small">
+                  Reading these chords in these inversions, voiced in close position — not
+                  four parts you wrote. Parallels are a style constraint, not a law: common
+                  practice avoids them, and a great deal of pop and rock is built on them.
+                </p>
+                {faults.length === 0 ? (
+                  <p className="muted small">Nothing to report in this voicing.</p>
+                ) : (
+                  <ul className="observations">
+                    {faults.map((f, i) => (
+                      <li key={i} className="obs obs-voiceleading">
+                        <strong>{f.label}</strong> into chord {f.at + 1}
+                        {' '}({analysis.chords[f.at]?.symbol}) — {f.why}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

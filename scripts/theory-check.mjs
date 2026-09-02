@@ -15,7 +15,7 @@ const { generateProgression, FLAVOURS } = await import(B + 'theory/generate.js')
 const { groupIntoBars, totalBeats, beatsOf, describeLength, barsAreComplete, TIME_SIGNATURES, timeSignatureOf } = await import(B + 'theory/rhythm.js')
 const { flattenSong, songBeats, readSegment, makeSegment } = await import(B + 'lib/song.js')
 const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theory/transpose.js')
-const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
+const { optimiseInversions, progressionMovement, voiceLeadingFaults } = await import(B + 'theory/voicelead.js')
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
 const { analyseProgression, cadenceAt, contrapuntalRole } = await import(B + 'theory/analyze.js')
@@ -1413,6 +1413,57 @@ console.log('\n--- lessons ---')
 // tell a suspension from an appoggiatura — they can be the same pitch over the
 // same chord on the same beat, and what separates them is where the note came
 // from and where it goes.
+// optimiseInversions searched for the smoothest voicing and had no idea what a
+// bad one looks like. Minimising movement alone happily returns parallel fifths,
+// because moving two voices in lockstep is about the smoothest thing they can do.
+console.log('\n--- voice-leading faults ---')
+{
+  const P = (s) => s.split(/\s+/).map(parseChord)
+  const kinds = (chart, invs) => voiceLeadingFaults(P(chart), invs).map((f) => f.type)
+
+  eq('  V–IV in root position makes parallel fifths',
+    kinds('G F', [0, 0]).includes('parallel-fifths'), true)
+  eq('  I–II in root position too',
+    kinds('C D', [0, 0]).includes('parallel-fifths'), true)
+  // The two ways parallels are avoided in practice.
+  eq('  a held voice is oblique motion, not a parallel',
+    kinds('C Am', [0, 1]).includes('parallel-fifths'), false)
+  eq('  contrary motion is not a parallel',
+    kinds('C G', [0, 2]).includes('parallel-fifths'), false)
+  eq('  a single chord has nothing to compare', voiceLeadingFaults(P('C'), [0]).length, 0)
+  eq('  and no progression at all is not an error', voiceLeadingFaults([], []).length, 0)
+
+  // Smoothing must not make voice leading worse, and should make it better.
+  // Measured across every backing preset in every key rather than on one chart.
+  let before = 0
+  let after = 0
+  let moveBefore = 0
+  let moveAfter = 0
+  let regressions = 0
+  let n = 0
+  for (const preset of BACKINGS) {
+    for (const tonic of BACKING_KEYS) {
+      const built = buildBacking(preset, tonic)
+      if (!built) continue
+      n++
+      const b0 = voiceLeadingFaults(built.progression, built.inversions).length
+      const inv = optimiseInversions(built.progression)
+      const b1 = voiceLeadingFaults(built.progression, inv).length
+      before += b0
+      after += b1
+      if (b1 > b0) regressions++
+      moveBefore += progressionMovement(built.progression, built.inversions)
+      moveAfter += progressionMovement(built.progression, inv)
+    }
+  }
+  eq('  smoothing never leaves a progression with more faults than it started', regressions, 0)
+  eq(`  and removes most of them (${before} → ${after} across ${n} progressions)`, after < before * 0.25, true)
+  eq('  while still reducing movement', moveAfter < moveBefore, true)
+  // The parallel penalty is meant to break ties, not to buy fewer parallels
+  // with clumsier voice leading. It removes faults at no cost in movement.
+  eq('  smoothing keeps movement under one semitone per change on average', moveAfter / n < 1, true)
+}
+
 console.log('\n--- melodic figures ---')
 {
   const ts44 = timeSignatureOf('4/4')
