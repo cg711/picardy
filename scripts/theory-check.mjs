@@ -18,7 +18,7 @@ const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theo
 const { optimiseInversions, progressionMovement, voiceLeadingFaults } = await import(B + 'theory/voicelead.js')
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
-const { analyseProgression, cadenceAt, contrapuntalRole } = await import(B + 'theory/analyze.js')
+const { analyseProgression, cadenceAt, contrapuntalRole, findSequence, fiveSixMove } = await import(B + 'theory/analyze.js')
 const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
 const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
 const { classifyNote, classifyFigure, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
@@ -1416,6 +1416,55 @@ console.log('\n--- lessons ---')
 // optimiseInversions searched for the smoothest voicing and had no idea what a
 // bad one looks like. Minimising movement alone happily returns parallel fifths,
 // because moving two voices in lockstep is about the smoothest thing they can do.
+// The engine already noticed a progression was full of falling fifths and said
+// so as a statistic. One word short of the name.
+console.log('\n--- sequences, 5-6, and perfect vs imperfect ---')
+{
+  const chords = (chart) => parseChart(chart).chords
+  const seq = (chart) => findSequence(chords(chart))?.label ?? null
+  const C = makeKey('C', 'major')
+
+  eq('  descending fifths', seq('| C | F | Bdim | Em | Am | Dm | G | C |'), 'descending fifths')
+  eq('  …with sevenths on top', seq('| Cmaj7 | Fmaj7 | Bm7b5 | Em7 | Am7 | Dm7 | G7 | Cmaj7 |'), 'descending fifths')
+  eq('  ascending fifths', seq('| C | G | D | A |'), 'ascending fifths')
+  eq('  descending 5–6, the falling-thirds sequence', seq('| C | G | Am | Em | F | C |'), 'descending 5–6')
+  eq('  ascending 5–6', seq('| C | Am | Dm | Bdim | Em |'), 'ascending 5–6')
+  eq('  descending steps', seq('| C | Bb | Ab | Gb |'), 'descending steps')
+  eq('  an ordinary progression is not a sequence', seq('| C | Am | F | G |'), null)
+  eq('  one statement is not a sequence', seq('| C | F | G | C |'), null)
+  eq('  and nothing too short to state one twice', seq('| C | F | Bdim |'), null)
+
+  // Steps, not semitones. A diatonic descending-fifths sequence contains one
+  // diminished fifth — F to B in C major — so a semitone matcher reports the
+  // sequence starting two chords late, and the 5–6 patterns never match at all
+  // because E–F is a semitone where the other steps are tones.
+  const full = findSequence(chords('| C | F | Bdim | Em | Am | Dm | G | C |'))
+  eq('  the sequence is found from its first chord, tritone link and all', full.start, 0)
+  eq('  …and counts every statement', full.statements, 7)
+
+  // The named sequence replaces the statistic it refines.
+  const named = analyseProgression(chords('| C | F | Bdim | Em | Am | Dm | G | C |'), C)
+  eq('  it is reported by name', named.observations.some((o) => o.kind === 'sequence'), true)
+  eq('  …and not also as a count of fifths', named.observations.some((o) => /changes fall by a fifth/.test(o.text)), false)
+
+  // The 5-6 technique: a bass that holds while a voice above it steps up.
+  const five = (chart, invs, i) => !!fiveSixMove(chords(chart), i, invs)
+  eq('  C then Am over the same C bass is a 5–6', five('| C | Am |', [0, 1], 1), true)
+  eq('  …but Am in root position is a real chord change', five('| C | Am |', [0, 0], 1), false)
+  eq('  a different bass is not a 5–6', five('| C | F |', [0, 0], 1), false)
+  eq('  the same chord twice is not a 5–6', five('| C | C |', [0, 0], 1), false)
+  eq('  and without inversions nothing is claimed', five('| C | Am |', null, 1), false)
+
+  // Perfect and imperfect by position, which is what the terms actually mean.
+  const cad = (invs) => analyseProgression(chords('| C | G7 | C |'), C, invs)
+    .observations.filter((o) => o.kind === 'cadence').map((o) => o.text).join(' ')
+  eq('  root position both sides is perfect in the strict sense', /perfect in the strict sense/.test(cad([0, 0, 0])), true)
+  eq('  an inverted dominant makes it imperfect', /imperfect/.test(cad([0, 1, 0])), true)
+  eq('  an inverted tonic too', /imperfect/.test(cad([0, 0, 1])), true)
+  eq('  with no inversions the claim is not made', /strict sense|imperfect/.test(
+    analyseProgression(chords('| C | G7 | C |'), C).observations.map((o) => o.text).join(' ')), false)
+}
+
 console.log('\n--- voice-leading faults ---')
 {
   const P = (s) => s.split(/\s+/).map(parseChord)

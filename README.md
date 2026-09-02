@@ -407,6 +407,31 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## Sequences, the 5–6 technique, and what "perfect" means
+
+Three refinements to readings the engine already made, from the last of the
+Aldwell & Schachter findings.
+
+**Sequences by name.** The engine noticed a progression was full of falling fifths and reported it
+as a statistic — "6 of 7 changes fall by a fifth" — which is true and one word short of the name.
+`findSequence` names six patterns: descending and ascending fifths, ascending and descending 5–6,
+and stepwise motion either way. Measured in **scale steps, not semitones**, which is the part that
+matters: a diatonic descending-fifths sequence contains one diminished fifth (F to B in C major), so
+a semitone matcher reports the sequence starting two chords late, and the 5–6 patterns never match
+at all because E–F is a semitone where the other steps are tones. A pattern must be stated twice —
+one statement is a progression. The name replaces the statistic rather than joining it.
+
+**The 5–6 technique.** `fiveSixMove` tells a held bass with a voice stepping up over it from a real
+chord change. C major followed by A minor over the same C looks like `vi6` and is not: nothing has
+moved to a new harmony, one line has stepped from the fifth to the sixth. Appendix III is emphatic
+about the distinction, and writes it `I 5–6`.
+
+**Perfect versus imperfect.** `CADENCES` splits perfect from authentic on chord quality — whether
+the dominant is a seventh — which is a different question from the one those terms answer. The
+textbook distinction is position: a perfect authentic cadence has both chords in root position.
+Added as a qualifier on the cadence observation rather than by rewriting that table, which the
+exercises draw their wrong answers from, and only stated when there are inversions to read.
+
 ## Voice-leading faults
 
 `optimiseInversions` searched for the smoothest voicing and had no idea what a bad one looks like.

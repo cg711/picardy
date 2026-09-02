@@ -201,6 +201,132 @@ export function contrapuntalRole(progression, index, inversions) {
   return null
 }
 
+/**
+ * Named sequence patterns, tested against a run of root motions.
+ *
+ * The engine already noticed that a progression was full of falling fifths and
+ * said so as a statistic — "6 of 7 changes fall by a fifth". True, and one word
+ * short of the name. Aldwell & Schachter separate four patterns and give each a
+ * compositional job, so this names them.
+ *
+ * `steps` is the repeating unit of root motion in semitones, and a sequence has
+ * to state it at least twice — one statement is a progression, two is a pattern.
+ */
+// Measured in scale steps, not semitones. A diatonic descending-fifths sequence
+// contains one diminished fifth — F to B in C major — so in semitones the chain
+// breaks exactly once and a semitone matcher reports the sequence as starting
+// two chords late. The 5–6 patterns fail outright for the same reason, since
+// E–F is a semitone where the other steps are tones. Counting letters is how the
+// music is actually regular.
+const SEQUENCES = [
+  {
+    id: 'desc5', label: 'descending fifths', steps: [3],
+    why: 'Roots falling a fifth each time, the most common sequence in tonal music — every chord is the dominant of the next.',
+  },
+  {
+    id: 'asc5', label: 'ascending fifths', steps: [4],
+    why: 'Roots rising a fifth each time. Rarer and less driven than the falling version, because it moves away from resolution rather than towards it.',
+  },
+  {
+    id: 'asc56', label: 'ascending 5–6', steps: [5, 3],
+    why: 'Down a third, up a fourth, climbing by a step each time round. The 5–6 technique: a rising line harmonised without parallel fifths.',
+  },
+  {
+    id: 'desc56', label: 'descending 5–6', steps: [4, 1],
+    why: 'Up a fifth then up a step, so the roots fall in thirds overall — the falling-thirds sequence.',
+  },
+  {
+    id: 'descStep', label: 'descending steps', steps: [6],
+    why: 'Roots walking down by step, which gives a scalar, marching feel rather than a functional pull.',
+  },
+  {
+    id: 'ascStep', label: 'ascending steps', steps: [1],
+    why: 'Roots walking up by step, gathering rather than resolving.',
+  },
+]
+
+/**
+ * The longest named sequence in a progression, if there is one.
+ *
+ * @returns { id, label, why, start, end, statements } or null. `end` exclusive.
+ */
+export function findSequence(progression) {
+  if (!progression || progression.length < 4) return null
+  const motions = []
+  for (let i = 1; i < progression.length; i++) {
+    motions.push(mod(progression[i].root.letter - progression[i - 1].root.letter, 7))
+  }
+
+  let best = null
+  for (const seq of SEQUENCES) {
+    const unit = seq.steps.length
+    for (let start = 0; start + unit * 2 <= motions.length; start++) {
+      // How far does the pattern hold from here?
+      let len = 0
+      while (start + len < motions.length && motions[start + len] === seq.steps[len % unit]) len++
+      const statements = Math.floor(len / unit)
+      if (statements < 2) continue
+      const covered = statements * unit
+      const candidate = {
+        id: seq.id,
+        label: seq.label,
+        why: seq.why,
+        start,
+        end: start + covered + 1,
+        statements,
+      }
+      // Longest wins; ties go to whichever pattern is listed first, which puts
+      // the fifths above the steps they could otherwise be described as.
+      if (!best || covered > best.end - best.start - 1) best = candidate
+    }
+  }
+  return best
+}
+
+/**
+ * The 5–6 technique: an upper voice stepping from the fifth above the bass to
+ * the sixth, while the bass holds.
+ *
+ * Worth telling apart from an inversion because the two make different claims.
+ * C major followed by A minor over the same C in the bass looks like Am in first
+ * inversion, and Appendix III is emphatic that it is not: nothing has moved to a
+ * new harmony, one voice has stepped up over a held bass. Written I 5–6 rather
+ * than I–vi6, because the second says a chord change happened.
+ *
+ * Needs inversions, and says nothing without them.
+ */
+export function fiveSixMove(progression, index, inversions) {
+  if (!inversions) return null
+  const a = progression[index - 1]
+  const b = progression[index]
+  if (!a || !b) return null
+
+  const bassA = bassOf(a, inversions[index - 1] ?? 0)
+  const bassB = bassOf(b, inversions[index] ?? 0)
+  if (!bassA.note || !bassB.note) return null
+  if (pcOf(bassA.note) !== pcOf(bassB.note)) return null
+
+  // Everything above the bass, as intervals from it.
+  const over = (chord, bass) =>
+    new Set(chordNotes(chord).map((e) => mod(pcOf(e.note) - pcOf(bass.note), 12)))
+  const setA = over(a, bassA)
+  const setB = over(b, bassB)
+
+  // A fifth above the bass has become a sixth, and nothing else changed.
+  if (!setA.has(7) || setB.has(7)) return null
+  const sixth = setB.has(9) ? 9 : setB.has(8) ? 8 : null
+  if (sixth === null || setA.has(sixth)) return null
+  const restA = [...setA].filter((x) => x !== 7).sort()
+  const restB = [...setB].filter((x) => x !== sixth).sort()
+  if (restA.length !== restB.length || restA.some((x, i) => x !== restB[i])) return null
+
+  return {
+    id: 'fiveSix',
+    label: '5–6 technique',
+    why: 'The bass holds and a voice above it steps from the fifth to the sixth. It shares a bass with the chord before it but is not its inversion — no new harmony has arrived, one line has moved.',
+  }
+}
+
 /** The cadence formed by the last two chords, if any. */
 export function cadenceAt(progression, index, key) {
   const a = progression[index - 1]
@@ -316,6 +442,21 @@ export function analyseProgression(progression, keyOverride = null, inversions =
     // "a authentic cadence" — two of the nine labels start with a vowel.
     const article = /^[aeiou]/i.test(ending.label) ? 'an' : 'a'
     note('cadence', `Ends on ${article} ${ending.label}: ${chords[chords.length - 2].roman} to ${chords[chords.length - 1].roman}. ${ending.why}`)
+
+    // Perfect and imperfect, the way the textbooks draw the line. CADENCES
+    // splits perfect from authentic on chord quality — whether the dominant is
+    // a seventh — which is a different question from the one the terms answer.
+    // The real distinction is position: a perfect authentic cadence has both
+    // chords in root position. Added as a qualifier rather than by rewriting
+    // that table, which the exercises draw their wrong answers from, and only
+    // when there are inversions to read.
+    if ((ending.id === 'perfect' || ending.id === 'authentic') && inversions) {
+      const last = progression.length - 1
+      const rootPosition = (inversions[last - 1] ?? 0) === 0 && (inversions[last] ?? 0) === 0
+      note('cadence', rootPosition
+        ? 'Both chords are in root position, so it is perfect in the strict sense — the strongest form of the ending.'
+        : 'One of the two chords is inverted, which makes it imperfect: still an authentic cadence, but it lands softer than a root-position pair would.')
+    }
   } else if (progression.length > 1) {
     note('cadence', `The last move, ${chords[chords.length - 2].roman} to ${chords[chords.length - 1].roman}, is not one of the standard cadences — the phrase stops rather than closes.`)
   }
@@ -326,6 +467,13 @@ export function analyseProgression(progression, keyOverride = null, inversions =
   for (const c of chords.filter((c) => c.sixFour)) {
     const next = chords[c.index + 1]
     note('six-four', `${c.symbol} at ${c.roman} is a ${c.sixFour} — read it as ${c.readAs}, an ornamented ${next.roman}, rather than as a tonic. The bass is already on the dominant and stays there; the 6th and 4th above it are dissonances that fall to the 5th and 3rd.`)
+  }
+
+  // --- the 5-6 technique -------------------------------------------------------
+  for (let i = 1; i < progression.length; i++) {
+    const move = fiveSixMove(progression, i, inversions)
+    if (!move) continue
+    note('counterpoint', `${chords[i - 1].symbol} to ${chords[i].symbol} over the same bass is the ${move.label}, written ${chords[i - 1].roman} 5–6. ${move.why}`)
   }
 
   // --- contrapuntal chords -----------------------------------------------------
@@ -378,13 +526,20 @@ export function analyseProgression(progression, keyOverride = null, inversions =
   for (let i = 1; i < progression.length; i++) {
     motions.push(mod(pcOf(progression[i].root) - pcOf(progression[i - 1].root), 12))
   }
-  const fifths = motions.filter((m) => m === 5).length
-  if (motions.length && fifths / motions.length >= 0.6) {
-    note('motion', `${fifths} of ${motions.length} changes fall by a fifth, so the progression is driven by the circle of fifths.`)
-  }
-  const steps = motions.filter((m) => m === 2 || m === 10).length
-  if (motions.length && steps / motions.length >= 0.6) {
-    note('motion', 'The roots mostly move by step, which gives a scalar, marching feel rather than a functional pull.')
+  // A named sequence says everything the statistics below would, and says it
+  // as a name, so it replaces them rather than sitting alongside.
+  const sequence = findSequence(progression)
+  if (sequence) {
+    note('sequence', `Chords ${sequence.start + 1}–${sequence.end} are a ${sequence.label} sequence, stated ${sequence.statements} times: ${chords.slice(sequence.start, sequence.end).map((c) => c.roman).join('–')}. ${sequence.why}`)
+  } else {
+    const fifths = motions.filter((m) => m === 5).length
+    if (motions.length && fifths / motions.length >= 0.6) {
+      note('motion', `${fifths} of ${motions.length} changes fall by a fifth, so the progression is driven by the circle of fifths.`)
+    }
+    const steps = motions.filter((m) => m === 2 || m === 10).length
+    if (motions.length && steps / motions.length >= 0.6) {
+      note('motion', 'The roots mostly move by step, which gives a scalar, marching feel rather than a functional pull.')
+    }
   }
 
   // --- shape -------------------------------------------------------------------
