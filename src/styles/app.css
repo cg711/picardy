@@ -897,6 +897,19 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   padding: 0 5px; white-space: nowrap;
 }
 
+/* A key change, sitting in the gap between the two chords it happens across.
+   Louder than the root-motion labels it replaces, because it reframes every
+   numeral after it. */
+.fn-keychange {
+  flex: 0 0 auto; align-self: stretch;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 0 7px;
+  font-size: 9.5px; line-height: 1.15; text-align: center;
+  color: var(--accent); white-space: nowrap;
+  border-left: 1px dashed var(--accent); border-right: 1px dashed var(--accent);
+}
+.fn-keychange-arrow { font-size: 12px; }
+
 .fn-motion {
   flex: 0 0 auto; align-self: center;
   font-size: 9.5px; color: var(--text-dim); white-space: nowrap;

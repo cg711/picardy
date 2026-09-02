@@ -6,7 +6,7 @@
 
 const B = '../src/'
 const { parseChord, chordSymbol, chordNotes, voiceChord, chordId, makeChord, bassOf, inversionLabel, inversionShort, QUALITIES } = await import(B + 'theory/chords.js')
-const { makeKey, romanNumeral, detectKey, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
+const { makeKey, romanNumeral, detectKey, detectKeyAreas, scaleNotes, harmonicFunction, isDiatonic, keyName } = await import(B + 'theory/keys.js')
 const { prettyName, noteName, parseNote, pcOf: pcOfNote } = await import(B + 'theory/notes.js')
 const { suggestNext } = await import(B + 'theory/suggest.js')
 const { findVoicings, TUNINGS, voicingLabel, tuningKey, normaliseTuning } = await import(B + 'theory/guitar.js')
@@ -1400,6 +1400,106 @@ console.log('\n--- lessons ---')
   eq('  a trailing slash is the same lesson', lessonSlugFor(`${lessonPath(LESSONS[0].id)}/`), LESSONS[0].id)
   // The tab title has to come from the path, since every lesson shares a route.
   eq('  a lesson titles its own tab', pageFor('lesson', lessonPath('cadences')).title, 'Cadences — Picardy')
+}
+
+// Forcing one key on a progression that moves does not merely miss the
+// modulation — it reports the opening as a string of errors. The hard part is
+// not finding key changes, it is refusing to find them where a single applied
+// dominant fits another key better for one chord.
+console.log('\n--- modulation ---')
+{
+  const chords = (chart) => parseChart(chart).chords
+  const areasOf = (chart) => detectKeyAreas(chords(chart)).map((a) => `${a.start}-${a.end} ${keyName(a.key)}`)
+  const keysOf = (chart) => detectKeyAreas(chords(chart)).map((a) => keyName(a.key)).join(' → ')
+
+  // Must NOT modulate. Every one of these fits another key better somewhere,
+  // and reporting a key change in any of them would be worse than the old
+  // single-key reading.
+  const stays = [
+    ['a plain progression', '| C | F | G | C |', 'C major'],
+    ['an applied dominant of ii', '| C | A7 | Dm | G7 | C |', 'C major'],
+    ['an applied dominant of V', '| C | D7 | G7 | C |', 'C major'],
+    ['a tonicisation held for three chords', '| C | C | A7 | Dm | Dm | G7 | C |', 'C major'],
+    ['borrowed chords', '| C | Fm | C | Ab | Bb | C |', 'C major'],
+    ['a rock ♭VII', '| C | Bb | F | C |', 'C major'],
+    ['a twelve-bar blues', '| C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7 |', 'C major'],
+  ]
+  for (const [what, chart, want] of stays) {
+    eq(`  ${what} stays in one key`, keysOf(chart), want)
+  }
+
+  // Must modulate.
+  const moves = [
+    ['to the dominant', '| C | F | G | C | D7 | G | D7 | G |', 'C major → G major'],
+    ['to the relative major', '| Am | Dm | E7 | Am | C | F | G | C |', 'A minor → C major'],
+    ['to the relative minor', '| C | F | G | C | E7 | Am | Dm | E7 | Am |', 'C major → A minor'],
+    ['two ii–V–Is a fifth apart', '| Dm7 | G7 | Cmaj7 | Am7 | D7 | Gmaj7 |', 'C major → G major'],
+  ]
+  for (const [what, chart, want] of moves) {
+    eq(`  a modulation ${what}`, keysOf(chart), want)
+  }
+  eq('  …and the boundary lands where the key changes', areasOf('| C | F | G | C | D7 | G | D7 | G |').join(' | '), '0-4 C major | 4-8 G major')
+
+  // Areas must tile the progression exactly — a gap or an overlap would leave a
+  // chord with no key or two.
+  for (const [, chart] of [...stays, ...moves]) {
+    const n = chords(chart).length
+    const areas = detectKeyAreas(chords(chart))
+    const contiguous = areas[0].start === 0 && areas[areas.length - 1].end === n
+      && areas.every((a, i) => i === 0 || a.start === areas[i - 1].end)
+    const longEnough = areas.length === 1 || areas.every((a) => a.end - a.start >= 3)
+    if (!contiguous || !longEnough) eq(`  areas tile ${chart}`, `${contiguous}/${longEnough}`, 'true/true')
+  }
+  eq('  every area is contiguous and long enough', true, true)
+
+  // The reading that started all this.
+  const moved = analyseProgression(chords('| C | F | G | C | D7 | G | D7 | G |'))
+  eq('  the opening is no longer read in the key it ends in', moved.chords[0].roman, 'I')
+  eq('  …and its F is not reported as borrowed', moved.observations.some((o) => o.kind === 'mixture'), false)
+  eq('  …and it is not said to open on IV', /opens on IV/.test(moved.observations.find((o) => o.kind === 'shape')?.text ?? ''), false)
+  eq('  …and the modulation is named', moved.observations.some((o) => o.kind === 'modulation'), true)
+  eq('  …with the pivot chord identified', moved.observations.some((o) => /turns on/.test(o.text)), true)
+  // Numerals are read in each chord's own area, so the same chord reads differently.
+  eq('  the same G is V in the first key…', moved.chords[2].roman, 'V')
+  eq('  …and I in the second', moved.chords[5].roman, 'I')
+
+  // A key the user set is not overruled when nothing modulates.
+  const C = makeKey('C', 'major')
+  eq('  an explicit key stands when there is no modulation',
+    analyseProgression(chords('| C | A7 | Dm |'), C).chords[1].roman, 'V7/ii')
+
+  // detectKey and the segmenter share one scorer, so a one-area reading must
+  // name the key detectKey names — otherwise the panel contradicts its own
+  // "detected key" banner. Checked across every backing preset in every key.
+  let disagreed = 0
+  let split = 0
+  for (const preset of BACKINGS) {
+    for (const tonic of BACKING_KEYS) {
+      const built = buildBacking(preset, tonic)
+      if (!built) continue
+      const areas = detectKeyAreas(built.progression)
+      if (areas.length > 1) { split++; continue }
+      if (keyName(areas[0].key) !== keyName(detectKey(built.progression))) disagreed++
+    }
+  }
+  eq('  no backing preset is reported as modulating', split, 0)
+  eq('  and a single area always names the key detectKey names', disagreed, 0)
+
+  // Everything above runs with no key set, which is not how the app calls it —
+  // the studio always passes the user's key. That path has its own failure mode:
+  // the home-key nudge is applied per chord, and at 0.7 it was quietly hiding
+  // the modulation from A minor to its relative major, where the two keys share
+  // all seven notes and nothing else separates them.
+  const withKey = [
+    [1, 'a tonicisation', '| C | A7 | Dm | G7 | C |', makeKey('C', 'major')],
+    [1, 'a blues', '| C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7 |', makeKey('C', 'major')],
+    [2, 'a move to the dominant', '| C | F | G | C | D7 | G | D7 | G |', makeKey('C', 'major')],
+    [2, 'a move to the relative major', '| Am | Dm | E7 | Am | C | F | G | C |', makeKey('A', 'minor')],
+    [2, 'a move to the relative minor', '| C | F | G | C | E7 | Am | Dm | E7 | Am |', makeKey('C', 'major')],
+  ]
+  for (const [want, what, chart, key] of withKey) {
+    eq(`  with the user's key set, ${what}`, analyseProgression(chords(chart), key).areas.length, want)
+  }
 }
 
 console.log('\n--- routes ---')

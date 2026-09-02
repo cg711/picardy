@@ -86,7 +86,15 @@ export default function AnalysisPanel({
   }
 
   const focused = playingIndex >= 0 ? playingIndex : activeIndex
-  const mismatch = detected && !sameKey(detected, musicKey)
+  // detectKey answers with one key, so on a progression that modulates it names
+  // whichever key won overall — and offering to "read it all in G major" is
+  // offering the exact reading the key areas were built to replace. The banner
+  // is for a genuine disagreement about a single key, so it stands down when
+  // the set key is one the music is actually in.
+  const areas = analysis.areas ?? []
+  const modulates = areas.length > 1
+  const inSomeArea = areas.some((a) => sameKey(a.key, musicKey))
+  const mismatch = detected && !sameKey(detected, musicKey) && !(modulates && inSomeArea)
 
   return (
     <div className="panel p-analysis">
@@ -103,7 +111,12 @@ export default function AnalysisPanel({
       <div className="sub-head">
         <h3>Progression</h3>
         <span className="muted small">
-          read in {keyName(musicKey)}
+          {/* Once there is more than one key area, "read in X" is not true of
+              the whole progression and saying it anyway is how the old reading
+              went wrong. */}
+          {analysis.areas?.length > 1
+            ? `read in ${analysis.areas.map((a) => keyName(a.key)).join(' → ')}`
+            : `read in ${keyName(musicKey)}`}
           {progression.length === 1 ? ' · one chord' : ` · ${progression.length} chords`}
         </span>
       </div>
@@ -131,7 +144,17 @@ export default function AnalysisPanel({
         <div className="fn-map" role="list">
           {analysis.chords.map((c, i) => (
             <React.Fragment key={i}>
-              {i > 0 && (
+              {/* Where the music changes key. The marker sits between the two
+                  chords rather than on either, because the change belongs to
+                  the join — and it replaces the root-motion label there, since
+                  a step measured across a key change is not the interesting
+                  thing about that join. */}
+              {i > 0 && c.startsArea ? (
+                <span className="fn-keychange" title={`Modulates to ${c.keyName}`}>
+                  <span className="fn-keychange-arrow" aria-hidden="true">→</span>
+                  {c.keyName}
+                </span>
+              ) : i > 0 && (
                 <span className="fn-motion" aria-hidden="true">
                   {motions[i]}
                 </span>

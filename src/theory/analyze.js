@@ -2,7 +2,7 @@
 
 import { mod, pcOf, prettyName } from './notes.js'
 import { QUALITIES, chordSymbol, chordNotes, inversionCount } from './chords.js'
-import { romanNumeral, harmonicFunction, isDiatonic, detectKey, keyName, scalePcs } from './keys.js'
+import { romanNumeral, harmonicFunction, isDiatonic, detectKey, detectKeyAreas, keyName, scalePcs } from './keys.js'
 
 /**
  * Named cadence patterns, tested against the last chords of a phrase.
@@ -143,23 +143,50 @@ export function cadenceAt(progression, index, key) {
  * @returns { key, chords: [...], observations: [...] }
  */
 export function analyseProgression(progression, keyOverride = null, inversions = null) {
-  if (!progression.length) return { key: null, chords: [], observations: [] }
+  if (!progression.length) return { key: null, chords: [], observations: [], areas: [] }
   const key = keyOverride ?? detectKey(progression)
-  const scale = new Set(scalePcs(key))
-  // A minor key's raised 7th is part of its normal vocabulary, not borrowed
-  // colour — without this every V7 in minor gets reported as chromatic.
-  if (key.mode === 'minor') scale.add(mod(pcOf(key.tonic) + 11, 12))
+
+  // Where the music changes key, if it does. A progression read wholly in the
+  // key it ends in does not merely miss the modulation: it reports the opening
+  // as a string of mistakes, because every chord belonging to the first key is
+  // measured against the second. C–F–G–C moving to G came back with "♭VII is
+  // outside the key" and "it opens on IV", both of which are artefacts of
+  // asking one key to explain two.
+  const found = detectKeyAreas(progression, keyOverride)
+  // A key the user set is not a guess to be second-guessed. When the segmenter
+  // finds no modulation there is nothing to add, so the setting stands — which
+  // also means this whole feature changes nothing for the progressions that do
+  // not modulate, which is most of them. Only when the music genuinely moves
+  // does a second key get to contradict the setting, and the panel's existing
+  // key-mismatch banner covers the case where it disagrees outright.
+  const areas = keyOverride && found.length === 1
+    ? [{ ...found[0], key: keyOverride }]
+    : found
+  const keyAt = (i) => areas.find((a) => i >= a.start && i < a.end)?.key ?? key
+
+  // One scale per area rather than per chord, since areas are few and chords
+  // are not.
+  const scaleFor = new Map()
+  for (const area of areas) {
+    const s = new Set(scalePcs(area.key))
+    // A minor key's raised 7th is part of its normal vocabulary, not borrowed
+    // colour — without this every V7 in minor gets reported as chromatic.
+    if (area.key.mode === 'minor') s.add(mod(pcOf(area.key.tonic) + 11, 12))
+    scaleFor.set(area.key, s)
+  }
 
   const chords = progression.map((chord, i) => {
-    const diatonic = isDiatonic(chord, key)
+    const localKey = keyAt(i)
+    const scale = scaleFor.get(localKey) ?? new Set(scalePcs(localKey))
+    const diatonic = isDiatonic(chord, localKey)
     const outside = chordNotes(chord)
       .filter((e) => !scale.has(pcOf(e.note)))
       .map((e) => prettyName(e.note))
     // With inversions in hand the numeral carries its figured bass, which is
     // what the progression chips have always shown. Without them this panel
     // said "I" while the chip beside it said "I 6/4".
-    const roman = romanNumeral(chord, key, inversions?.[i] ?? 0)
-    const sixFour = cadentialSixFour(progression, i, key, inversions)
+    const roman = romanNumeral(chord, localKey, inversions?.[i] ?? 0)
+    const sixFour = cadentialSixFour(progression, i, localKey, inversions)
     return {
       index: i,
       symbol: chordSymbol(chord),
@@ -167,9 +194,14 @@ export function analyseProgression(progression, keyOverride = null, inversions =
       // The one place a chord's function depends on what follows it. Everywhere
       // else harmonicFunction is right; here it is looking at a tonic triad and
       // cannot see the dominant holding underneath it.
-      fn: sixFour ? 'D' : harmonicFunction(chord, key),
+      fn: sixFour ? 'D' : harmonicFunction(chord, localKey),
       sixFour: sixFour ? sixFour.label : null,
       readAs: sixFour ? sixFour.readAs : null,
+      // Which key this chord is being read in, and whether it starts an area.
+      // The panel needs both to show where the music changes key.
+      key: localKey,
+      keyName: keyName(localKey),
+      startsArea: areas.length > 1 && areas.some((a) => a.start === i),
       diatonic,
       outside: [...new Set(outside)],
       applied: isApplied(roman) && !roman.includes('♭') && /^(V|vii)/.test(roman),
@@ -179,8 +211,22 @@ export function analyseProgression(progression, keyOverride = null, inversions =
   const observations = []
   const note = (kind, text) => observations.push({ kind, text })
 
+  // --- modulation --------------------------------------------------------------
+  // Named before the cadence, because which key the phrase closes in is the
+  // first thing you need to know once there is more than one.
+  if (areas.length > 1) {
+    const route = areas.map((a) => keyName(a.key)).join(' → ')
+    note('modulation', `It does not stay in one key: ${route}. ${areas.map((a, n) => `${n === 0 ? 'Bars' : 'then'} ${a.start + 1}–${a.end} in ${keyName(a.key)}`).join(', ')}. Each numeral below is read in the key of its own area, which is why the same chord can be a I in one place and a IV in another.`)
+    for (let n = 1; n < areas.length; n++) {
+      const pivot = chords[areas[n].start - 1]
+      const arrival = chords[areas[n].start]
+      note('modulation', `The change at chord ${areas[n].start + 1} turns on ${pivot.symbol}: ${pivot.roman} in ${pivot.keyName}, and ${arrival.symbol} arrives as ${arrival.roman} in ${arrival.keyName}.`)
+    }
+  }
+
   // --- cadence at the end -----------------------------------------------------
-  const ending = cadenceAt(progression, progression.length - 1, key)
+  // Read in the key the phrase actually ends in, not the one it started in.
+  const ending = cadenceAt(progression, progression.length - 1, keyAt(progression.length - 1))
   if (ending) {
     // "a authentic cadence" — two of the nine labels start with a vowel.
     const article = /^[aeiou]/i.test(ending.label) ? 'an' : 'a'
@@ -259,5 +305,5 @@ export function analyseProgression(progression, keyOverride = null, inversions =
   const allDiatonic = chords.every((c) => c.diatonic)
   if (allDiatonic) note('palette', 'Every chord is diatonic — nothing borrowed, nothing applied.')
 
-  return { key, keyName: keyName(key), chords, observations }
+  return { key, keyName: keyName(key), chords, observations, areas }
 }

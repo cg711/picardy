@@ -407,6 +407,49 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## Modulation
+
+`detectKey` returns one key. For anything that moves, that is the wrong shape of answer: a phrase in
+C that modulates to G was read wholly in G, which made its opening tonic a IV and its F natural a
+borrowed ♭VII. Both were stated plainly, so a user checking an ordinary modulation against the app
+was told it contained two mistakes.
+
+`detectKeyAreas` splits a progression into key areas. It is a shortest path rather than a sliding
+window, because the question is global — whether a chord belongs to a new key depends on how long
+the new key lasts, which a window centred on that chord cannot see. Every chord scores against all
+thirty candidate keys using the same `chordKeyScore` that `detectKey` uses, staying is free,
+switching costs, and the best path through is the segmentation.
+
+Three things had to be true and each took a measurement to get right.
+
+**Telling tonicisation from modulation.** The switch cost alone cannot do it: no value separates
+C–A7–Dm–G7–C from a real modulation, because A7–Dm genuinely *is* a V7–i in D minor. What separates
+them is that the music does not stay, so a key area has a minimum length. Three chords, chosen
+conservatively — missing a short modulation leaves the old reading, which is merely incomplete,
+while splitting a tonicisation misreports ordinary harmony, which is worse.
+
+**Agreeing with `detectKey`.** A one-area reading has to name the key `detectKey` names, or the
+panel contradicts the "detected key" banner directly above it. That failed at first because the
+segmenter dropped `detectKey`'s positional weighting, and a key and its relative share all seven
+notes — position is the only thing telling them apart. Ten backing presets came back in the relative
+minor. Restoring the weighting fixed it, but only when scoped to the *progression's* ends: paying it
+at every area's edges makes an extra area earn a fresh pair of bonuses, which is a standing bribe to
+split, and a plain twelve-bar blues came back in three keys. Asserted across all 120 preset/key
+combinations.
+
+**Dominant sevenths as evidence.** Normally a dominant seventh names its key. In a blues it names
+nothing, because every chord is one — the ♭7 is the style's colour, not a tension, which is exactly
+what the twelve-bar lesson argues. Undamped, each tonic seventh read as the dominant of the key a
+fourth above. `dominantEvidenceWeight` measures how ubiquitous they are and discounts the evidence
+accordingly; the measurement separates cleanly, with every preset and test progression at or below
+0.4 and the blues at 1.0. This also fixed a standing bug: `detectKey` used to call a C blues F
+major, and now calls it C major.
+
+A key the user has set is not overruled. When the segmenter finds no modulation the setting stands
+outright, so this changes nothing for progressions that do not modulate — which is most of them.
+The home-key nudge that applies when something *does* modulate is deliberately small: at 0.7 per
+chord it was hiding the modulation from A minor to its relative major.
+
 ## The cadential 6/4
 
 The one chord where the vertical reading and the functional reading disagree, and the only place
@@ -577,7 +620,8 @@ src/
                   so Cb, E#, and Fx come out right
     chords.js     quality table, symbol parser, chord spelling, piano voicings, inversions
     keys.js       scales, roman numerals (incl. applied-dominant and figured-bass notation),
-                  harmonic function, key detection
+                  harmonic function, key detection, and splitting a progression
+                  into key areas where it modulates
     suggest.js    the suggestion engine: generators + context-aware scoring
     generate.js   "Surprise me" — styles, cadence templates, whole-progression walk
     rhythm.js     note durations, time signatures, grouping chords into bars with ties
