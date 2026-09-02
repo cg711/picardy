@@ -897,6 +897,16 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   padding: 0 5px; white-space: nowrap;
 }
 
+/* A chord that decorates rather than structures. Smaller and set back, so the
+   spine of the progression reads first and the decoration reads as decoration —
+   which is the claim the parentheses around its numeral are making. */
+.fn-cell.subordinate {
+  transform: scale(0.9);
+  opacity: 0.78;
+  border-style: dashed;
+}
+.fn-cell.subordinate:hover, .fn-cell.subordinate.on { opacity: 1; }
+
 /* A key change, sitting in the gap between the two chords it happens across.
    Louder than the root-motion labels it replaces, because it reframes every
    numeral after it. */

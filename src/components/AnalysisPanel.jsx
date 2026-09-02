@@ -161,16 +161,19 @@ export default function AnalysisPanel({
               )}
               <button
                 role="listitem"
-                className={`fn-cell fn-${c.fn}${i === focused ? ' on' : ''}${c.diatonic ? '' : ' chromatic'}`}
+                className={`fn-cell fn-${c.fn}${i === focused ? ' on' : ''}${c.diatonic ? '' : ' chromatic'}${c.contrapuntal ? ' subordinate' : ''}`}
                 onClick={() => onSelect(i)}
-                title={`${c.symbol} — ${c.sixFour ? `${c.sixFour}, read as ${c.readAs}` : FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
+                title={`${c.symbol} — ${c.contrapuntal ? `${c.contrapuntal}, decorating ${analysis.chords[i - 1]?.roman ?? 'the chord before it'}` : c.sixFour ? `${c.sixFour}, read as ${c.readAs}` : FN_LABEL[c.fn]}${c.diatonic ? '' : `, chromatic (${c.outside.join(', ')})`}`}
               >
                 {/* A cadential 6/4 spells a tonic and works as a dominant, so
                     the cell shows both readings rather than picking one: the
                     literal numeral, and what it is doing underneath. */}
-                <span className="fn-roman">{c.roman}</span>
+                <span className="fn-roman">{c.shownRoman ?? c.roman}</span>
                 <span className="fn-sym">{c.symbol}</span>
                 {c.readAs && <span className="fn-readas">{c.readAs}</span>}
+                {c.contrapuntal && (
+                  <span className="fn-readas">{c.contrapuntal.replace(' chord', '')}</span>
+                )}
                 {cadences[i] && (
                   <span className="fn-cadence" title={cadences[i].label}>
                     {cadences[i].label.replace(/ cadence$/, '')}

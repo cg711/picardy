@@ -407,6 +407,36 @@ have broken all of them, so `legacyToolPath()` forwards a state fragment arrivin
 to `/tool`, carrying the hash, with `replaceState` — no round trip and no back-history entry. It is
 pure and lives in `routes.js` so the check suite holds it to that promise.
 
+## Chords that are not harmonies
+
+The central claim of Aldwell & Schachter, and the one thing the engine had no vocabulary for: some
+chords carry the structure and some decorate it. A VII6 between I and I6 is not a third harmony in a
+three-chord progression — it is a passing chord inside one prolonged tonic. Picardy used to give it
+a roman numeral, a harmonic function and a place in the root-motion count, all with exactly the same
+weight as the tonic it was decorating.
+
+`contrapuntalRole` names two cases, both decidable from the bass alone:
+
+- **passing** — the bass walks by step in one direction and lands back on the same harmony it left,
+  in a different position: I–(VII6)–I6.
+- **neighbour / pedal** — the harmony either side is identical and the bass steps away and back, or
+  holds while the upper voices move: I–(IV 6/4)–I.
+
+Two constraints keep it honest. A chord standing on its own **root** is claiming to be a harmony and
+mostly is — C–Dm–C is I–ii–I, not a tonic with a neighbour inside it — so a contrapuntal chord has
+to be an inversion, which is true of every one the book names, and is what sitting over a borrowed
+bass means. And a cadential 6/4 is excluded, because it is already being read as something other
+than what it spells and two answers to one question is worse than one.
+
+Everything else the book calls contrapuntal needs judgement the engine cannot defend: an apparent
+tonic between IV and V depends on where the soprano is and which beat it lands on. Those are left
+alone rather than guessed at.
+
+The numeral is shown in parentheses, which is the book's own notation for the claim, and the panel
+draws the chord smaller and set back so the spine reads first. The analysis also states the
+structural progression with the decoration removed. Verified to fire on none of the 120 backing
+preset/key combinations — the risk here is not missing a passing chord, it is demoting a real one.
+
 ## Modulation
 
 `detectKey` returns one key. For anything that moves, that is the wrong shape of answer: a phrase in

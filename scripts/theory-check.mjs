@@ -18,7 +18,7 @@ const { transposeChord, transposeKey, keyPrefersFlats } = await import(B + 'theo
 const { optimiseInversions, progressionMovement } = await import(B + 'theory/voicelead.js')
 const { scalesForChord, guideTones, commonTones } = await import(B + 'theory/scales.js')
 const { reharmonise } = await import(B + 'theory/reharm.js')
-const { analyseProgression, cadenceAt } = await import(B + 'theory/analyze.js')
+const { analyseProgression, cadenceAt, contrapuntalRole } = await import(B + 'theory/analyze.js')
 const { makeQuestion, makeRng, LEVELS: EX_LEVELS, checkNote, positionsFor } = await import(B + 'theory/exercises.js')
 const { intervalBetween, INTERVALS } = await import(B + 'theory/intervals.js')
 const { classifyNote, chordAtBeat, normaliseMelody } = await import(B + 'theory/melody.js')
@@ -1406,6 +1406,62 @@ console.log('\n--- lessons ---')
 // modulation — it reports the opening as a string of errors. The hard part is
 // not finding key changes, it is refusing to find them where a single applied
 // dominant fits another key better for one chord.
+// Some chords carry the structure and some decorate it. The risk here is not
+// missing one, it is claiming an ordinary harmony is decoration — so the
+// negative cases outnumber the positive ones.
+console.log('\n--- contrapuntal chords ---')
+{
+  const chords = (chart) => parseChart(chart).chords
+  const roleOf = (chart, invs, i = 1) => {
+    const r = contrapuntalRole(chords(chart), i, invs)
+    return r ? r.label : null
+  }
+
+  eq('  I–VII6–I6: the VII6 is passing', roleOf('| C | Bdim | C |', [0, 1, 1]), 'passing chord')
+  eq('  I–V 4/3–I6: likewise', roleOf('| C | G7 | C |', [0, 2, 1]), 'passing chord')
+  eq('  and descending, I6–V 4/3–I', roleOf('| C | G7 | C |', [1, 2, 0]), 'passing chord')
+  eq('  I–IV 6/4–I is a pedal', roleOf('| C | F | C |', [0, 2, 0]), 'pedal chord')
+  eq('  V–I 6/4–V is a pedal', roleOf('| G | C | G |', [0, 2, 0]), 'pedal chord')
+
+  // Everything that must NOT be called decoration.
+  eq('  a plain I–IV–V is three harmonies', roleOf('| C | F | G |', [0, 0, 0]), null)
+  eq('  ii–V–I is three harmonies', roleOf('| Dm | G7 | C |', [0, 0, 0]), null)
+  eq('  I–ii–I in root position is not a neighbour', roleOf('| C | Dm | C |', [0, 0, 0]), null)
+  eq('  I–♭VII–I in root position is not a neighbour', roleOf('| C | Bb | C |', [0, 0, 0]), null)
+  eq('  a bass that leaps is not passing', roleOf('| C | G | C |', [0, 0, 0]), null)
+  eq('  different harmonies either side is not passing', roleOf('| C | G | Am |', [0, 1, 0]), null)
+  eq('  with no inversions nothing is claimed', roleOf('| C | Bdim | C |', null), null)
+  // The first and last chord have nothing on one side of them.
+  eq('  the first chord is never contrapuntal', roleOf('| C | Bdim | C |', [0, 1, 1], 0), null)
+  eq('  the last chord is never contrapuntal', roleOf('| C | Bdim | C |', [0, 1, 1], 2), null)
+
+  // A cadential 6/4 is already read as something other than what it spells;
+  // it must not also be called a pedal.
+  const cad = analyseProgression(chords('| C | G | C |'), makeKey('C', 'major'), [2, 0, 0])
+  eq('  a cadential 6/4 is not also called contrapuntal', cad.chords[0].contrapuntal, null)
+
+  // The notation, and the spine underneath it.
+  const passing = analyseProgression(chords('| C | Bdim | C |'), makeKey('C', 'major'), [0, 1, 1])
+  eq('  the numeral is parenthesised', passing.chords[1].shownRoman, '(vii° 6)')
+  eq('  …and the structural chords are not', passing.chords[0].shownRoman, 'I')
+  eq('  it is marked subordinate', passing.chords[1].structural, false)
+  eq('  …and it is explained', passing.observations.some((o) => o.kind === 'counterpoint'), true)
+  eq('  …with the underlying progression named', passing.observations.some((o) => /Underneath, the progression is I–I 6/.test(o.text)), true)
+
+  // How often does this fire where it should not? Every backing preset in every
+  // key, all root position: the answer has to be never.
+  let falsePositives = 0
+  for (const preset of BACKINGS) {
+    for (const tonic of BACKING_KEYS) {
+      const built = buildBacking(preset, tonic)
+      if (!built) continue
+      const a = analyseProgression(built.progression, built.key, built.inversions)
+      falsePositives += a.chords.filter((c) => c.contrapuntal).length
+    }
+  }
+  eq('  no chord in any backing preset is called decoration', falsePositives, 0)
+}
+
 console.log('\n--- modulation ---')
 {
   const chords = (chart) => parseChart(chart).chords

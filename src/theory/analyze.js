@@ -1,7 +1,7 @@
 // Reading a progression back: what the chords are doing, and where.
 
 import { mod, pcOf, prettyName } from './notes.js'
-import { QUALITIES, chordSymbol, chordNotes, inversionCount } from './chords.js'
+import { QUALITIES, chordSymbol, chordNotes, inversionCount, bassOf } from './chords.js'
 import { romanNumeral, harmonicFunction, isDiatonic, detectKey, detectKeyAreas, keyName, scalePcs } from './keys.js'
 
 /**
@@ -126,6 +126,81 @@ export function cadentialSixFour(progression, index, key, inversions) {
   }
 }
 
+/**
+ * Chords that are consequences of voice leading rather than harmonies.
+ *
+ * The central claim of Aldwell & Schachter, and the one thing this engine had
+ * no vocabulary for at all: some chords carry the structure and some decorate
+ * it. A VII6 between I and I6 is not a third harmony in a three-chord
+ * progression — it is a passing chord inside one prolonged tonic, and the book
+ * writes it in parentheses to say so.
+ *
+ * Two cases only, both decidable from the bass alone:
+ *
+ *   passing    — the bass walks by step in one direction and lands back on the
+ *                same harmony it left, in a different position. I–(VII6)–I6.
+ *   neighbour  — the harmony either side is identical, and the bass steps away
+ *                and back, or holds while the upper voices move. I–(IV 6/4)–I.
+ *
+ * Everything else the book calls contrapuntal needs judgement this engine
+ * cannot defend — an apparent tonic between IV and V depends on where the
+ * soprano is and which beat it falls on. Picardy's rule is that it only says
+ * what it can justify, so those are left alone rather than guessed at, and a
+ * chord this returns null for is simply a chord like any other.
+ */
+export function contrapuntalRole(progression, index, inversions) {
+  if (!inversions) return null
+  const prev = progression[index - 1]
+  const chord = progression[index]
+  const next = progression[index + 1]
+  if (!prev || !chord || !next) return null
+
+  const bassPc = (c, i) => {
+    const b = bassOf(c, inversions[i] ?? 0)
+    return b.note ? pcOf(b.note) : null
+  }
+  // A chord standing on its own root is claiming to be a harmony, and mostly
+  // is: C–Dm–C is I–ii–I, not a tonic with a neighbour inside it. Every
+  // contrapuntal chord the book names is an inversion — VII6, V 4/3, IV 6/4 —
+  // because sitting over a bass borrowed from the harmony it decorates is what
+  // makes it subordinate. Without this the detector relabelled ordinary
+  // root-position progressions.
+  if ((inversions[index] ?? 0) === 0) return null
+
+  const b0 = bassPc(prev, index - 1)
+  const b1 = bassPc(chord, index)
+  const b2 = bassPc(next, index + 1)
+  if (b0 === null || b1 === null || b2 === null) return null
+
+  // Signed motion in semitones, counting only steps — a leap is not this.
+  const step = (from, to) => {
+    const up = mod(to - from, 12)
+    if (up === 1 || up === 2) return up
+    if (up === 10 || up === 11) return up - 12
+    return up === 0 ? 0 : null
+  }
+  const d1 = step(b0, b1)
+  const d2 = step(b1, b2)
+  if (d1 === null || d2 === null) return null
+
+  const sameHarmony = pcOf(prev.root) === pcOf(next.root) && prev.qualityId === next.qualityId
+
+  // Passing: through in one direction, from one position of a harmony to
+  // another. Both steps must actually move, or nothing is being passed through.
+  if (sameHarmony && d1 !== 0 && d2 !== 0 && Math.sign(d1) === Math.sign(d2) && b0 !== b2) {
+    return { role: 'passing', label: 'passing chord', of: prev }
+  }
+
+  // Neighbour: away and back to exactly where it started, or a bass that holds
+  // while the chord above it changes and returns.
+  const samePosition = sameHarmony && (inversions[index - 1] ?? 0) === (inversions[index + 1] ?? 0)
+  if (samePosition && b0 === b2 && (d2 === -d1)) {
+    return { role: 'neighbour', label: d1 === 0 ? 'pedal chord' : 'neighbour chord', of: prev }
+  }
+
+  return null
+}
+
 /** The cadence formed by the last two chords, if any. */
 export function cadenceAt(progression, index, key) {
   const a = progression[index - 1]
@@ -187,6 +262,10 @@ export function analyseProgression(progression, keyOverride = null, inversions =
     // said "I" while the chip beside it said "I 6/4".
     const roman = romanNumeral(chord, localKey, inversions?.[i] ?? 0)
     const sixFour = cadentialSixFour(progression, i, localKey, inversions)
+    // A cadential 6/4 is already being read as something other than what it
+    // spells, and calling it a passing chord as well would be two answers to
+    // one question.
+    const contrapuntal = sixFour ? null : contrapuntalRole(progression, i, inversions)
     return {
       index: i,
       symbol: chordSymbol(chord),
@@ -197,6 +276,12 @@ export function analyseProgression(progression, keyOverride = null, inversions =
       fn: sixFour ? 'D' : harmonicFunction(chord, localKey),
       sixFour: sixFour ? sixFour.label : null,
       readAs: sixFour ? sixFour.readAs : null,
+      // Structural or subordinate. The book writes a contrapuntal chord's
+      // numeral in parentheses, so this does too — it is the established
+      // notation for exactly this claim.
+      contrapuntal: contrapuntal ? contrapuntal.label : null,
+      structural: !contrapuntal,
+      shownRoman: contrapuntal ? `(${roman})` : roman,
       // Which key this chord is being read in, and whether it starts an area.
       // The panel needs both to show where the music changes key.
       key: localKey,
@@ -241,6 +326,21 @@ export function analyseProgression(progression, keyOverride = null, inversions =
   for (const c of chords.filter((c) => c.sixFour)) {
     const next = chords[c.index + 1]
     note('six-four', `${c.symbol} at ${c.roman} is a ${c.sixFour} — read it as ${c.readAs}, an ornamented ${next.roman}, rather than as a tonic. The bass is already on the dominant and stays there; the 6th and 4th above it are dissonances that fall to the 5th and 3rd.`)
+  }
+
+  // --- contrapuntal chords -----------------------------------------------------
+  // Worth saying out loud, because it changes what the progression *is*: three
+  // chords with a passing chord in the middle are one harmony, not three.
+  const decorative = chords.filter((c) => c.contrapuntal)
+  if (decorative.length) {
+    for (const c of decorative) {
+      const around = chords[c.index - 1]
+      note('counterpoint', `${c.symbol} is a ${c.contrapuntal}, not a harmony of its own — the bass ${c.contrapuntal === 'pedal chord' ? 'holds' : 'steps'} through it and ${around.roman} is still in force either side. Written ${c.shownRoman} in parentheses, the way an analysis marks a chord that decorates rather than structures.`)
+    }
+    const spine = chords.filter((c) => c.structural).map((c) => c.roman)
+    if (spine.length >= 2 && spine.length < chords.length) {
+      note('counterpoint', `Underneath, the progression is ${spine.join('–')}.`)
+    }
   }
 
   // --- ii-V pairs --------------------------------------------------------------
