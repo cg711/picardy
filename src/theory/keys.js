@@ -1,6 +1,6 @@
 // Keys, scales, and roman-numeral analysis.
 
-import { mod, pcOf, spellFrom, noteName, prettyName, parseNote, normAcc } from './notes.js'
+import { mod, pcOf, spellFrom, noteName, prettyName, parseNote, normAcc, pcName, LETTERS } from './notes.js'
 import { QUALITIES, chordNotes } from './chords.js'
 
 export const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11]
@@ -544,6 +544,37 @@ export function detectKeyAreas(progression, homeKey = null, { switchCost = KEY_S
     at = j
   }
   return areas
+}
+
+/**
+ * Spell a bare MIDI number as a note in a key.
+ *
+ * Melody notes are stored as pitch numbers, which is the one place in this app
+ * where spelling has been thrown away — fine while the roll only had to colour
+ * them, and not fine the moment they have to be written down. A diatonic pitch
+ * takes the key's own spelling of that degree, so in D♭ major the fourth degree
+ * is G♭ and never F♯. A chromatic one is written as an alteration of whichever
+ * neighbouring degree the key's own accidentals point at: sharps raise the
+ * degree below, flats lower the degree above.
+ */
+export function spellPitchInKey(midi, key) {
+  const pc = mod(midi, 12)
+  const scale = scaleNotes(key)
+
+  let note = scale.find((n) => pcOf(n) === pc)
+  if (!note) {
+    const flats = prefersFlats(key)
+    // The degree a half step away in the direction the key leans.
+    const neighbour = scale.find((n) => pcOf(n) === mod(pc + (flats ? 1 : -1), 12))
+    note = neighbour
+      ? { letter: neighbour.letter, acc: normAcc(neighbour.acc + (flats ? -1 : 1)) }
+      : { letter: LETTERS.indexOf(pcName(pc, flats)[0]), acc: pcName(pc, flats).length > 1 ? (flats ? -1 : 1) : 0 }
+  }
+
+  // The octave belongs to the letter, not the sounding pitch: B♯ sounding at
+  // middle C is B♯3, not B♯4, and C♭ sounding a semitone below is C♭4.
+  const octave = Math.floor((midi - note.acc) / 12) - 1
+  return { note, octave }
 }
 
 export function keySignatureAccidentals(key) {

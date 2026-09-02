@@ -18,6 +18,7 @@ import { identifyChord } from './theory/identify.js'
 import { playChord, playProgression, stopPlayback, setVolume, resumeAudio } from './audio/synth.js'
 import { isBand } from './audio/styles.js'
 import { buildMidi, songToEvents, progressionToEvents, downloadMidi } from './lib/midi.js'
+import { buildMusicXml, progressionToParts, downloadMusicXml } from './lib/musicxml.js'
 import {
   decodeState, encodeState, writeHash, shareUrl, loadHistory, saveToHistory, clearHistory, historyToState,
   loadPrefs, savePref,
@@ -836,6 +837,43 @@ export default function App() {
     downloadMidi(bytes, name)
   }
 
+  /**
+   * The same chart, in the format that keeps its spelling.
+   *
+   * Unlike the MIDI export this hands over chords rather than voicings: the
+   * whole reason for the format is that a root, a quality and an accidental
+   * survive the trip, and voicing them into pitch numbers first would throw
+   * away exactly what is being preserved.
+   */
+  const exportMusicXml = (scope = { kind: 'song' }) => {
+    const entries = entriesFor(scope)
+    const fromSong = entries.length > 0
+    const flat = fromSong ? flattenSong(entries, segments) : null
+    const parts = flat
+      ? flat.map((item) => ({
+        chord: item.chord,
+        inversion: item.inversion,
+        beats: toBeats(item.durationId),
+        sectionName: item.indexInSegment === 0 ? item.segmentName : null,
+      }))
+      : progressionToParts(progression, inversions, durations)
+    if (!parts.length) return
+    const line = fromSong ? flattenMelody(entries, segments) : melody
+    const name = nameFor(scope)
+    // A song's sections can be in different keys; the score gets one signature,
+    // so the first section's key is the one written and the rest are spelled
+    // against it. Their chord symbols are unaffected — those carry their own
+    // accidentals.
+    const text = buildMusicXml(parts, {
+      key: flat?.[0]?.key ?? musicKey,
+      timeSignature: flat?.[0]?.timeSignature ?? timeSignature,
+      bpm,
+      title: name,
+      melody: includeMelody ? line : [],
+    })
+    if (text) downloadMusicXml(text, name)
+  }
+
   const loadChart = (parsed, detectedKey) => {
     stopEverything()
     if (detectedKey) setMusicKey(detectedKey)
@@ -1213,6 +1251,7 @@ export default function App() {
                 backingHrefFor={backingHrefFor}
                 onExportPdf={(scope) => setExporting(scope)}
                 onExportMidi={exportMidi}
+                onExportMusicXml={exportMusicXml}
               />
             )}
 

@@ -28,6 +28,7 @@ export default function ExportPanel({
   backingHrefFor,
   onExportPdf,
   onExportMidi,
+  onExportMusicXml,
 }) {
   const byId = new Map(segments.map((s) => [s.id, s]))
 
@@ -58,6 +59,7 @@ export default function ExportPanel({
         <a className="btn ghost tiny" href={backingHrefFor(scope)}>Backing track</a>
         <button className="btn ghost tiny" onClick={() => onExportPdf(scope)}>PDF chart</button>
         <button className="btn ghost tiny" onClick={() => onExportMidi(scope)}>MIDI</button>
+        <button className="btn ghost tiny" onClick={() => onExportMusicXml(scope)}>MusicXML</button>
       </div>
     </div>
   )

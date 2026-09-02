@@ -110,6 +110,24 @@ tick — decides whether a run is over. Browsers throttle timers in a hidden tab
 stops being a clock the moment you switch away: in testing it froze at 0.2s and the run never
 ended, which would also have meant backgrounding the tab bought unlimited answering time.
 
+**MusicXML export.** The format that keeps the spelling. MIDI cannot: a German sixth and a ♭VI7 are
+the same bytes in a `.mid`, and `C7♯9`'s D♯ arrives as an E♭. MusicXML carries step, alter and
+octave separately — the same shape the chord model has used all along — so a chart opened in
+MuseScore, Sibelius or Dorico is spelled the way Picardy decided rather than however the importer
+guesses.
+
+Chord symbols go out as `<harmony>` with the real root and alteration, and every one carries the
+app's own symbol as display text, so an augmented sixth still reads `A♭+6(Ger)` even though
+MusicXML has no kind for one. Roman numerals go below the staff, section names become rehearsal
+marks, and the melody is notated — spelled *in the key*, which is where `spellPitchInKey` comes in:
+melody notes are stored as bare pitch numbers, the one place in the app where spelling had been
+thrown away.
+
+Written by hand like the MIDI writer, and checked for the two things importers actually reject:
+malformed XML, and measures whose durations do not add up. That second one is asserted for 3/4, 5/4,
+7/8 and 6/8 as well as 4/4, and for ragged progressions that do not fill their last bar. Notes
+crossing a bar line are split and tied rather than overflowing.
+
 **MIDI export.** A Format 1 `.mid` file — tempo, metre, per-chord durations, voiced chords, and a
 marker at each section so a DAW shows the arrangement on its ruler. Written byte by byte with no
 dependency.

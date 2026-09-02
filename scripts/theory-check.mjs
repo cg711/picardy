@@ -34,6 +34,7 @@ const { BACKINGS, BACKING_KEYS, buildBacking } = await import(B + 'lib/backings.
 const { STYLES, barFor, swingBeat, isCompound, pulseOf } = await import(B + 'audio/styles.js')
 const { DRUM_VOICES } = await import(B + 'audio/drums.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
+const { buildMusicXml, progressionToParts, fifthsFor } = await import(B + 'lib/musicxml.js')
 const { readFile } = await import('node:fs/promises')
 
 let fails = 0
@@ -1735,6 +1736,102 @@ console.log('\n--- modulation ---')
   for (const [want, what, chart, key] of withKey) {
     eq(`  with the user's key set, ${what}`, analyseProgression(chords(chart), key).areas.length, want)
   }
+}
+
+// The export that keeps the spelling. MIDI cannot: a German sixth and a ♭VI7
+// are the same bytes. MusicXML carries step, alter and octave, so the checks
+// here are about the two things an importer actually rejects — measures whose
+// durations do not add up, and malformed XML.
+console.log('\n--- MusicXML ---')
+{
+  const C = makeKey('C', 'major')
+  const chords = (chart) => parseChart(chart).chords
+  const build = (chart, opts = {}) => {
+    const prog = chords(chart)
+    return buildMusicXml(
+      progressionToParts(prog, prog.map(() => 0), opts.durations ?? prog.map(() => 4)),
+      { key: C, timeSignature: '4/4', bpm: 96, title: 'Test', ...opts },
+    )
+  }
+
+  const xml = build('| Cmaj7 | Am7 | Dm7 | G7 |')
+
+  // Tags must balance. A hand-written generator is exactly where they do not.
+  const balanced = (text) => {
+    const stack = []
+    const tag = /<(\/?)([A-Za-z][\w-]*)([^>]*?)(\/?)>/g
+    let m
+    while ((m = tag.exec(text))) {
+      const [, closing, name, attrs, selfClose] = m
+      if (attrs.startsWith('?') || name === 'xml') continue
+      if (selfClose === '/') continue
+      if (closing) {
+        if (stack.pop() !== name) return false
+      } else {
+        stack.push(name)
+      }
+    }
+    return stack.length === 0
+  }
+  eq('  the document is balanced', balanced(xml.replace(/<\?xml[^>]*\?>|<!DOCTYPE[^>]*>/g, '')), true)
+  eq('  it declares itself as MusicXML', /<score-partwise version="4\.0">/.test(xml), true)
+
+  // The one thing importers refuse outright: a measure that does not add up.
+  const measureSums = (text, perBar = 4, divisions = 96) => {
+    const bad = []
+    const measures = text.match(/<measure number="\d+">[\s\S]*?<\/measure>/g) ?? []
+    measures.forEach((mm, i) => {
+      const total = [...mm.matchAll(/<duration>(\d+)<\/duration>/g)]
+        .reduce((sum, d) => sum + Number(d[1]), 0)
+      if (total !== perBar * divisions) bad.push(`${i + 1}:${total}`)
+    })
+    return { count: measures.length, bad }
+  }
+  const sums = measureSums(xml)
+  eq('  four chords of four beats make four bars', sums.count, 4)
+  eq('  every measure adds up to a full bar', sums.bad.join(','), '')
+
+  // Spelling is the whole point. C7♯9 has a D♯ in it and must not be respelled.
+  const sharp9 = build('| C7#9 |')
+  eq('  a chord keeps its own symbol as display text', /<kind text="C7♯9"/.test(sharp9), true)
+  const ger = buildMusicXml(
+    progressionToParts([parseChord('Abger6')], [0], [4]),
+    { key: makeKey('C', 'minor'), timeSignature: '4/4' },
+  )
+  eq('  an augmented sixth survives as text even with no MusicXML kind for it',
+    /<kind text="A♭\+6\(Ger\)">other<\/kind>/.test(ger), true)
+
+  // A melody note is stored as a bare pitch number, so it has to be spelled on
+  // the way out — and spelled in the key, not with a default sharp.
+  const flat = buildMusicXml(
+    progressionToParts([parseChord('Db')], [0], [4]),
+    { key: makeKey('Db', 'major'), timeSignature: '4/4', melody: [{ at: 0, beats: 4, midi: 66 }] },
+  )
+  eq('  a melody note is spelled in its key', /<step>G<\/step>\s*<alter>-1<\/alter>/.test(flat), true)
+  eq('  …and the key signature says five flats', /<fifths>-5<\/fifths>/.test(flat), true)
+
+  // A note crossing a bar line is split and tied rather than overflowing.
+  const tied = build('| C | Am | Dm | G7 |', { melody: [{ at: 2, beats: 4, midi: 60 }] })
+  eq('  a note across a bar line is tied, not overflowed', /<tie type="start"\/>/.test(tied) && /<tie type="stop"\/>/.test(tied), true)
+  eq('  …and the bars still add up', measureSums(tied).bad.join(','), '')
+
+  // Odd metres and odd lengths are where an exporter that assumes 4/4 falls over.
+  for (const [tsId, per] of [['3/4', 3], ['5/4', 5], ['7/8', 3.5], ['6/8', 3]]) {
+    const odd = buildMusicXml(
+      progressionToParts(chords('| C | F | G | C |'), [0, 0, 0, 0], [per, per, per, per]),
+      { key: C, timeSignature: tsId },
+    )
+    const s = measureSums(odd, per)
+    eq(`  ${tsId} bars add up`, s.bad.join(','), '')
+  }
+  // A chord that does not fill a bar leaves the measure short unless it is padded.
+  const ragged = buildMusicXml(
+    progressionToParts(chords('| C | F |'), [0, 0], [3, 2]),
+    { key: C, timeSignature: '4/4' },
+  )
+  eq('  a ragged progression still writes full measures', measureSums(ragged).bad.join(','), '')
+
+  eq('  nothing to export returns nothing', buildMusicXml([], { key: C }), null)
 }
 
 console.log('\n--- routes ---')
