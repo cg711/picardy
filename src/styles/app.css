@@ -2274,3 +2274,13 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .capo-advice strong { color: var(--accent); font-weight: 600; }
 .capo-shapes { color: var(--ink); }
+
+/* The engraved staff. VexFlow draws its own SVG; this only has to give it room
+   and keep its ink on the app's palette. */
+.staff-view { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 2px; }
+.staff-host { overflow-x: auto; }
+.staff-host svg { max-width: none; }
+/* VexFlow paints black by default, which is invisible on a dark ground. */
+.staff-host svg path, .staff-host svg rect { fill: var(--ink); stroke: var(--ink); }
+.staff-host svg text { fill: var(--ink); }
+.staff-error { color: var(--danger); }

@@ -57,6 +57,24 @@ song can modulate: a chorus a minor third up from the verse keeps its own roman 
 sections into a song with repeat counts, reorder them, and play the whole thing end to end. The
 instruments follow along and the numerals switch key as each section arrives.
 
+**The staff.** The progression engraved, with the melody on it, chord symbols above and numerals
+below. The one part of this app that is not drawn by hand, deliberately: the fretboard, the piano
+and the melody roll are diagrams with a handful of primitives and no typographic tradition to fall
+short of, and music engraving has four hundred years of one. A hand-rolled clef, beam and accidental
+stack announces itself immediately as not quite right.
+
+VexFlow does the drawing, loaded on demand exactly as jsPDF is, so it lands in its own chunk and
+the studio stays as light as it was for everyone who never opens the tab. What is *not* delegated is
+any musical decision. Where the bar lines fall, which notes tie across them, how a pitch is spelled
+and what the chord above it is called all come from the engine — `layOutMeasures` in
+`src/lib/leadsheet.js`, the same function the MusicXML export uses, extracted from it precisely so
+the printed part and the screen cannot disagree. VexFlow is asked only to draw what it is given, and
+accidentals are stated explicitly rather than inferred, because the app already knows.
+
+Bars are fitted to the panel and wrapped rather than scrolled: a staff you have to drag sideways is
+one you cannot read while playing. A `ResizeObserver` re-engraves when the width changes, since how
+many bars fit on a line is a layout decision and not a fixed one.
+
 **PDF chart.** One click produces a lead sheet: chords laid out in bars with roman numerals
 underneath, tied continuations bracketed where a chord crosses a bar line, and a legend of
 fingering diagrams for every distinct chord. Choose guitar, piano, both, or symbols only at export
@@ -863,6 +881,7 @@ src/
     ExercisesPage.jsx  the drill page at /exercises
     LessonsPage.jsx    the lesson index and reader at /lessons
   lib/            URL/share encoding, colour tokens, segment + song model,
+                  lead-sheet measure layout shared by the staff and MusicXML,
                   ready-made backing tracks (backings.js),
                   PDF export, MIDI writer, chart text import,
                   Web MIDI input (midiInput.js)

@@ -14,7 +14,8 @@
 import { chordNotes, chordSymbol } from '../theory/chords.js'
 import { scaleNotes, spellPitchInKey, romanNumeral } from '../theory/keys.js'
 import { pcOf, LETTERS } from '../theory/notes.js'
-import { toBeats, timeSignatureOf } from '../theory/rhythm.js'
+import { timeSignatureOf, toBeats } from '../theory/rhythm.js'
+import { layOutMeasures, figureFor } from './leadsheet.js'
 
 /** Ticks per quarter note. Divides thirds, halves and sixteenths exactly. */
 const DIVISIONS = 96
@@ -60,23 +61,6 @@ const KINDS = {
   maj13: 'major-13th',
   m13: 'minor-13th',
   sevenAlt: 'dominant',
-}
-
-/** Note values, longest first, so the closest match is found by scanning. */
-const FIGURES = [
-  [4, 'whole', 0], [3, 'half', 1], [2, 'half', 0], [1.5, 'quarter', 1],
-  [1, 'quarter', 0], [0.75, 'eighth', 1], [0.5, 'eighth', 0],
-  [0.375, '16th', 1], [0.25, '16th', 0], [0.125, '32nd', 0],
-]
-
-function figureFor(beats) {
-  let best = FIGURES[FIGURES.length - 1]
-  let gap = Infinity
-  for (const f of FIGURES) {
-    const d = Math.abs(f[0] - beats)
-    if (d < gap) { gap = d; best = f }
-  }
-  return { type: best[1], dots: best[2] }
 }
 
 const esc = (s) => String(s ?? '')
@@ -148,22 +132,11 @@ export function buildMusicXml(parts, {
   if (!parts?.length || !key) return null
 
   const ts = timeSignatureOf(timeSignature)
-  const perBar = ts.beatsPerBar
-
-  // Chord spans along one timeline.
-  const spans = []
-  let at = 0
-  for (const part of parts) {
-    const beats = Math.max(0.0625, toBeats(part.beats))
-    spans.push({ ...part, start: at, end: at + beats })
-    at += beats
-  }
-  const total = at
-  const barCount = Math.max(1, Math.ceil(total / perBar - 1e-9))
-
-  const line = [...(melody ?? [])]
-    .filter((n) => Number.isFinite(n?.at) && Number.isFinite(n?.midi) && n.beats > 0)
-    .sort((a, b) => a.at - b.at)
+  // Where the bar lines and the ties fall is decided once, in leadsheet.js, and
+  // the staff view reads the same answer. Two renderers each working it out for
+  // themselves would drift, and the drift would only show up when somebody
+  // compared a printed part against the screen.
+  const measures = layOutMeasures(parts, { timeSignature, melody })
 
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -184,15 +157,12 @@ export function buildMusicXml(parts, {
     '  </part-list>',
     '  <part id="P1">',
   ]
-
   let lastSection = null
 
-  for (let bar = 0; bar < barCount; bar++) {
-    const barStart = bar * perBar
-    const barEnd = barStart + perBar
-    xml.push(`    <measure number="${bar + 1}">`)
+  for (const measure of measures) {
+    xml.push(`    <measure number="${measure.index + 1}">`)
 
-    if (bar === 0) {
+    if (measure.index === 0) {
       xml.push(
         '      <attributes>',
         `        <divisions>${DIVISIONS}</divisions>`,
@@ -223,60 +193,35 @@ export function buildMusicXml(parts, {
 
     // A section change is a rehearsal mark, the same information the MIDI
     // export writes as a marker.
-    const opening = spans.find((s) => s.start >= barStart - 1e-9 && s.start < barEnd - 1e-9 && s.sectionName)
-    if (opening && opening.sectionName !== lastSection) {
-      lastSection = opening.sectionName
+    if (measure.sectionName && measure.sectionName !== lastSection) {
+      lastSection = measure.sectionName
       xml.push(
         '      <direction placement="above">',
         '        <direction-type>',
-        `          <rehearsal>${esc(opening.sectionName)}</rehearsal>`,
+        `          <rehearsal>${esc(measure.sectionName)}</rehearsal>`,
         '        </direction-type>',
         '      </direction>',
       )
     }
 
-    // Every point in this bar where something starts or stops. Splitting the
-    // melody at chord changes as well as at bar lines means a harmony never has
-    // to be attached partway through a note, which keeps the file simple and
-    // costs only a tie.
-    const cuts = new Set([barStart, Math.min(barEnd, Math.max(total, barEnd))])
-    cuts.add(barEnd)
-    for (const s of spans) {
-      if (s.start > barStart && s.start < barEnd) cuts.add(s.start)
-      if (s.end > barStart && s.end < barEnd) cuts.add(s.end)
-    }
-    for (const n of line) {
-      const end = n.at + n.beats
-      if (n.at > barStart && n.at < barEnd) cuts.add(n.at)
-      if (end > barStart && end < barEnd) cuts.add(end)
-    }
-    const points = [...cuts].filter((p) => p >= barStart && p <= barEnd).sort((a, b) => a - b)
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const from = points[i]
-      const to = points[i + 1]
-      const beats = to - from
-      if (beats <= 1e-9) continue
-
-      const startingHere = spans.find((s) => Math.abs(s.start - from) < 1e-9)
-      if (startingHere) {
-        xml.push(...harmonyXml(startingHere.chord, key, '      '))
+    for (const slot of measure.slots) {
+      if (slot.chord) {
+        xml.push(...harmonyXml(slot.chord, key, '      '))
         if (romanNumerals) {
           xml.push(
             '      <direction placement="below">',
             '        <direction-type>',
-            `          <words>${esc(romanNumeral(startingHere.chord, key, startingHere.inversion ?? 0))}</words>`,
+            `          <words>${esc(romanNumeral(slot.chord, key, slot.inversion))}</words>`,
             '        </direction-type>',
             '      </direction>',
           )
         }
       }
 
-      const note = line.find((n) => n.at <= from + 1e-9 && n.at + n.beats >= to - 1e-9)
-      const { type, dots } = figureFor(beats)
-      const duration = Math.max(1, Math.round(beats * DIVISIONS))
+      const { type, dots } = figureFor(slot.beats)
+      const duration = Math.max(1, Math.round(slot.beats * DIVISIONS))
 
-      if (!note) {
+      if (slot.midi == null) {
         xml.push(
           '      <note>',
           '        <rest/>',
@@ -288,21 +233,19 @@ export function buildMusicXml(parts, {
         continue
       }
 
-      const { note: spelled, octave } = spellPitchInKey(note.midi, key)
-      const tieStart = note.at + note.beats > to + 1e-9
-      const tieStop = note.at < from - 1e-9
+      const { note: spelled, octave } = spellPitchInKey(slot.midi, key)
       xml.push(
         '      <note>',
         ...pitchXml(spelled, octave, '        '),
         `        <duration>${duration}</duration>`,
-        ...(tieStop ? ['        <tie type="stop"/>'] : []),
-        ...(tieStart ? ['        <tie type="start"/>'] : []),
+        ...(slot.tieStop ? ['        <tie type="stop"/>'] : []),
+        ...(slot.tieStart ? ['        <tie type="start"/>'] : []),
         `        <type>${type}</type>`,
         ...Array.from({ length: dots }, () => '        <dot/>'),
-        ...(tieStop || tieStart ? [
+        ...(slot.tieStop || slot.tieStart ? [
           '        <notations>',
-          ...(tieStop ? ['          <tied type="stop"/>'] : []),
-          ...(tieStart ? ['          <tied type="start"/>'] : []),
+          ...(slot.tieStop ? ['          <tied type="stop"/>'] : []),
+          ...(slot.tieStart ? ['          <tied type="start"/>'] : []),
           '        </notations>',
         ] : []),
         '      </note>',

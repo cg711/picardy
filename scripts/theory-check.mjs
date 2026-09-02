@@ -35,6 +35,7 @@ const { STYLES, barFor, swingBeat, isCompound, pulseOf } = await import(B + 'aud
 const { DRUM_VOICES } = await import(B + 'audio/drums.js')
 const { unfinished: placeholders } = await import(B + 'pages/site.js')
 const { buildMusicXml, progressionToParts, fifthsFor } = await import(B + 'lib/musicxml.js')
+const { layOutMeasures, figureFor } = await import(B + 'lib/leadsheet.js')
 const { readFile } = await import('node:fs/promises')
 
 let fails = 0
@@ -1861,6 +1862,63 @@ console.log('\n--- weighted question choice ---')
     }
   }
   eq('  weighted draws still build a question every time', built, EX_LEVELS.length * 60)
+}
+
+// Where the bar lines and the ties fall is decided once and read by both the
+// MusicXML writer and the engraved staff. Two renderers working it out
+// separately would drift, and the drift would only surface when someone
+// compared a printed part against the screen.
+console.log('\n--- lead-sheet layout ---')
+{
+  const parts = (chart, beats) => {
+    const chords = parseChart(chart).chords
+    return chords.map((chord, i) => ({ chord, inversion: 0, beats: beats?.[i] ?? 4 }))
+  }
+
+  const four = layOutMeasures(parts('| C | F | G | C |'), { timeSignature: '4/4' })
+  eq('  four four-beat chords make four measures', four.length, 4)
+  eq('  every measure is full', four.every((m) => m.slots.reduce((s, x) => s + x.beats, 0) === 4), true)
+  eq('  a measure with no melody is one rest', four[0].slots.length === 1 && four[0].slots[0].midi === null, true)
+  eq('  and it carries its chord', chordSymbol(four[0].slots[0].chord), 'C')
+
+  // Melody notes are split at bar lines and at chord changes, and the split is
+  // marked as a tie so nothing is silently shortened.
+  const tied = layOutMeasures(parts('| C | F |'), {
+    timeSignature: '4/4',
+    melody: [{ at: 2, beats: 4, midi: 60 }],
+  })
+  const spanning = tied.flatMap((m) => m.slots).filter((s) => s.midi === 60)
+  eq('  a note across a bar line becomes two slots', spanning.length, 2)
+  eq('  …the first tied forward', spanning[0].tieStart, true)
+  eq('  …the second tied back', spanning[1].tieStop, true)
+  eq('  …and together they keep the original length', spanning.reduce((s, x) => s + x.beats, 0), 4)
+
+  // Odd metres and ragged lengths, which is where a layout that assumes 4/4
+  // falls over.
+  for (const [tsId, per] of [['3/4', 3], ['5/4', 5], ['7/8', 3.5]]) {
+    const odd = layOutMeasures(parts('| C | F | G |', [per, per, per]), { timeSignature: tsId })
+    eq(`  ${tsId} measures are full`, odd.every((m) => Math.abs(m.slots.reduce((s, x) => s + x.beats, 0) - per) < 1e-9), true)
+  }
+  const ragged = layOutMeasures(parts('| C | F |', [3, 2]), { timeSignature: '4/4' })
+  eq('  a ragged progression still fills its last measure',
+    ragged.every((m) => Math.abs(m.slots.reduce((s, x) => s + x.beats, 0) - 4) < 1e-9), true)
+
+  // Slots must tile their measure exactly — no gap, no overlap.
+  let broken = 0
+  for (const m of [...four, ...tied, ...ragged]) {
+    let at = m.start
+    for (const s of m.slots) {
+      if (Math.abs(s.from - at) > 1e-9) broken++
+      at = s.to
+    }
+    if (Math.abs(at - m.end) > 1e-9) broken++
+  }
+  eq('  slots tile every measure with no gap or overlap', broken, 0)
+
+  // The two renderers must choose the same note value for the same slot.
+  eq('  a half note is a half note in both notations',
+    `${figureFor(2).type}/${figureFor(2).code}`, 'half/h')
+  eq('  a dotted quarter carries its dot', `${figureFor(1.5).code}+${figureFor(1.5).dots}`, 'q+1')
 }
 
 console.log('\n--- MusicXML ---')

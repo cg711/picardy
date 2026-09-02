@@ -46,6 +46,7 @@ import ScalePanel from './components/ScalePanel.jsx'
 import ReharmDialog from './components/ReharmDialog.jsx'
 import LyricTimeline from './components/LyricTimeline.jsx'
 import ExportPanel from './components/ExportPanel.jsx'
+import StaffView from './components/StaffView.jsx'
 import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, usePathname, linkProps } from './lib/router.js'
@@ -1280,6 +1281,7 @@ export default function App() {
                 ['chips', 'Chords'],
                 ['melody', 'Melody'],
                 ['lyrics', 'Lyrics & timing'],
+                ['staff', 'Staff'],
                 ['sections', 'Song structure'],
                 ['export', 'Export'],
               ].map(([id, label]) => (
@@ -1292,6 +1294,18 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {editorView === 'staff' && (
+              <StaffView
+                progression={progression}
+                inversions={inversions}
+                durations={durations}
+                timeSignature={timeSignature}
+                musicKey={musicKey}
+                melody={melody}
+                numeralStyle={numeralStyle}
+              />
+            )}
 
             {editorView === 'export' && (
               <ExportPanel
