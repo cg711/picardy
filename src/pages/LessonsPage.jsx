@@ -34,7 +34,7 @@ function LessonIndex() {
   return (
     <div className="page lessons-page">
       <section className="home-hero lessons-hero">
-        <h2>Lessons</h2>
+        <h1>Lessons</h1>
         <p className="lessons-lede">
           The theory behind the tool, in short articles. Every example is built by the same
           engine that powers the studio — the chord symbols, the roman numerals and the
@@ -88,7 +88,7 @@ function LessonReader({ lesson }) {
         </nav>
 
         <header className="lesson-head">
-          <h2>{lesson.title}</h2>
+          <h1>{lesson.title}</h1>
           <p className="lesson-blurb">{lesson.blurb}</p>
         </header>
 

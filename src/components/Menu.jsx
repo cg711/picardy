@@ -2,6 +2,32 @@ import React, { useEffect, useRef, useState } from 'react'
 import { PAGES } from '../lib/routes.js'
 import { linkProps } from '../lib/router.js'
 
+/** The pages worth a slot in the bar. The legal pages live in the footer. */
+const NAV_ROUTES = ['app', 'backing', 'lessons', 'exercises']
+
+/**
+ * The same destinations as the menu, as visible links on screens wide enough to
+ * hold them. A hamburger on a desktop hides the four things the site is for
+ * behind a click nobody needs to make; CSS swaps the two at the breakpoint.
+ */
+export function TopNav({ route }) {
+  const here = route === 'lesson' ? 'lessons' : route
+  return (
+    <nav className="topnav" aria-label="Main">
+      {PAGES.filter((page) => NAV_ROUTES.includes(page.route)).map((page) => (
+        <a
+          key={page.path}
+          {...linkProps(page.path)}
+          className="topnav-link"
+          aria-current={page.route === here ? 'page' : undefined}
+        >
+          {page.label}
+        </a>
+      ))}
+    </nav>
+  )
+}
+
 /**
  * The site menu.
  *

@@ -218,20 +218,25 @@ export default function BackingPage() {
     return (
       <main className="backing">
         <header className="bk-intro">
-          <h1>Backing tracks</h1>
+          {/* The key sits beside the title rather than under the prose: it
+              changes every card on the shelf, so it is the first decision on
+              the page and should read as one. */}
+          <div className="bk-title-row">
+            <h1>Backing tracks</h1>
+            <label className="bk-keypick">
+              <span className="lbl">Play in</span>
+              <select value={presetKey} onChange={(e) => setPresetKey(e.target.value)}>
+                {BACKING_KEYS.map((k) => (
+                  <option key={k} value={k}>{k.replace('b', '♭')}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p>
             Pick something to play over. Every one is built from scale degrees, so
             it comes out spelled correctly in whichever key you choose — or write
             your own in the <a {...linkProps(TOOL_PATH)}>studio</a> and open it here.
           </p>
-          <label className="ctl bk-keypick">
-            <span className="lbl">Key</span>
-            <select value={presetKey} onChange={(e) => setPresetKey(e.target.value)}>
-              {BACKING_KEYS.map((k) => (
-                <option key={k} value={k}>{k.replace('b', '♭')}</option>
-              ))}
-            </select>
-          </label>
         </header>
 
         <div className="bk-shelf">

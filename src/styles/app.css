@@ -129,7 +129,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 
 .brand { display: flex; align-items: baseline; gap: 10px; text-decoration: none; color: inherit; }
 a.brand:hover .tagline { color: var(--accent); }
-.brand h1 { font-size: 18px; }
+.brand-lock { display: flex; align-items: center; font-size: 18px; font-weight: 700; }
 .tagline { color: var(--text-dim); font-size: 12px; }
 .topbar-right { margin-left: auto; display: flex; gap: 8px; }
 
@@ -166,8 +166,8 @@ a.brand:hover .tagline { color: var(--accent); }
      order of its own it would default to 0 and sit above the progression it is
      describing. The single-chord readout lives inside it now, so there is no
      separate chord panel to place. */
-  .p-instruments { order: 2; }
-  .p-analysis { order: 3; }
+  .p-instruments { order: 3; }
+  .p-analysis { order: 2; }
   .p-recent { order: 4; }
 }
 
@@ -194,7 +194,7 @@ a.brand:hover .tagline { color: var(--accent); }
   background: #ffffff05;
   border-radius: var(--radius) var(--radius) 0 0;
 }
-.panel-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+.panel-head h1, .panel-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
 .panel-head > .muted { font-size: 12px; }
 .panel-head .tabs, .panel-head .fb-controls { margin-left: auto; }
 .panel-head > .btn { margin-left: auto; }
@@ -320,10 +320,16 @@ select { cursor: pointer; }
 .chip-x { background: none; border: 0; color: var(--text-dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
 .chip-x:hover { color: var(--danger); }
 .chip-symbol { font-size: 18px; font-weight: 600; margin: 2px 0; }
-.chip-meta { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+/* One line, always: the card is a fixed height, and "predominant · chromatic"
+   wrapping to two pushed the tool row out of the bottom of it. The full text is
+   on the analysis panel. */
+.chip-meta {
+  font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .chip-controls { display: flex; gap: 3px; margin-top: auto; padding-top: 6px; }
 .chip-controls button {
-  flex: 1; font: inherit; font-size: 10px; padding: 2px; border: 1px solid var(--border-soft);
+  flex: 1; font: inherit; font-size: 11px; padding: 2px; border: 1px solid var(--border-soft);
   background: #14110c; color: var(--text-dim); border-radius: 5px; cursor: pointer;
 }
 .chip-controls button:hover:not(:disabled) { color: var(--text); border-color: var(--border); }
@@ -449,7 +455,7 @@ select { cursor: pointer; }
 .sug-roman { color: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .sug-symbol { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sug-cat {
-  font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 1px solid transparent;
+  font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid transparent;
   white-space: nowrap; text-align: center;
   /* Last resort if a label still cannot fit: shorten it visibly rather than let
      it spill past the pill's own border. */
@@ -494,8 +500,8 @@ select { cursor: pointer; }
   display: inline-flex; align-items: baseline; gap: 3px;
   border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-size: 12px;
 }
-.pill em { font-style: normal; color: var(--text-dim); font-size: 10px; }
-.pill sub { font-size: 9px; color: var(--text-dim); }
+.pill em { font-style: normal; color: var(--text-dim); font-size: 11px; }
+.pill sub { font-size: 11px; color: var(--text-dim); }
 
 /* ---------- piano ---------- */
 
@@ -554,7 +560,7 @@ select { cursor: pointer; }
 .box-dot { fill: var(--accent); }
 .box-mark { text-anchor: middle; fill: var(--text-dim); font-size: 8px; }
 .box-pos { fill: var(--text-dim); font-size: 8px; text-anchor: middle; }
-.box-label { font-size: 9.5px; color: var(--text-dim); text-align: center; line-height: 1.2; }
+.box-label { font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.2; }
 
 .fb-controls { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 12px; }
 .check { display: flex; align-items: center; gap: 5px; color: var(--text-dim); cursor: pointer; }
@@ -583,7 +589,7 @@ select { cursor: pointer; }
      together — a.brand is the tell, since only those pages link the logo. */
   .brand { flex: 1 1 100%; }
   a.brand { flex: 0 1 auto; }
-  .brand h1 { font-size: 16px; white-space: nowrap; }
+  .brand-lock { font-size: 16px; white-space: nowrap; }
   .tagline { display: none; }
   .topbar-right { margin-left: auto; }
   .key-picker { gap: 8px; font-size: 12px; }
@@ -638,13 +644,13 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .prog-chip { position: relative; }
 .prog-chip.bar-start { border-left: 2px solid #574a39; }
 .bar-num {
-  position: absolute; top: -9px; left: 6px; font-size: 9px; letter-spacing: 0.05em;
+  position: absolute; top: -10px; left: 6px; font-size: 11px; letter-spacing: 0.05em;
   color: var(--text-dim); background: var(--surface-1); padding: 0 5px; border-radius: 3px;
   border: 1px solid var(--border-soft); line-height: 1.45; white-space: nowrap;
 }
 .chip-duration { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 .chip-duration select {
-  flex: 1; font-size: 10px; padding: 1px 4px; border-radius: 5px;
+  flex: 1; font-size: 11px; padding: 1px 4px; border-radius: 5px;
   border: 1px solid var(--border-soft); background: #14110c; color: var(--text-dim);
 }
 .dur-meter {
@@ -693,7 +699,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 }
 
 .song-pos {
-  font-size: 10px; opacity: 0.6; min-width: 14px; text-align: right; font-variant-numeric: tabular-nums;
+  font-size: 11px; opacity: 0.6; min-width: 14px; text-align: right; font-variant-numeric: tabular-nums;
 }
 .song-name { font-weight: 600; }
 .song-repeats { display: flex; align-items: center; gap: 2px; font-size: 11px; opacity: 0.8; }
@@ -774,7 +780,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   border: 1px solid var(--border); background: transparent; color: var(--text-dim);
 }
 .scale-chip.on { border-color: var(--accent); color: var(--accent); background: #2a2113; }
-.scale-chip em { font-style: normal; font-size: 9px; opacity: 0.7; margin-left: 5px; }
+.scale-chip em { font-style: normal; font-size: 11px; opacity: 0.7; margin-left: 5px; }
 .scale-notes { display: flex; flex-wrap: wrap; gap: 4px; }
 .scale-note {
   font-size: 12px; padding: 2px 8px; border-radius: 6px;
@@ -799,7 +805,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 }
 .rh-roman { color: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .rh-symbol { font-size: 15px; font-weight: 600; }
-.rh-cat { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.rh-cat { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .rh-why { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
 
 /* ---------- import & analysis ---------- */
@@ -818,7 +824,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   padding: 4px 9px; border-radius: 7px; background: var(--surface-2);
   border: 1px solid var(--border-soft); font-size: 13px; font-weight: 600;
 }
-.an-chord em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--accent); }
+.an-chord em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--accent); }
 .an-chord.chromatic em { color: #f0abfc; }
 .observations { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .observations li {
@@ -882,7 +888,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .fn-cell.chromatic { --fn-tint: #c084fc16; --fn-tint-on: #c084fc2e; border-color: #c084fc55; }
 
 .fn-cadence {
-  margin-top: 3px; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+  margin-top: 3px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--bg); background: var(--fn-ink, var(--accent));
   padding: 1px 5px; border-radius: 999px; white-space: nowrap;
 }
@@ -891,7 +897,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
    only the cadential 6/4. Outlined rather than filled, so it reads as a second
    opinion about the chord above it and not as another badge. */
 .fn-readas {
-  margin-top: 3px; font-size: 9px; letter-spacing: 0.04em;
+  margin-top: 3px; font-size: 11px; letter-spacing: 0.04em;
   color: var(--fn-ink, var(--accent));
   border: 1px solid currentColor; border-radius: 999px;
   padding: 0 5px; white-space: nowrap;
@@ -923,7 +929,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   flex: 0 0 auto; align-self: stretch;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: 0 7px;
-  font-size: 9.5px; line-height: 1.15; text-align: center;
+  font-size: 11px; line-height: 1.15; text-align: center;
   color: var(--accent); white-space: nowrap;
   border-left: 1px dashed var(--accent); border-right: 1px dashed var(--accent);
 }
@@ -931,11 +937,11 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 
 .fn-motion {
   flex: 0 0 auto; align-self: center;
-  font-size: 9.5px; color: var(--text-dim); white-space: nowrap;
+  font-size: 11px; color: var(--text-dim); white-space: nowrap;
   padding: 0 3px; opacity: 0.75;
 }
 
-.fn-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10.5px; color: var(--text-dim); }
+.fn-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--text-dim); }
 .fn-key { display: inline-flex; align-items: center; gap: 4px; }
 .fn-key::before {
   content: ''; width: 8px; height: 8px; border-radius: 2px;
@@ -962,7 +968,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .chip-lyric::placeholder { color: #6e6355; }
 .chip-lyric:focus { border-color: var(--accent); }
 .chip-top { gap: 4px; }
-.pinned-shape { font-size: 10px; color: var(--accent-2); margin-right: auto; }
+.pinned-shape { font-size: 11px; color: var(--accent-2); margin-right: auto; }
 
 .undo-pair { display: flex; gap: 4px; }
 .undo-pair .btn { padding: 6px 10px; font-size: 14px; line-height: 1; }
@@ -991,7 +997,7 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
 .lyric-timeline.dragging { cursor: grabbing; user-select: none; }
 .tl-hint { margin: 0 0 4px; }
 .tl-hint kbd {
-  font: inherit; font-size: 10px; padding: 0 4px; border-radius: 4px;
+  font: inherit; font-size: 11px; padding: 0 4px; border-radius: 4px;
   border: 1px solid var(--border); background: #14110c;
 }
 
@@ -1017,9 +1023,9 @@ select.flavour { font-size: 12px; padding: 4px 8px; }
   display: flex; flex-direction: column; gap: 2px; align-items: center;
   padding-top: 12px; width: 26px; flex: none;
 }
-.tl-line-num { font-size: 9px; color: var(--text-dim); }
+.tl-line-num { font-size: 11px; color: var(--text-dim); }
 .tl-line-actions button {
-  font: inherit; font-size: 10px; width: 20px; height: 18px; line-height: 1; cursor: pointer;
+  font: inherit; font-size: 11px; width: 20px; height: 18px; line-height: 1; cursor: pointer;
   border: 1px solid var(--border-soft); background: #14110c; color: var(--text-dim); border-radius: 4px;
 }
 .tl-line-actions button:hover { color: var(--text); border-color: var(--border); }
@@ -1257,7 +1263,7 @@ a.brand { text-decoration: none; color: inherit; }
 .bk-current strong { font-size: clamp(40px, 9vw, 68px); line-height: 1; letter-spacing: -0.03em; }
 .bk-next { display: flex; align-items: baseline; gap: 10px; margin-left: auto; opacity: 0.65; }
 .bk-next strong { font-size: clamp(20px, 4vw, 30px); line-height: 1; letter-spacing: -0.02em; }
-.bk-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); }
+.bk-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); }
 .bk-roman { font-size: 15px; color: var(--accent); }
 
 /* The chart. auto-fill rather than a fixed count so a long track keeps four
@@ -1279,7 +1285,7 @@ a.brand { text-decoration: none; color: inherit; }
 .bk-bar.on { border-color: var(--accent); background: #4a351226; }
 .bk-barnum {
   position: absolute; top: 6px; left: 9px;
-  font-size: 10px; color: var(--text-dim);
+  font-size: 11px; color: var(--text-dim);
 }
 .bk-section-head {
   grid-column: 1 / -1;
@@ -1297,7 +1303,7 @@ a.brand { text-decoration: none; color: inherit; }
    the symbol is what you read to know what to play. */
 .bk-cell { display: flex; flex-direction: column; gap: 1px; }
 .bk-cell b { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: #d8d0c4; }
-.bk-cell-roman { font-style: normal; font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.02em; }
+.bk-cell-roman { font-style: normal; font-size: 11px; color: var(--text-dim); letter-spacing: 0.02em; }
 .bk-cell.on b { color: var(--accent); }
 .bk-cell.on .bk-cell-roman { color: var(--accent); opacity: 0.8; }
 .bk-cell.tied { opacity: 0.4; }
@@ -1305,10 +1311,15 @@ a.brand { text-decoration: none; color: inherit; }
 
 /* ---------- the shelf of ready-made tracks ---------- */
 
-.bk-intro h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 10px; }
+.bk-title-row { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; margin: 0 0 10px; }
+.bk-intro h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0; }
 .bk-intro p { margin: 0 0 14px; max-width: 62ch; font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
 .bk-intro a { color: var(--accent); }
-.bk-keypick { display: inline-flex; }
+.bk-keypick { display: inline-flex; align-items: center; gap: 8px; }
+.bk-keypick select {
+  font-size: 16px; font-weight: 600; padding: 7px 12px; min-height: 40px;
+  color: var(--accent); border-color: #6b4d1a;
+}
 
 .bk-shelf {
   display: grid;
@@ -1398,10 +1409,6 @@ a.brand { text-decoration: none; color: inherit; }
   font-size: 13px; text-transform: uppercase; letter-spacing: 0.09em;
   color: var(--text-dim); margin: 0 0 16px;
 }
-.section-lead {
-  margin: -8px 0 16px; max-width: 62ch;
-  font-size: 13.5px; line-height: 1.6; color: var(--text-dim);
-}
 
 /* auto-fit rather than a fixed column count: a third tool drops in without the
    grid needing to be told about it, and one tool still fills the row. */
@@ -1436,16 +1443,6 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .pitch p { margin: 0; padding-left: 12px; font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
 
-.topic-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.topic-list a {
-  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-  padding: 11px 12px; border-radius: 8px;
-  color: inherit; text-decoration: none;
-  border-bottom: 1px solid var(--border-soft);
-}
-.topic-list a:hover { background: #ffffff08; }
-.topic-list strong { flex: 0 0 auto; min-width: 140px; font-size: 14px; font-weight: 600; }
-.topic-list span { flex: 1 1 260px; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
 
 .home-closing {
   border-top: 1px solid var(--border-soft);
@@ -1457,8 +1454,7 @@ a.brand { text-decoration: none; color: inherit; }
   .home { gap: 36px; }
   .home-hero { padding-top: 26px; }
   .hero-actions .btn { flex: 1 1 auto; text-align: center; }
-  .topic-list strong { min-width: 0; flex-basis: 100%; }
-}
+  }
 
 /* ---------- exercises ---------- */
 
@@ -1759,7 +1755,7 @@ a.brand { text-decoration: none; color: inherit; }
 .song-chip.playing { box-shadow: 0 0 0 2px var(--accent-2) inset; }
 .song-pos {
   position: absolute; top: -9px; left: 8px;
-  font-size: 10px; padding: 1px 6px; border-radius: 5px;
+  font-size: 11px; padding: 1px 6px; border-radius: 5px;
   background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--text-dim);
 }
 .song-chip-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; }
@@ -1769,7 +1765,7 @@ a.brand { text-decoration: none; color: inherit; }
   font-size: 12px; color: var(--text); opacity: 0.82;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.song-chip-meta { font-size: 10.5px; color: var(--text-dim); }
+.song-chip-meta { font-size: 11px; color: var(--text-dim); }
 .song-chip-controls { display: flex; align-items: center; gap: 4px; }
 .song-chip-controls button {
   font: inherit; font-size: 12px; line-height: 1; padding: 3px 7px; cursor: pointer;
@@ -1855,7 +1851,7 @@ a.brand { text-decoration: none; color: inherit; }
   gap: 12px;
 }
 .topbar .brand { align-items: center; min-width: 0; }
-.topbar .brand h1 { display: flex; align-items: center; }
+.topbar .brand-lock { display: flex; align-items: center; }
 .topbar-right { align-items: center; flex: none; }
 /* Things get sacrificed for width in order of how little they carry: the
    tagline first, then the size of the actions, then the wordmark — the mark
@@ -1921,7 +1917,7 @@ a.brand { text-decoration: none; color: inherit; }
 .chip-inversion { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
 .chip-inversion select { flex: 1; min-width: 0; font-size: 11px; padding: 3px 5px; }
 .chip-inv-badge {
-  flex: 1; text-align: center; font-size: 10px; padding: 2px 4px; border-radius: 5px;
+  flex: 1; text-align: center; font-size: 11px; padding: 2px 4px; border-radius: 5px;
   color: var(--text-dim); background: #00000030; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
@@ -1987,7 +1983,7 @@ a.brand { text-decoration: none; color: inherit; }
   padding: 2px 4px; border: 1px solid var(--border-soft); border-radius: 6px;
   background: #14110c;
 }
-.tuning-num { font-size: 9px; color: var(--text-dim); width: 8px; text-align: center; }
+.tuning-num { font-size: 11px; color: var(--text-dim); width: 8px; text-align: center; }
 .tuning-string button {
   font: inherit; font-size: 12px; line-height: 1; width: 18px; height: 18px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -2020,7 +2016,7 @@ a.brand { text-decoration: none; color: inherit; }
 .tl-line-num {
   flex: 0 0 auto; width: 18px; height: 18px; border-radius: 4px;
   display: grid; place-items: center;
-  font-size: 10px; color: var(--text-dim); background: #ffffff0d;
+  font-size: 11px; color: var(--text-dim); background: #ffffff0d;
 }
 /* The line as one sentence: what it reads like, and where you type it. */
 .line-field {
@@ -2055,7 +2051,7 @@ a.brand { text-decoration: none; color: inherit; }
 .lyric-cell.lead-in.filled { flex: 1 1 92px; }
 .lyric-cell.lead-in input { background: #100d09; }
 .lyric-cell.lead-in .lyric-cell-chord {
-  font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
 }
 
 .lyric-cell-chord {
@@ -2068,7 +2064,7 @@ a.brand { text-decoration: none; color: inherit; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .lyric-chord-name:hover { text-decoration: underline; }
-.lyric-chord-roman { font-size: 9px; color: var(--text-dim); flex: 0 0 auto; }
+.lyric-chord-roman { font-size: 11px; color: var(--text-dim); flex: 0 0 auto; }
 /* The line-break toggle. Dim until you go near the cell, lit when this chord is
    the one that starts a line — so the breaks in a lyric are visible at a glance
    without a control shouting on every column. */
@@ -2101,7 +2097,7 @@ a.brand { text-decoration: none; color: inherit; }
 /* ---- Lessons ------------------------------------------------------------ */
 
 .lessons-hero { padding: 40px 0 0; }
-.lessons-hero h2 {
+.lessons-hero h1 {
   font-size: clamp(30px, 6vw, 46px);
   line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 16px;
 }
@@ -2136,7 +2132,7 @@ a.brand { text-decoration: none; color: inherit; }
 .lesson-crumb { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .lesson-crumb a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
 .lesson-crumb a:hover { color: var(--accent); }
-.lesson-head h2 {
+.lesson-head h1 {
   font-size: clamp(27px, 5.5vw, 40px);
   line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 12px;
 }
@@ -2248,7 +2244,7 @@ a.brand { text-decoration: none; color: inherit; }
 .ex-result-score b { font-size: 30px; color: var(--accent); font-variant-numeric: tabular-nums; }
 .ex-result-body p { margin: 0; }
 .ex-result-best {
-  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--accent-ink); background: var(--accent);
   padding: 2px 8px; border-radius: 999px;
 }
@@ -2274,3 +2270,105 @@ a.brand { text-decoration: none; color: inherit; }
 }
 .capo-advice strong { color: var(--accent); font-weight: 600; }
 .capo-shapes { color: var(--ink); }
+
+/* ---------- design pass: nav, calm chips, transport, hit areas ---------- */
+
+/* Desktop gets the four destinations as visible links; phones keep the menu.
+   Both topbars carry both, and this breakpoint decides which one shows. */
+.topnav { display: none; align-items: center; gap: 2px; }
+.topnav-link {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px;
+  border-radius: 7px; font-size: 13.5px; color: var(--text-dim);
+  text-decoration: none; white-space: nowrap;
+}
+.topnav-link:hover { color: var(--text); background: #ffffff08; }
+.topnav-link[aria-current='page'] { color: var(--accent); }
+.topnav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (min-width: 900px) {
+  .topnav { display: flex; }
+  .topbar .menu-wrap { display: none; }
+}
+/* The studio bar also holds the tagline and Share; the tagline gives way first. */
+@media (max-width: 1239px) {
+  .topbar .tagline { display: none; }
+}
+
+/* A chip at rest shows what the chord is: numeral, symbol, function, length.
+   The tools for changing it appear on the chip you are working on — selected,
+   hovered or holding keyboard focus. Faded rather than removed, so revealing
+   them never reflows the strip, and still in the tab order, so keyboard users
+   reach them and focus-within brings them back. */
+.prog-chip .chip-x, .prog-chip .chip-inversion, .prog-chip .chip-controls { transition: opacity 120ms; }
+.prog-chip:not(.active):not(:hover):not(:focus-within) :is(.chip-x, .chip-inversion, .chip-controls) {
+  opacity: 0; pointer-events: none;
+}
+.prog-chip:not(.active):not(:hover):not(:focus-within) .chip-duration select {
+  border-color: transparent; background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prog-chip .chip-x, .prog-chip .chip-inversion, .prog-chip .chip-controls { transition: none; }
+}
+
+/* Hit areas: 24px minimum everywhere, 44px on touch screens for anything that
+   is not packed inside a chord card. */
+.chip-x { width: 24px; height: 24px; }
+.chip-controls button { min-height: 24px; }
+.btn.tiny { min-height: 26px; }
+.foot-links a { display: inline-flex; align-items: center; min-height: 24px; }
+@media (pointer: coarse) {
+  .foot-links { gap: 0 20px; }
+  .foot-links a, .topnav-link { min-height: 44px; }
+  .menu-item { display: flex; align-items: center; min-height: 44px; }
+  .chip-controls button { min-height: 28px; }
+}
+
+/* Transport: the controls you use while writing, then the ones you set once. */
+.transport { flex-direction: column; align-items: stretch; gap: 0; }
+.transport-main, .transport-more { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+.transport-more {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-soft);
+}
+.transport-more[hidden], .transport .ctl[hidden] { display: none; }
+.transport-toggle {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; min-height: 32px;
+}
+.transport-toggle.on { border-color: var(--accent); }
+.transport-summary {
+  color: var(--text-dim); max-width: 30ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.transport-caret { font-size: 11px; transition: transform 120ms; }
+.transport-toggle.on .transport-caret { transform: rotate(180deg); }
+@media (max-width: 560px) {
+  .transport-summary { display: none; }
+}
+
+/* ---------- home hero demo ---------- */
+
+.home > .home-hero {
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 32px 44px; align-items: center;
+}
+.home > .home-hero .hero-sub { max-width: 44ch; }
+@media (max-width: 860px) {
+  .home > .home-hero { grid-template-columns: minmax(0, 1fr); }
+}
+.hero-demo {
+  margin: 0; padding: 18px; min-width: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface-1), #15120dcc);
+  box-shadow: 0 24px 60px #00000055;
+}
+.hero-demo-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hero-demo-play { min-width: 76px; }
+.hero-demo-map { list-style: none; margin: 0; padding: 0; gap: 6px; overflow: visible; }
+.hero-demo-map .fn-cell { flex: 1 1 0; min-width: 0; cursor: default; padding: 14px 4px 11px; }
+.hero-demo-cadence { margin: -4px 0 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.hero-demo-cadence .fn-cadence { margin: 0; }
+.hero-demo-map .fn-roman { font-size: 19px; }
+.hero-demo-map .fn-sym { font-size: 13px; }
+.hero-demo-note { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+.hero-demo-link { align-self: flex-start; font-size: 13px; color: var(--accent); text-decoration: none; }
+.hero-demo-link:hover { text-decoration: underline; }

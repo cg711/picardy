@@ -50,7 +50,7 @@ import MelodyRoll from './components/MelodyRoll.jsx'
 import { exportChart } from './lib/pdf.js'
 import { useRoute, usePathname, linkProps } from './lib/router.js'
 import { legacyToolPath, pageFor, BACKING_PATH } from './lib/routes.js'
-import Menu from './components/Menu.jsx'
+import Menu, { TopNav } from './components/Menu.jsx'
 import SiteFooter from './components/SiteFooter.jsx'
 import LegalPage from './pages/LegalPage.jsx'
 import ExercisesPage from './pages/ExercisesPage.jsx'
@@ -1203,10 +1203,14 @@ export default function App() {
     return (
       <div className="app">
         <header className="topbar">
-          <a className="brand" {...linkProps('/')}>
-            <h1><Lockup /></h1>
+          {/* A link, not a heading: the page's own title is its h1, and a
+              wordmark repeated as the top heading of every page tells a screen
+              reader nothing about which page this is. */}
+          <a className="brand" {...linkProps('/')} aria-label="Picardy home">
+            <span className="brand-lock"><Lockup /></span>
           </a>
           <div className="topbar-right">
+            <TopNav route={route} />
             <Menu route={route} />
           </div>
         </header>
@@ -1224,8 +1228,8 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         {/* A link now that there is a front page to go back to. */}
-        <a className="brand" {...linkProps('/')}>
-          <h1><Lockup /></h1>
+        <a className="brand" {...linkProps('/')} aria-label="Picardy home">
+          <span className="brand-lock"><Lockup /></span>
           <span className="tagline">fretboard &amp; keyboard progression explorer</span>
         </a>
         {/* The key and transpose controls moved down to the progression they act
@@ -1235,6 +1239,7 @@ export default function App() {
           <button className="btn ghost share-btn" onClick={copyShare} disabled={!progression.length}>
             {copied ? 'Link copied' : 'Share link'}
           </button>
+          <TopNav route={route} />
           <Menu route={route} />
         </div>
       </header>
@@ -1243,7 +1248,8 @@ export default function App() {
         <section className="col col-left">
           <div className="panel p-progression">
             <div className="panel-head">
-              <h2>Studio</h2>
+              {/* The page's one h1, now that the wordmark is a plain link. */}
+              <h1>Studio</h1>
             </div>
 
             {/* Both of these read or rewrite the progression below: which key the

@@ -43,7 +43,9 @@ export function SaveSectionRow({ canSave, onSave, savedNote }) {
       <datalist id="section-name-options">
         {SEGMENT_NAMES.map((n) => <option key={n} value={n} />)}
       </datalist>
-      <button className="btn primary" onClick={save} disabled={!canSave}>
+      {/* Ghost, not filled: Play is the one primary action on this panel, and
+          two filled buttons a few pixels apart made neither the obvious one. */}
+      <button className="btn ghost" onClick={save} disabled={!canSave}>
         Save progression as section
       </button>
       {savedNote ? (

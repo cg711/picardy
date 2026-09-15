@@ -320,7 +320,9 @@ is its own track on its own channel, which is what makes a DAW open it as a sepa
 than a lump of notes inside the comping.
 
 **Practice transport.** Loop, a count-in bar of clicks, and playback feels beyond block chords:
-strum, arpeggio, and bass + comp.
+strum, arpeggio, and bass + comp. Play, tempo and loop sit in the bar; metre, new-chord length,
+sound, style, volume, count-in and speed-up fold behind a *Playback* toggle whose label summarises
+what they are set to, because they are set once and left.
 
 **Lyrics under their chords.** Each line is a card: the whole line in one editable field at the
 top, and under it a row of chord-over-words cells, one column per chord. Typing in the line field
@@ -433,11 +435,18 @@ Where it will insert is not stored anywhere. It is always `activeIndex + 1` — 
 
 *Save as section* stays outside the Sections tab on purpose: it acts on the
 progression, not on the library, so it should not hide behind the tab that lists
-what you have already saved.
+what you have already saved. It is a ghost button: Play is the one filled button on the panel.
+
+**Chips have a resting state.** At rest a chip shows the numeral, the symbol, the function and the
+length. Remove, inversion, drag, move and reharmonise appear on the selected chip, on hover, and on
+keyboard focus. They fade out rather than leaving the layout, so revealing them never reflows the
+strip, and they stay in the tab order so `:focus-within` can bring them back. Icon buttons have a
+24px minimum hit area, and 44px on touch screens for anything not packed inside a card. No HTML
+text is set below 11px.
 
 Stacked below 1100px the columns stop being a spatial grouping and become a reading
 order, so `display: contents` drops the wrappers and the panels re-flow into
-workflow order instead of column order.
+workflow order instead of column order: progression, then its analysis, then the instruments.
 
 Inside a panel, `.sub-head` names each part — a hairline and a quiet label, not a
 second run of panel chrome, which would just rebuild the borders that grouping
@@ -477,9 +486,15 @@ a minimum ΔE from the accent and from every other tone. Retune those by the num
 `/` is the landing page — what Picardy is, the tools, and links into them. `/tool` is the studio,
 `/backing` the backing-track player, `/exercises` the drills, `/lessons` the written theory,
 `/privacy` and `/terms` the legal
-text. The menu in the
-top bar and the footer are both generated from `PAGES` in `src/lib/routes.js`, so a new page appears
-in both by adding one entry.
+text. The top-bar links, the phone menu and the footer are all generated from `PAGES` in
+`src/lib/routes.js`, so a new page appears in all three by adding one entry. From 900px up the top bar
+shows Studio, Backing tracks, Lessons and Exercises as links; below that they fold into the menu.
+
+The hero carries a working example rather than a paragraph about one: `HeroDemo` plays Am–Dm–E7–A
+and shows the engine's own reading of it — numerals, function colours, the cadence, and the note
+that the final A brings in a C♯. Nothing in it is typed, so it cannot drift from the analysis.
+
+Each page has exactly one `h1`, its own title. The wordmark in the top bar is a plain link.
 
 `/lessons/<slug>` is the one path that takes an argument. Lessons are known at build time, so
 `routeFor` stays a membership test against a fixed list rather than growing a wildcard — an unknown
@@ -714,7 +729,7 @@ reporting the more useful truth.
 
 ## Legal pages
 
-`/privacy` and `/terms`, reachable from the menu in the top bar and from the footer. They are
+`/privacy` and `/terms`, reachable from the footer on every page and from the menu on phones. They are
 drafts written to describe what the app actually does, and they have not been reviewed by a lawyer.
 
 Three facts have to come from you — who is legally responsible, a contact address, and which state's

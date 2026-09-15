@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { linkProps } from '../lib/router.js'
 import { TOOL_PATH, BACKING_PATH } from '../lib/routes.js'
-import { LEVELS } from '../theory/exercises.js'
+import HeroDemo from '../components/HeroDemo.jsx'
 
 /**
  * The tools, as cards. Kept as data so the grid and the "what you can do" list
@@ -89,25 +89,43 @@ export default function HomePage() {
 
   return (
     <main className="home">
+      {/* Words on one side, the product working on the other. A paragraph
+          describing the analysis was a weaker argument than four chords you can
+          press play on and watch it happen to. */}
       <section className="home-hero">
-        <h1>
-          Chord progressions,
-          <br />
-          <span className="hero-accent">explained.</span>
-        </h1>
-        <p className="hero-sub">
-          A fretboard and keyboard progression explorer. Enter chords, get ranked
-          suggestions for what could come next — from plain diatonic moves through
-          borrowed chords, applied dominants and tritone subs — each with a roman
-          numeral, a reason, and a live view on both instruments.
-        </p>
-        <div className="hero-actions">
-          <a className="btn primary hero-cta" {...linkProps(TOOL_PATH)}>Open the studio</a>
-          <a className="btn ghost hero-cta" {...linkProps('/exercises')}>Try the exercises</a>
+        <div className="hero-copy">
+          <h1>
+            Chord progressions,
+            <br />
+            <span className="hero-accent">explained.</span>
+          </h1>
+          <p className="hero-sub">
+            Write chords and Picardy tells you what each one is doing, how the phrase
+            closes, and what could come next.
+          </p>
+          <div className="hero-actions">
+            <a className="btn primary hero-cta" {...linkProps(TOOL_PATH)}>Open the studio</a>
+            <a className="btn ghost hero-cta" {...linkProps('/exercises')}>Try the exercises</a>
+          </div>
+          <p className="hero-note">
+            Free, no account, nothing to install.
+          </p>
         </div>
-        <p className="hero-note">
-          Free, no account, nothing to install.
-        </p>
+        <HeroDemo />
+      </section>
+
+      {/* The reasons come before the catalogue: someone deciding whether to
+          trust a theory tool wants to know how it thinks before what it has. */}
+      <section className="home-section">
+        <h2>Why it is built this way</h2>
+        <div className="pitch-grid">
+          {PITCH.map((item) => (
+            <div key={item.title} className="pitch">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="home-section">
@@ -126,38 +144,6 @@ export default function HomePage() {
             </a>
           ))}
         </div>
-      </section>
-
-      <section className="home-section">
-        <h2>Why it is built this way</h2>
-        <div className="pitch-grid">
-          {PITCH.map((item) => (
-            <div key={item.title} className="pitch">
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-section">
-        <h2>Practice topics</h2>
-        <p className="section-lead">
-          Six sets of drills, generated from the same engine the tool runs on — so the
-          answers here and the analysis there can never disagree.
-        </p>
-        {/* Read from LEVELS rather than retyped: a topic added to the drill shows
-            up on the front page by itself, and cannot be described wrongly. */}
-        <ul className="topic-list">
-          {LEVELS.map((level) => (
-            <li key={level.id}>
-              <a {...linkProps('/exercises')}>
-                <strong>{level.label}</strong>
-                <span>{level.blurb}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="home-section home-closing">
